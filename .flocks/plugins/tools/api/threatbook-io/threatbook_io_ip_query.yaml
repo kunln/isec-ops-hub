@@ -1,0 +1,43 @@
+name: threatbook_io_ip_query
+description: >
+  Query IP threat intelligence including reputation verdict, geolocation,
+  threat types, and associated malware samples. Use when analyzing
+  suspicious IP addresses during security incident investigation.
+description_cn: 查询IP威胁情报，包括信誉判定、地理位置、威胁类型和关联恶意样本。用于安全事件调查中分析可疑IP。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    resource:
+      type: string
+      description: Single IPv4 or IPv6 address to query
+    exclude:
+      type: string
+      description: >
+        Comma-separated parameters to exclude from response. Options:
+        asn, ssl_certs, intelligences, judgments, tags_classes,
+        samples, update_time, pdns_count, scene
+      required: false
+  required: [resource]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v2/ip/query"
+  query_params:
+    resource: "{resource}"
+    exclude: "{exclude}"
+  timeout: 30
+
+response:
+  extract: "data"
+  error_mapping:
+    400: "Invalid request parameters"
+    401: "API key invalid or expired"
+    405: "Invalid API method"
+    429: "Rate limit exceeded"
+    500: "System error"

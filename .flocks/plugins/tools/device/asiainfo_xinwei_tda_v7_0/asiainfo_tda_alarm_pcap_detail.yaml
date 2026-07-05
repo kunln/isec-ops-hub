@@ -1,0 +1,21 @@
+name: asiainfo_tda_alarm_pcap_detail
+description: Parse a TDA alarm PCAP by flow ID and return decoded packet details without downloading or exporting the PCAP file.
+description_cn: 按 flow_id 解析 TDA 告警关联 PCAP，返回解码后的报文详情；不下载、不导出 PCAP 文件。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties:
+    flow_id:
+      type: string
+      description: 会话唯一标识。可来自 TDA 告警或威胁情报告警记录，例如 585749449644348499。
+  required:
+    - flow_id
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: alarm_pcap_detail

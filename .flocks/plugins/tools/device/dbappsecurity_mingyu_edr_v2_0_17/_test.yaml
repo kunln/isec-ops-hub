@@ -1,0 +1,131 @@
+schema_version: 1
+provider: dbappsecurity_edr_api
+
+# Service-level connectivity probe.
+# The vendor PDF does not document a standalone token validation endpoint.
+# /node/list with page=1/limit=1 is a lightweight tenant-side read-only call
+# that validates base_url, Cookie/Token credentials, and asset-list permission.
+connectivity:
+  tool: mingyu_edr_health
+  params: {}
+
+fixtures:
+  mingyu_edr_health:
+    - label: "Probe asset list"
+      label_cn: "最小化资产列表探针"
+      tags: [smoke]
+      params: {}
+      assert:
+        success: true
+
+  mingyu_edr_assets:
+    - label: "List assets"
+      label_cn: "查询资产列表"
+      tags: [smoke, asset]
+      params:
+        action: list
+        page: 1
+        limit: 50
+      assert:
+        success: true
+
+    - label: "Get terminal details"
+      label_cn: "查询终端详情"
+      tags: [asset]
+      params:
+        action: details
+        node_id: "node-id"
+
+  mingyu_edr_security_findings:
+    - label: "List antivirus findings"
+      label_cn: "查询病毒扫描结果"
+      tags: [smoke, finding]
+      params:
+        action: antivirus_virus_list
+        page: 1
+        limit: 50
+      assert:
+        success: true
+
+    - label: "List Windows vulnerabilities"
+      label_cn: "查询 Windows 漏洞列表"
+      tags: [vulnerability]
+      params:
+        action: win_vuln_list
+        page: 1
+        limit: 50
+
+  mingyu_edr_policy:
+    - label: "List policy templates"
+      label_cn: "查询策略模板列表"
+      tags: [smoke, policy]
+      params:
+        action: template_list
+        page: 1
+        limit: 50
+      assert:
+        success: true
+
+  mingyu_edr_logs:
+    - label: "List protection logs"
+      label_cn: "查询防护日志列表"
+      tags: [smoke, log]
+      params:
+        action: protection_list
+        page: 1
+        limit: 50
+      assert:
+        success: true
+
+    - label: "List operation logs"
+      label_cn: "查询运维日志列表"
+      tags: [log]
+      params:
+        action: operation_list
+        page: 1
+        limit: 50
+
+  mingyu_edr_reports:
+    - label: "Get EDR event trend"
+      label_cn: "查询 EDR 事件趋势"
+      tags: [smoke, report]
+      params:
+        action: edr_event_trend
+      assert:
+        success: true
+
+  mingyu_edr_info_search:
+    - label: "Get information-search time"
+      label_cn: "查询信息搜索最新时间"
+      tags: [smoke, info-search]
+      params:
+        action: time
+      assert:
+        success: true
+
+    - label: "List process snapshots"
+      label_cn: "查询运行程序快照"
+      tags: [info-search]
+      params:
+        action: process
+        page: 1
+        limit: 50
+
+  mingyu_edr_risk_baseline:
+    - label: "List risk assets"
+      label_cn: "查询风险资产列表"
+      tags: [smoke, risk]
+      params:
+        action: risk_assets
+        page: 1
+        limit: 50
+      assert:
+        success: true
+
+    - label: "List baseline tasks"
+      label_cn: "查询基线任务列表"
+      tags: [baseline]
+      params:
+        action: baseline_task_list
+        page: 1
+        limit: 50

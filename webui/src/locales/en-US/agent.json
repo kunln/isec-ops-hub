@@ -1,0 +1,86 @@
+{
+  "pageTitle": "AI Agents",
+  "pageDescription": "Manage and configure AI Agents",
+  "createSubAgent": "Create Sub-Agent",
+  "confirmDelete": "Are you sure you want to delete Agent \"{{name}}\"?",
+  "deleteFailed": "Delete failed",
+  "emptyState": {
+    "title": "No Agents",
+    "description": "Create your first Agent"
+  },
+  "section": {
+    "primary": {
+      "title": "Primary Agent",
+      "subtitle": "Directly interacts with users, analyzes tasks and coordinates sub-agents"
+    },
+    "sub": {
+      "title": "Sub-Agents",
+      "subtitle": "Specialized executors scheduled by the primary agent, each handling specific tasks"
+    }
+  },
+  "totalCount": "{{total}} Agents",
+  "badge": {
+    "native": "Built-in",
+    "custom": "Custom",
+    "delegatable": "Delegatable",
+    "delete": "Delete",
+    "edit": "Edit",
+    "nativeDeleteDisabled": "Built-in agents cannot be deleted"
+  },
+  "filter": {
+    "all": "All",
+    "builtin": "Built-in",
+    "custom": "Custom",
+    "aria": "Filter by source"
+  },
+  "pagination": {
+    "info": "{{start}}–{{end}} of {{total}}"
+  },
+  "form": {
+    "name": "Name",
+    "description": "Description (English)",
+    "descriptionHint": "Used for delegation and model context; English by convention",
+    "descriptionPlaceholder": "Short English description for delegation",
+    "descriptionCn": "Chinese (UI)",
+    "descriptionCnPlaceholder": "Optional Chinese label for the UI",
+    "mode": "Mode",
+    "model": "Model",
+    "temperature": "Temperature",
+    "systemDefault": "System Default",
+    "otherCategory": "Other",
+    "selectAll": "Select All",
+    "selected": "{{count}} selected",
+    "clearSelection": "Clear",
+    "noTools": "No tools available",
+    "noSkills": "No skills available",
+    "loadingTools": "Loading tools...",
+    "loadingSkills": "Loading skills...",
+    "primaryModeLabel": "Primary (Primary Agent)",
+    "subagentModeLabel": "Subagent (Sub-Agent)",
+    "nativeReadOnlyPrefix": "Built-in Agent only supports modifying ",
+    "nativeReadOnlyAnd": " and ",
+    "nativeReadOnlySuffix": ", other configurations are maintained by the system",
+    "rexAssistWrite": "Rex Assist Writing",
+    "color": "Color",
+    "colorOptional": "(Optional)"
+  },
+  "error": {
+    "updateFailed": "Update failed: {{detail}}",
+    "extractTimeout": "Extraction timed out. Please ask Rex to output the configuration in JSON format in the conversation, then try again.",
+    "requiredFields": "Please fill in required fields",
+    "createFailed": "Create failed: {{message}}"
+  },
+  "sheet": {
+    "done": "Done"
+  },
+  "chat": {
+    "createTitle": "Create Sub-Agent",
+    "subtitle": "Describe your needs through conversation, AI generates configuration automatically",
+    "preparing": "Preparing creator...",
+    "placeholder": "Describe the Agent you want to create... (Enter to send)"
+  },
+  "dialog": {
+    "createTitle": "Create Agent",
+    "editTitle": "Edit Agent: {{name}}"
+  }
+}

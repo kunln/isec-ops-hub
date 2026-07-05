@@ -1,0 +1,34 @@
+name: threatbook_io_file_upload
+description: >
+  Upload a file to ThreatBook sandbox for malware analysis. Supports PE, Office,
+  PDF, HTML, scripts, and archive formats up to 100MB. Use when analyzing
+  suspicious files from email attachments or endpoint detections.
+description_cn: 上传文件到威胁情报沙箱进行恶意软件分析，支持PE、Office、PDF、HTML等格式，最大100MB。用于分析邮件附件或终端检测到的可疑文件。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    file_path:
+      type: string
+      description: Local path to the file to upload for analysis
+    sandbox_type:
+      type: string
+      description: >
+        Sandbox environment. Options: win7_sp1_enx64_office2013, win7_sp1_enx86_office2013,
+        win7_sp1_enx86_office2010, win7_sp1_enx86_office2007, win7_sp1_enx86_office2003,
+        win10_1903_enx64_office2016, ubuntu_1704_x64, centos_7_x64, kylin_desktop_v10
+      default: "win7_sp1_enx86_office2013"
+    run_time:
+      type: integer
+      description: Sandbox execution time in seconds (default 60, max 300)
+      default: 60
+  required: [file_path]
+
+handler:
+  type: script
+  script_file: threatbook_io_file_upload.handler.py
+  function: file_upload

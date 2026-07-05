@@ -1,0 +1,47 @@
+name: mingyu_apt_platform_status
+description: 查询明御 APT 探测器列表和系统资源折线图，适合排查探测器状态、版本、近 24 小时/7 天风险计数和 CPU/内存/磁盘使用率。
+description_cn: 查询明御 APT 平台状态，只读支持探测器列表和指定探测器系统资源趋势。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingyu_apt_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: detector_list=探测器列表；system_status_line=系统资源折线图。
+      enum:
+        - detector_list
+        - system_status_line
+      default: detector_list
+    poid:
+      type: integer
+      description: 探测器 ID。action=system_status_line 时必填，可从 detector_list 返回的 id 获取。
+    time_ago:
+      type: string
+      description: 系统资源时间范围：h1、h3、h6、h12、h24、d3、d7、d14、d30。
+      enum:
+        - h1
+        - h3
+        - h6
+        - h12
+        - h24
+        - d3
+        - d7
+        - d14
+        - d30
+      default: h24
+    begin:
+      type: string
+      description: 自定义开始时间，格式 yyyy-MM-dd HH:mm:ss。不填时使用 time_ago。
+    end:
+      type: string
+      description: 自定义结束时间，格式 yyyy-MM-dd HH:mm:ss。不填时使用 time_ago。
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_apt.handler.py
+  function: platform_status

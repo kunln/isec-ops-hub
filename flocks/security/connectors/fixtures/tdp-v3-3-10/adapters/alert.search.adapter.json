@@ -1,0 +1,23 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "alert.search",
+  "transport": "tool",
+  "tool": {
+    "name": "tdp_log_search",
+    "params": {
+      "action": "search",
+      "net_data_type": ["attack", "risk", "action"],
+      "size": 20,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": ["data.list", "data.rows", "data.items", "result.list", "result.hits", "hits", "list", "rows", "items"],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/alert.search.mapping.json",
+  "pagination": {
+    "type": "size",
+    "size_param": "size"
+  }
+}

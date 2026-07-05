@@ -1,0 +1,36 @@
+name: threatbook_io_report_detail
+description: >
+  Retrieve detailed threat intelligence report including severity, threat types, summary,
+  tags, targeted industries/regions/organizations/products, impacts, ATT&CK techniques,
+  IOCs, and detection rules. Use when investigating specific threat intelligence reports.
+description_cn: 获取威胁情报报告详情，包括严重程度、威胁类型、摘要、标签、目标行业/地区/组织/产品、影响、ATT&CK技术、IOC和检测规则。用于调查特定威胁情报报告。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    id:
+      type: string
+      description: Unique identifier of the report
+  required: [id]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v2/reports/{id}"
+  path_params:
+    id: "{id}"
+  timeout: 30
+
+response:
+  extract: "data"
+  error_mapping:
+    204: "Report not found"
+    400: "Invalid request parameters"
+    401: "API key invalid or expired"
+    405: "Invalid API method"
+    429: "Rate limit exceeded"
+    500: "System error"

@@ -1,0 +1,39 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "alert.search",
+  "transport": "tool",
+  "tool": {
+    "name": "mingyu_apt_safe_event",
+    "params": {
+      "action": "list",
+      "days": 7,
+      "offset": 0,
+      "limit": 100,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": [
+        "data.list",
+        "data.rows",
+        "data.items",
+        "result.list",
+        "result.rows",
+        "eventList",
+        "safeEventList",
+        "events",
+        "alarms",
+        "list",
+        "rows",
+        "items",
+        "records"
+      ],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/alert.search.mapping.json",
+  "pagination": {
+    "type": "offset",
+    "offset_param": "offset",
+    "size_param": "limit"
+  }
+}

@@ -1,0 +1,44 @@
+name: asiainfo_tda_raw_events
+description: Query AsiaInfo Security Xinwei TDA 2025.6 raw alert events with signed read-only API access.
+description_cn: 查询亚信安全信桅 TDA 2025.6 原始告警，支持时间范围、flow_id、攻击/受害 IP、威胁名称和分页筛选。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties:
+    time_type:
+      type: integer
+      description: 时间类型：1 今日，2 最近 7 日，3 最近 14 日，4 最近 30 日，5 自定义。
+      default: 2
+    time_limit:
+      type: string
+      description: 自定义时间范围，time_type=5 时使用，格式为起止时间戳英文逗号分隔。
+    flow_id:
+      type: string
+      description: 流量会话 ID。
+    attacker_addr:
+      type: string
+      description: 攻击 IP。
+    victim_addr:
+      type: string
+      description: 被攻击 IP。
+    threat_desc:
+      type: string
+      description: 威胁名称。
+    page:
+      type: integer
+      description: 第几页，默认 1。
+      default: 1
+    limit:
+      type: integer
+      description: 每页条数，默认 100，最大 500。
+      default: 100
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: raw_events

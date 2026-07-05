@@ -1,0 +1,44 @@
+name: mingyu_edr_assets
+description: Query Mingyu EDR read-only asset inventory, fingerprint details, ports, processes, accounts, software, and performance monitors.
+description_cn: 查询明御 EDR 资产概况和资产指纹，只读支持资产列表、终端详情、监听端口、运行程序、账号、软件、CPU/内存/网络/磁盘监控。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 只读动作。
+      enum: [list, details, ports, process, account, software, monitor_cpu, monitor_memory, monitor_net, monitor_disk]
+      default: list
+    page:
+      type: integer
+      description: 页码。若现场接口字段不同，可用 body/params 覆盖。
+      default: 1
+    limit:
+      type: integer
+      description: 每页数量，最大 500。
+      default: 50
+    node_id:
+      type: string
+      description: 资产/终端 ID。PDF 未给字段名，默认作为 node_id 传递；现场字段不同可改用 body/params。
+    keyword:
+      type: string
+      description: 资产名称、IP 或关键字过滤。
+    params:
+      type: object
+      description: GET 查询参数或 POST JSON 字段，用于兼容现场实际字段名。
+      additionalProperties: true
+    body:
+      type: object
+      description: POST JSON 字段；会覆盖 params 中同名字段。
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: assets

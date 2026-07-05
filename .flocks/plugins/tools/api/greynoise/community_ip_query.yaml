@@ -1,0 +1,31 @@
+name: greynoise_community_ip_query
+description: >
+  FREE GreyNoise Community API - Query IP threat intelligence for basic classification.
+  Returns whether the IP is malicious/benign, RIOT status, and last seen date.
+  Rate limit: 50 lookups per week. Use for quick IP checks without subscription.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    ip:
+      type: string
+      description: IPv4 address to query (e.g., "1.2.3.4")
+  required: [ip]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v3/community/{ip}"
+  timeout: 30
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded (50 lookups/week for free)"
+    404: "No data found for this IP"
+    400: "Invalid IP address format"

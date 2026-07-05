@@ -1,0 +1,47 @@
+name: mingyu_apt_asset
+description: 查询明御 APT 资产列表、国家/城市枚举和资产分组树。只读，不保存或删除资产分组。
+description_cn: 查询明御 APT 资产模块，只读支持资产列表、国家/城市枚举和资产分组树。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingyu_apt_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: list=资产列表；countries=国家枚举；cities=中国城市枚举；groups=资产分组树。
+      enum:
+        - list
+        - countries
+        - cities
+        - groups
+      default: list
+    offset:
+      type: integer
+      description: 资产列表起始条数。若实际设备版本不支持该字段，可通过 body 覆盖或留空由设备忽略。
+      default: 0
+    limit:
+      type: integer
+      description: 资产列表每页数量。
+      default: 100
+    start_time:
+      type: string
+      description: 资产查询开始时间，对应部分版本的 startTime。
+    end_time:
+      type: string
+      description: 资产查询结束时间，对应部分版本的 endTime。
+    keyword:
+      type: string
+      description: 资产分组查询关键字。
+    body:
+      type: object
+      description: 透传给 /openapi/asset/list 的 JSON Body。用于兼容现场设备实际字段名，传入字段会覆盖默认 offset/limit 之外的查询条件。
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_apt.handler.py
+  function: asset

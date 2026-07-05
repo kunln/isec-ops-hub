@@ -1,0 +1,75 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "asset.search",
+  "target": "assets",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["id", "asset_id", "assetId", "hostId", "host_id", "uuid", "ip", "assetIp", "asset_ip"], "target": "id" },
+    { "raw": ["name", "asset_name", "assetName", "hostname", "hostName", "ip", "assetIp", "asset_ip"], "target": "name", "default": "Mingyu APT Asset" },
+    {
+      "raw": ["type", "asset_type", "assetType", "host_type"],
+      "target": "asset_type",
+      "default": "server",
+      "enum_default": "other",
+      "enum": {
+        "server": "server",
+        "host": "server",
+        "endpoint": "endpoint",
+        "pc": "endpoint",
+        "terminal": "endpoint",
+        "network_device": "network_device",
+        "security_device": "security_device",
+        "web_app": "web_app",
+        "api": "api",
+        "database": "database",
+        "other": "other"
+      }
+    },
+    { "raw": ["ip", "hostIp", "host_ip", "assetIp", "asset_ip", "clientIp", "client_ip"], "target": "ip" },
+    { "raw": ["hostname", "hostName", "machine", "machine_name"], "target": "hostname" },
+    { "raw": ["domain", "domainName"], "target": "domain" },
+    { "raw": ["group", "group_name", "assetGroup", "asset_group", "business_system", "system"], "target": "business_system" },
+    {
+      "raw": ["level", "importance", "criticality", "riskLevel"],
+      "target": "importance",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "0": "low",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "critical",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical",
+        "高": "high",
+        "中": "medium",
+        "低": "low"
+      }
+    },
+    {
+      "raw": ["is_public", "isPublic", "public", "exposure"],
+      "target": "exposure_level",
+      "default": "unknown",
+      "enum_default": "unknown",
+      "enum": {
+        "true": "external",
+        "false": "internal",
+        "1": "external",
+        "0": "internal",
+        "internal": "internal",
+        "external": "external",
+        "unknown": "unknown"
+      }
+    },
+    { "raw": ["service", "services", "serviceName", "service_name"], "target": "services", "default": [], "transform": "list" },
+    { "raw": ["tags", "labels"], "target": "tags", "default": [], "transform": "list" },
+    { "raw": ["description", "remark", "memo"], "target": "description" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "fixture": "vulnerabilities_search",
+    "vendor": "ReplayDemo",
+    "captured_at": "2026-06-01T00:00:00Z"
+  },
+  "items": [
+    {
+      "id": "vul_replay_rce",
+      "asset_id": "ast_replay_portal",
+      "cve": "CVE-REPLAY-2026-0001",
+      "name": "Replay Upload Handler Remote Command Execution",
+      "severity": "critical",
+      "cvss": 9.8,
+      "epss": 0.91,
+      "known_exploited": true,
+      "poc": true,
+      "component": "Replay Upload Handler",
+      "fix": "Upgrade upload handler and restrict upload execution paths.",
+      "status": "confirmed",
+      "first_seen": "2026-05-30T09:10:00Z"
+    },
+    {
+      "id": "vul_replay_tls",
+      "asset_id": "ast_replay_legacy",
+      "name": "Replay Legacy TLS Configuration Weakness",
+      "severity": "medium",
+      "cvss": 5.4,
+      "epss": 0.08,
+      "known_exploited": false,
+      "poc": false,
+      "component": "Legacy API Gateway",
+      "status": "open"
+    }
+  ]
+}

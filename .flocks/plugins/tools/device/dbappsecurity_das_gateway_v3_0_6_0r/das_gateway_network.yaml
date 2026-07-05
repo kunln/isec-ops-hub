@@ -1,0 +1,71 @@
+name: das_gateway_network
+description: Read DAS-Gateway network configuration and status, including interfaces, zones, routes, NAT, and DNS.
+description_cn: 只读查询明御安全网关网络配置与状态，包括接口、安全域、路由、NAT 和 DNS。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 查询动作。detail/filter 类动作需要 path_params，例如 {"name":"eth0"}、{"id":"1"}、{"domain":"example.com"}。
+      enum:
+        - interface_list
+        - interface_detail
+        - subinterface_list
+        - subinterface_detail
+        - bridge_interface_list
+        - bridge_interface_detail
+        - net_zone_list
+        - net_zone_detail
+        - interface_state
+        - route_table
+        - static_route_list
+        - nat_pool_list
+        - nat_pool_detail
+        - snat_list
+        - snat_detail
+        - dnat_list
+        - dnat_detail
+        - static_nat_list
+        - static_nat_detail
+        - dns_server
+        - dns_proxy_wildcard_list
+        - dns_proxy_wildcard_detail
+        - dns_cache_enable
+        - dns_cache
+        - dns_server_specified_list
+        - dns_server_specified_detail
+        - dns_proxy_rule_enable
+        - dns_proxy_rule_balance
+        - dns_proxy_rule_list
+        - dns_proxy_rule_detail
+      default: interface_list
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：name、id、domain、interface_name。
+      additionalProperties: true
+    query:
+      type: object
+      description: 额外查询参数字典，会附加到 URL query。
+      additionalProperties: true
+    page:
+      type: integer
+      description: 分页页码；不填则不追加 page。
+    count:
+      type: integer
+      description: 每页数量；不填则不追加 count。
+    language:
+      type: string
+      description: 返回语言，CN 或 EN。
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: network

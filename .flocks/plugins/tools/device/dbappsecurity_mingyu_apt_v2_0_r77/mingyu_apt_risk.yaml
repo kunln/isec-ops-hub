@@ -1,0 +1,118 @@
+name: mingyu_apt_risk
+description: 查询明御 APT 风险枚举、风险列表、风险详情、批量详情、分析建议、特征事件、原始风险信息和风险趋势。只读，不执行风险处理。
+description_cn: 查询明御 APT 风险模块，只读支持风险列表/详情/趋势及辅助枚举，不包含处理、导出、下载或白名单操作。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingyu_apt_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: enum=风险查询条件枚举；list=风险列表；detail=单条风险详情；details=批量风险详情；analysis_suggest=分析与建议；sigtype=特征事件信息；comb_info=原始风险信息列表；trend=风险趋势。
+      enum:
+        - enum
+        - list
+        - detail
+        - details
+        - analysis_suggest
+        - sigtype
+        - comb_info
+        - trend
+      default: list
+    begin:
+      type: string
+      description: 开始时间，格式 yyyy-MM-dd HH:mm:ss。不填时默认最近 7 天。
+    end:
+      type: string
+      description: 结束时间，格式 yyyy-MM-dd HH:mm:ss。不填时默认当前时间。
+    days:
+      type: integer
+      description: 默认时间范围天数，仅 begin/end 未同时提供时生效。
+      default: 7
+    combined:
+      type: integer
+      description: 聚合类型，1=聚合数据，0=原始数据。
+      default: 1
+    flags:
+      type: array
+      description: 风险类型 ID 数组，可从 action=enum 返回的 flags 获取；不填默认 [-1] 表示全部。
+      items:
+        type: integer
+    sips:
+      type: array
+      description: 客户端 IP 数组。
+      items:
+        type: string
+    dips:
+      type: array
+      description: 服务端 IP 数组。
+      items:
+        type: string
+    siprange:
+      type: string
+      description: 客户端 IPv4 网段，例如 192.168.0.0/16。
+    diprange:
+      type: string
+      description: 服务端 IPv4 网段，例如 192.168.0.0/16。
+    sip_reverse:
+      type: boolean
+      description: 客户端 IP 查询是否取反，true=不等于，false=等于。
+    dip_reverse:
+      type: boolean
+      description: 服务端 IP 查询是否取反，true=不等于，false=等于。
+    attackstatuss:
+      type: array
+      description: 攻击状态 ID 数组，可从 action=enum 返回的 attackstatuss 获取。
+      items:
+        type: integer
+    eventypes:
+      type: array
+      description: 事件类型 ID 数组，可从 action=enum 返回的 eventypes 获取。
+      items:
+        type: integer
+    offset:
+      type: integer
+      description: 起始条数，从 0 开始。
+      default: 0
+    limit:
+      type: integer
+      description: 每页数量。
+      default: 20
+    second_max_accessid:
+      type: integer
+      description: 同一时间段翻页查询时上一页最后一条记录的 accessid。
+    accessid:
+      type: string
+      description: 风险 ID。detail、comb_info 时必填。
+    accessids:
+      type: array
+      description: 风险 ID 列表。details 时必填。
+      items:
+        type: string
+    poid:
+      type: integer
+      description: 探测器 ID，可从风险列表或探测器列表获取。detail、comb_info 时必填。
+    sensorip:
+      type: string
+      description: 探测器 IP。comb_info 时必填。
+    flag:
+      type: integer
+      description: 风险类别 ID。analysis_suggest、sigtype 时使用。
+    aptfamily:
+      type: integer
+      description: APT 组织/家族 ID。analysis_suggest 时必填。
+    ruleid:
+      type: integer
+      description: 规则 ID。analysis_suggest、sigtype 时必填。
+    accesssubtype:
+      type: integer
+      description: 策略来源 ID。analysis_suggest、sigtype 时必填。
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_apt.handler.py
+  function: risk

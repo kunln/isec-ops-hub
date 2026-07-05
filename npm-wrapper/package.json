@@ -1,0 +1,20 @@
+{
+  "name": "@flocks-ai/flocks",
+  "version": "0.2.0",
+  "description": "AI-Native SecOps platform — npm wrapper for `uvx flocks`",
+  "keywords": ["ai", "secops", "llm", "agent", "security"],
+  "license": "MIT",
+  "bin": {
+    "flocks": "bin/flocks.mjs"
+  },
+  "files": [
+    "bin/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flocks-ai/flocks"
+  }
+}

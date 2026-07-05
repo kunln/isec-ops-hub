@@ -1,0 +1,32 @@
+name: librarian
+description: >-
+  Specialized codebase understanding agent for multi-repository analysis,
+  searching remote codebases, retrieving official documentation, and finding
+  implementation examples.
+mode: subagent
+hidden: false
+tags: [system]
+delegatable: true
+tools:
+  - read
+  - bash
+  - grep
+  - glob
+  - webfetch
+  - websearch
+  - lsp
+prompt_metadata:
+  category: exploration
+  cost: CHEAP
+  prompt_alias: Librarian
+  triggers:
+    - domain: Librarian
+      trigger: Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource)
+  use_when:
+    - "How do I use [library]?"
+    - "What's the best practice for [framework feature]?"
+    - "Why does [external dependency] behave this way?"
+    - Find examples of [library] usage
+    - Working with unfamiliar npm/pip/cargo packages
+  key_trigger: "External library/source mentioned -> fire `librarian` background"
+# prompt injected by prompt_builder.py (year-aware)

@@ -1,0 +1,38 @@
+name: greynoise_gnql_query
+description: >
+  GreyNoise Query Language (GNQL) search. Use to search the GreyNoise NOISE dataset
+  for IPs matching criteria like classification:malicious, tags:Mirai, cve:CVE-2021-xxx,
+  port scans, vulnerability probes, and more. Returns up to 1000 results.
+  Requires Enterprise API subscription.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: GNQL query string (e.g., "tags:Mirai last_seen:1d")
+    size:
+      type: integer
+      description: Number of results to return (max 10000)
+      default: 100
+  required: [query]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v3/gnql"
+  query_params:
+    query: "{query}"
+    size: "{size}"
+  timeout: 60
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded"
+    400: "Invalid GNQL query"

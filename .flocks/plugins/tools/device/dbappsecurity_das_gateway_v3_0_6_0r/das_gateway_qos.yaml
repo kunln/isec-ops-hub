@@ -1,0 +1,45 @@
+name: das_gateway_qos
+description: Read DAS-Gateway QoS lines, channel policies, administrator keys, policy monitoring, and QoS whitelist.
+description_cn: 只读查询明御安全网关 QoS 线路、通道策略、分级分权、策略监控和 QoS 排除策略。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - line_list
+        - line_detail
+        - channel_policy_list
+        - channel_policy_by_line
+        - channel_policy_detail
+        - admin_key
+        - admin_key_writers
+        - monitor_qos
+        - whitelist
+      default: line_list
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：name、line_name、channel_name。
+      additionalProperties: true
+    query:
+      type: object
+      additionalProperties: true
+    page:
+      type: integer
+    count:
+      type: integer
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: qos

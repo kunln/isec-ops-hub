@@ -1,0 +1,76 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "asset.search",
+  "target": "assets",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["id", "asset_id", "assetId", "assetid", "uuid", "hostId", "host_id", "ip", "hostIp", "assetIp"], "target": "id" },
+    { "raw": ["name", "asset_name", "assetName", "hostName", "hostname", "domain", "url", "ip", "hostIp", "assetIp"], "target": "name", "default": "Mingjian Scanned Asset" },
+    {
+      "raw": ["type", "asset_type", "assetType", "module", "targetType", "webType"],
+      "target": "asset_type",
+      "default": "web_app",
+      "enum_default": "other",
+      "enum": {
+        "web": "web_app",
+        "website": "web_app",
+        "web_app": "web_app",
+        "api": "api",
+        "host": "server",
+        "server": "server",
+        "endpoint": "endpoint",
+        "pc": "endpoint",
+        "database": "database",
+        "network_device": "network_device",
+        "security_device": "security_device",
+        "other": "other"
+      }
+    },
+    { "raw": ["ip", "hostIp", "host_ip", "assetIp", "asset_ip", "serverIp", "server_ip"], "target": "ip" },
+    { "raw": ["hostname", "hostName", "domain", "domainName"], "target": "hostname" },
+    { "raw": ["url", "siteUrl", "website", "targetUrl", "address"], "target": "url" },
+    { "raw": ["group", "group_name", "businessSystem", "business_system", "ownerDept", "department"], "target": "business_system" },
+    {
+      "raw": ["importance", "level", "riskLevel", "assetLevel", "securityLevel"],
+      "target": "importance",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "0": "low",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "critical",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical",
+        "高": "high",
+        "中": "medium",
+        "低": "low"
+      }
+    },
+    {
+      "raw": ["isPublic", "is_public", "public", "internet", "exposure"],
+      "target": "exposure_level",
+      "default": "unknown",
+      "enum_default": "unknown",
+      "enum": {
+        "true": "external",
+        "false": "internal",
+        "1": "external",
+        "0": "internal",
+        "internal": "internal",
+        "external": "external",
+        "unknown": "unknown"
+      }
+    },
+    { "raw": ["ports", "port", "services", "service", "serviceName"], "target": "services", "default": [], "transform": "list" },
+    { "raw": ["tags", "labels", "assetTags"], "target": "tags", "default": [], "transform": "list" },
+    { "raw": ["description", "desc", "remark", "memo"], "target": "description" }
+  ]
+}

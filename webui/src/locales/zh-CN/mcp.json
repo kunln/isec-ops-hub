@@ -1,0 +1,71 @@
+{
+  "pageTitle": "MCP 服务器",
+  "pageDescription": "管理和发现 Model Context Protocol 服务器",
+  "tabs": {
+    "myServers": "我的服务器",
+    "catalog": "工具目录"
+  },
+  "servers": {
+    "count": "共 {{count}} 个服务器",
+    "refresh": "刷新",
+    "empty": "暂无 MCP 服务器",
+    "emptyHint": "切换到「工具目录」标签浏览并安装 MCP 工具",
+    "connected": "已连接",
+    "error": "错误",
+    "disconnected": "未连接",
+    "connect": "连接",
+    "disconnect": "断开",
+    "tools": "工具",
+    "resources": "资源",
+    "noTools": "暂无工具",
+    "noResources": "暂无资源",
+    "connectFailed": "连接失败",
+    "disconnectFailed": "断开失败"
+  },
+  "categories": {
+    "threat_intelligence": "威胁情报",
+    "vulnerability": "漏洞管理",
+    "siem": "SIEM & 日志分析",
+    "network_security": "网络安全",
+    "code_security": "代码安全",
+    "reverse_engineering": "逆向工程",
+    "osint": "开源情报 (OSINT)",
+    "cloud_security": "云安全",
+    "compliance": "合规检查",
+    "forensics": "数字取证",
+    "attack_framework": "攻击框架",
+    "data_pipeline": "数据处理",
+    "firewall": "防火墙 & 网络设备",
+    "secops_platform": "安全运营平台",
+    "identity_security": "身份安全"
+  },
+  "detail": {
+    "removeServer": "删除服务器"
+  },
+  "alert": {
+    "confirmRemoveMCP": "确定要删除 MCP 服务器「{{name}}」吗？"
+  },
+  "catalog": {
+    "all": "全部",
+    "searchPlaceholder": "搜索 MCP 工具...",
+    "toolCount": "{{count}} 个工具",
+    "official": "官方",
+    "requiresSecret": "需要密钥",
+    "install": "安装",
+    "installing": "安装中...",
+    "installFailed": "安装失败",
+    "noResults": "未找到匹配的工具",
+    "noResultsHint": "尝试调整搜索条件或分类筛选",
+    "language": "语言",
+    "license": "协议",
+    "transport": "传输",
+    "tags": "标签",
+    "envVars": "环境变量",
+    "systemDeps": "系统依赖",
+    "startCommand": "启动命令",
+    "githubRepo": "GitHub 仓库",
+    "addToMyServers": "添加到我的服务器",
+    "requiresEnvVars": "需要配置以下环境变量",
+    "configureEnvHint": "请在 ~/.flocks/config/.secret.json 或环境变量中配置"
+  }
+}

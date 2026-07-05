@@ -1,0 +1,34 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "alert.search",
+  "transport": "tool",
+  "tool": {
+    "name": "asiainfo_tda_alerts",
+    "params": {
+      "time_type": 2,
+      "page": 1,
+      "limit": 100,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": [
+        "alarm_list",
+        "data.alarm_list",
+        "result",
+        "data.result",
+        "list",
+        "rows",
+        "items",
+        "records",
+        "alerts"
+      ],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/alert.search.mapping.json",
+  "pagination": {
+    "type": "page",
+    "page_param": "page",
+    "size_param": "limit"
+  }
+}

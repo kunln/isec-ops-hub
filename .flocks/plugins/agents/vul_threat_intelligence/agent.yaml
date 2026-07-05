@@ -1,0 +1,46 @@
+name: vul-threat-intelligence
+description: >-
+  Vulnerability threat intelligence subagent for querying and analyzing vulnerability data.
+  Understands natural language queries, extracts structured parameters, and retrieves accurate
+  vulnerability intelligence through specialized tools (vulnList_query, vuln_query,
+  vuln_vendors_products_match, web_search). Handles vuln ID lookups, vendor/product searches,
+  keyword searches, time-range filtering, and risk-level filtering. Returns detailed vuln info
+  including CVE/XVE IDs, PoC availability, KEV status, CVSS scores, and remediation guidance.
+description_cn: >-
+  漏洞情报子 Agent：基于自然语言查询与分析漏洞数据；通过专用工具检索 CVE/XVE、厂商产品与关键词，
+  支持时间与风险等级筛选；返回 PoC、KEV 状态、CVSS 与修复建议等详细信息。
+mode: subagent
+hidden: false
+color: "#E67E22"
+delegatable: true
+tags:
+  - security
+  - vulnerability
+tools:
+  - read
+  - glob
+  - grep
+  - edit
+  - write
+  - bash
+  - todoread
+  - todowrite
+  - tool_search
+  - threatbook_mcp_vulnlist_query
+  - threatbook_mcp_vuln_query
+  - threatbook_mcp_vuln_vendors_products_match
+  - threatbook_mcp_web_search
+  - threatbook_mcp_ip_query
+  - threatbook_mcp_ip_attribution
+  - threatbook_mcp_domain_query
+  - threatbook_mcp_domain_attribution
+  - threatbook_mcp_hash_query
+  - threatbook_mcp_threat_actor_query
+  - threatbook_mcp_threat_actor_list_query
+  - threatbook_mcp_hrti_query
+  - websearch
+  - webfetch
+  - virustotal_ip_query
+  - virustotal_domain_query
+  - virustotal_url_query
+  - virustotal_file_query

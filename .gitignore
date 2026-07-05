@@ -1,0 +1,78 @@
+# macOS / editor
+.DS_Store
+._*
+*.swp
+.idea/
+.vscode/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node / WebUI
+webui/node_modules/
+webui/dist/
+webui/.vite/
+webui/.turbo/
+webui/coverage/
+
+# Logs
+*.log
+logs/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.kubeconfig
+
+# Local databases / runtime state
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# FLOCKS local runtime state
+.flocks/runtime/
+.flocks/state/
+.flocks/storage/
+.flocks/sessions/
+.flocks/logs/
+.flocks/cache/
+.flocks/config/.secret.json
+
+# Temp / uploads
+uploads/
+tmp/
+temp/
+
+# Local context/archive dumps
+flocks-context.tar.gz
+
+# Safer FLOCKS local state:
+# ignore all local .flocks runtime/config state by default,
+# but keep plugin definitions under version control.
+.flocks/*
+!.flocks/plugins/
+!.flocks/plugins/**
+
+# WebUI build outputs
+webui/dist-commercial-admin/
+webui/dist-frontstage/
+webui/dist/

@@ -1,0 +1,47 @@
+{
+  "version": "connector.package.v1",
+  "id": "dbappsecurity-mingyu-apt-v2-0-r77",
+  "name": "DBAPPSecurity Mingyu APT Connector",
+  "vendor": "DBAPPSecurity",
+  "product": "APT",
+  "product_version": "2.0R77",
+  "package_version": "2026.06.0",
+  "deployment": "device_tool",
+  "auth_methods": ["device_profile"],
+  "capabilities": [
+    "asset.search",
+    "alert.search"
+  ],
+  "adapters": {
+    "asset.search": "adapters/asset.search.adapter.json",
+    "alert.search": "adapters/alert.search.adapter.json"
+  },
+  "pagination": {
+    "type": "tool",
+    "page_size": 100
+  },
+  "rate_limit": {
+    "mode": "vendor_default",
+    "requests_per_minute": 60
+  },
+  "permissions": [
+    "mingyu_apt:asset:read",
+    "mingyu_apt:event:read"
+  ],
+  "risk_level": "medium",
+  "description": "DBAPPSecurity Mingyu APT connector backed by the existing Mingyu APT device tools. It syncs asset inventory and security event data into Flocks normalized assets and alerts.",
+  "compatibility": {
+    "min_flocks_version": "0.0.0"
+  },
+  "release": {
+    "channel": "stable",
+    "published_at": "2026-06-05T00:00:00Z",
+    "notes": "Adds read-only Mingyu APT asset and alert sync through the device tool registry.",
+    "changelog": [
+      "Uses mingyu_apt_asset for asset ingestion.",
+      "Uses mingyu_apt_safe_event for alert ingestion.",
+      "Keeps device targeting configurable through FLOCKS_CONNECTOR_DEVICE_ID."
+    ]
+  },
+  "enabled": true
+}

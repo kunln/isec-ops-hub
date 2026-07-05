@@ -1,0 +1,7 @@
+name: asiainfo_threat_intel_mcp
+type: remote
+url: "{secret:asiainfo_threat_intel_mcp_url}"
+transport: streamable_http
+headers:
+  X-API-KEY: "{secret:asiainfo_threat_intel_mcp_key}"
+enabled: false

@@ -1,0 +1,83 @@
+name: das_gateway_objects
+description: Read DAS-Gateway reusable objects, identity objects, schedules, applications, URL objects, and authentication servers.
+description_cn: 只读查询明御安全网关对象库、用户/用户组、时间表、应用、URL 对象和认证服务器配置。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 查询动作。detail/search 类动作需要 path_params，例如 {"name":"obj1"}、{"url":"example.com"}。
+      enum:
+        - address_list
+        - address_detail
+        - address_group_list
+        - address_group_detail
+        - predef_service_list
+        - custom_service_list
+        - custom_service_detail
+        - service_group_list
+        - service_group_detail
+        - day_schedule_list
+        - day_schedule_detail
+        - week_schedule_list
+        - week_schedule_detail
+        - month_schedule_list
+        - month_schedule_detail
+        - once_schedule_list
+        - once_schedule_detail
+        - keyword_list
+        - keyword_detail
+        - app_category_list
+        - app_object_list
+        - app_object_detail
+        - app_group_list
+        - custom_url_list
+        - custom_url_detail
+        - malware_url
+        - url_whitelist
+        - custom_https_list
+        - custom_https_detail
+        - url_classification
+        - url_category_search
+        - auth_user_list
+        - auth_user_detail
+        - auth_user_group_list
+        - auth_user_group_detail
+        - radius_server_list
+        - radius_server_detail
+        - radius_group_list
+        - radius_group_detail
+        - ldap_server_list
+        - ldap_server_detail
+        - ldap_group_list
+        - ldap_group_detail
+      default: address_list
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：name、url。
+      additionalProperties: true
+    query:
+      type: object
+      description: 额外查询参数字典。
+      additionalProperties: true
+    page:
+      type: integer
+      description: 分页页码；不填则不追加 page。
+    count:
+      type: integer
+      description: 每页数量；不填则不追加 count。
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: objects

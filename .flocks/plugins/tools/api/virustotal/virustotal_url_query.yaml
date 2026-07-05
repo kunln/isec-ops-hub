@@ -1,0 +1,19 @@
+name: virustotal_url_query
+description: Query URL threat intelligence from VirusTotal.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: The URL to query.
+  required: [url]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: url_query

@@ -1,0 +1,35 @@
+name: asiainfo_tda_asset_risks
+description: Query AsiaInfo Security Xinwei TDA 2025.6 asset risk list.
+description_cn: 查询亚信安全信桅 TDA 2025.6 资产风险列表，支持时间范围、资产 IP 和分页筛选。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties:
+    time_type:
+      type: integer
+      description: 时间类型：1 今日，2 最近 7 日，3 最近 14 日，4 最近 30 日，5 自定义。
+      default: 2
+    time_limit:
+      type: string
+      description: 自定义时间范围，time_type=5 时使用，格式为起止时间戳英文逗号分隔。
+    asset_addr:
+      type: string
+      description: 主机 IP。
+    page:
+      type: integer
+      description: 第几页，默认 1。
+      default: 1
+    limit:
+      type: integer
+      description: 每页条数，默认 100，最大 500。
+      default: 100
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: asset_risks

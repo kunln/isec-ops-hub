@@ -1,0 +1,78 @@
+name: das_gateway_security
+description: Read DAS-Gateway security protection configuration, including ARP defense, attack defense, IPS, antivirus, and WAF policies.
+description_cn: 只读查询明御安全网关安全防护配置，包括 ARP/攻击防护、IPS、病毒防护和 Web 防护策略。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 查询动作。需要名称、策略名、规则分类等路径值时通过 path_params 传入。
+      enum:
+        - arp_table
+        - ip_mac_bind_list
+        - ip_mac_bind_detail
+        - arp_spoof_config
+        - arp_flood
+        - arp_learn_control
+        - malformed_message_attack
+        - security_defend_scan
+        - security_defend_scan_interface
+        - security_defend_flood
+        - security_defend_interface_flood
+        - security_defend_interface_flood_detail
+        - blacklist_list
+        - blacklist_detail
+        - ips_template_list
+        - ips_template_rules
+        - ips_template_rule_type
+        - ips_protocol_check
+        - ips_rules
+        - ips_rules_type
+        - ips_custom_rule
+        - av_engine
+        - av_check_list
+        - virus_list
+        - virus_filter
+        - waf_policy_list
+        - waf_policy_detail
+        - access_control_enable
+        - access_control_list
+        - access_control_detail
+        - waf_rule_profile
+        - waf_rule_type
+        - anti_steal_link
+        - csrf_enable
+        - csrf_rule
+        - cc_defend
+        - anti_tamper
+        - app_hide
+        - waf_rulebase
+        - anti_tamper_url_cache
+      default: arp_table
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：ip、interface_name、blist、template_name、pid、rule_name、name、type、policy_name、id、url。
+      additionalProperties: true
+    query:
+      type: object
+      description: 额外查询参数字典。
+      additionalProperties: true
+    page:
+      type: integer
+    count:
+      type: integer
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: security_read

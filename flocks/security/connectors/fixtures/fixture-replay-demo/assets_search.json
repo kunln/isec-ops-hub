@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "fixture": "assets_search",
+    "vendor": "ReplayDemo",
+    "captured_at": "2026-06-01T00:00:00Z"
+  },
+  "items": [
+    {
+      "id": "ast_replay_portal",
+      "name": "Replay Internet Portal",
+      "type": "web_app",
+      "ip": "203.0.113.30",
+      "hostname": "replay-portal-01",
+      "domain": "replay-portal.example.com",
+      "system": "Replay Customer Portal",
+      "owner": "Replay Security Team",
+      "criticality": "critical",
+      "exposure": "external",
+      "env": "production",
+      "ports": [80, 443],
+      "services": ["nginx", "upload-service"],
+      "protocols": ["http", "https"],
+      "controls": {
+        "edr": true,
+        "waf": true,
+        "ndr": false,
+        "centralized_logging": true
+      },
+      "tags": ["fixture", "internet-facing"]
+    },
+    {
+      "id": "ast_replay_legacy",
+      "name": "Replay Legacy API",
+      "type": "api",
+      "hostname": "legacy-api-01",
+      "criticality": "high",
+      "exposure": "unknown",
+      "env": "production",
+      "ports": [8443],
+      "services": ["legacy-api"],
+      "tags": ["fixture", "missing-ip"]
+    }
+  ]
+}

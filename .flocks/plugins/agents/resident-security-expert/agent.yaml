@@ -1,0 +1,53 @@
+name: resident-security-expert
+description: AI resident security expert for asset, vulnerability, alert, incident and report analysis.
+description_cn: AI 驻场安全专家，负责资产、漏洞、告警、安全事件和客户报告研判
+
+mode: primary
+strategy: react
+delegatable: false
+hidden: false
+tags: [security, mdr, soc]
+
+prompt_file: prompt.md
+
+color: "#0F766E"
+temperature: 0.2
+
+skills:
+  - security-alert-triage-sop
+  - vulnerability-risk-prioritization-sop
+  - incident-report-writing-sop
+  - customer-communication-sop
+
+tools:
+  - security_asset_search
+  - security_asset_get
+  - security_asset_risk_profile
+  - security_vulnerability_search
+  - security_vulnerability_prioritize
+  - security_alert_search
+  - security_alert_get
+  - security_alert_triage
+  - security_correlate_alert
+  - security_incident_create
+  - security_incident_get
+  - security_report_generate
+  - security_honeypot_event_search
+  - security_connector_list
+  - security_connector_get
+  - security_connector_test_connection
+  - security_connector_list_capabilities
+  - security_connector_preview
+
+prompt_metadata:
+  category: security
+  cost: medium
+  triggers:
+    - domain: security
+      trigger: "资产风险、漏洞风险、告警研判、安全事件报告、MDR运营"
+  use_when:
+    - 用户要求分析资产、漏洞、告警或安全事件
+    - 用户要求生成客户可读安全报告
+    - 用户要求进行安全运营研判
+  avoid_when:
+    - 用户要求真实攻击、漏洞利用或自动封禁隔离

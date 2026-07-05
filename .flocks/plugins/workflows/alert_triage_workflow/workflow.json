@@ -1,0 +1,21 @@
+{
+  "name": "alert_triage_workflow",
+  "description": "Security Extension MVP workflow for alert triage, correlation and optional incident creation.",
+  "description_cn": "安全扩展 MVP 告警研判工作流：关联分析、风险研判和可选事件创建",
+  "start": "triage_alert",
+  "nodes": [
+    {
+      "id": "triage_alert",
+      "type": "python",
+      "description": "Call security_alert_triage for the provided alert_id.",
+      "code": "import json\n\nalert_id = inputs.get('alert_id') or inputs.get('alertId')\ncreate_incident = inputs.get('create_incident', inputs.get('createIncident', True))\nif not alert_id:\n    raise ValueError('alert_id is required')\n\nresult = tool.run_safe('security_alert_triage', alert_id=alert_id, create_incident=bool(create_incident))\nif not result['success']:\n    outputs['success'] = False\n    outputs['error'] = result['error']\nelse:\n    try:\n        triage = json.loads(result['text']) if isinstance(result.get('text'), str) else result.get('obj')\n    except Exception:\n        triage = {'raw': result.get('text', '')}\n    outputs['success'] = True\n    outputs['triage_result'] = triage\n    outputs['incident_id'] = triage.get('incident_id') if isinstance(triage, dict) else None\n    outputs['summary'] = triage.get('summary') if isinstance(triage, dict) else result.get('text', '')\n"
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "sampleInputs": {
+      "alert_id": "alr_sample_webshell_xdr",
+      "create_incident": true
+    }
+  }
+}

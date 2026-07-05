@@ -1,0 +1,17 @@
+name: asiainfo_tda_system_resource
+description: Query AsiaInfo Security Xinwei TDA 2025.6 hardware resource usage.
+description_cn: 查询亚信安全信桅 TDA 2025.6 设备硬件资源使用信息，包括 CPU、磁盘和内存。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties: {}
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: system_resource

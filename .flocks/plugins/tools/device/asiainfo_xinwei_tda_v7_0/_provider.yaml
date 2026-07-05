@@ -1,0 +1,48 @@
+name: 信桅高级威胁监测系统 TDA
+vendor: 亚信安全
+service_id: asiainfo_tda_api
+version: "7.0"
+integration_type: device
+description: AsiaInfo Security Xinwei TDA 2025.6 signed external API for read-only assets, alerts, attack views, sandbox delivery records, system resources, and connection health checks.
+description_cn: 亚信安全信桅高级威胁监测系统 TDA 2025.6 签名对外 API，提供资产、告警、攻击视角、投递记录、设备资源和连接健康检查等客户侧只读能力。
+auth:
+  type: hmac_sha256
+  secret: asiainfo_tda_api_key
+  description: |
+    TDA 2025.6 API 使用 api_key + auth_timestamp + sign 校验。
+    sign 默认按文档示例计算：Base64URL(HMACSHA256(auth_timestamp + api_key, Secret).hexdigest())。
+credential_fields:
+  - key: api_key
+    label: API Key
+    description: TDA 对外 API 分配的 ApiKey。
+    storage: secret
+    config_key: apiKey
+    secret_id: asiainfo_tda_api_key
+    input_type: password
+    required: true
+  - key: secret
+    label: Secret
+    description: TDA 对外 API 分配的 Secret，仅用于 HMACSHA256 签名，不会明文发送。
+    storage: secret
+    config_key: secret
+    secret_id: asiainfo_tda_secret
+    input_type: password
+    required: true
+  - key: base_url
+    label: Base URL
+    description: TDA 平台地址，例如 https://tda.example.com 或 https://192.0.2.10。不要在末尾填写 /ngtda。
+    storage: config
+    config_key: base_url
+    input_type: url
+    default: "https://YOUR_TDA_HOST"
+    required: true
+defaults:
+  base_url: "https://YOUR_TDA_HOST"
+  timeout: 30
+  category: custom
+  product_version: "2025.6"
+  signature_mode: hex_digest
+notes: |
+  客户侧 8080 只暴露低风险动作：添加设备、测试连接、启停、更新凭据、查看健康和只读查询。
+  本包只包含只读接口：设备资源、资产列表、实时告警、原始告警、资产风险、攻击视角、投递记录、告警 PCAP 解析和旧版自定义 IOC 查询。
+  文档中的 PCAP 下载、新增资产、新增规则/IOC/文件黑名单、告警加白和样本提交属于导出/写入/删除类能力，默认不暴露到客户侧设备 API。

@@ -1,0 +1,48 @@
+{
+  "productName": "Security Operations Platform",
+  "badge": "AI-Native SecOps",
+  "subtitle": "AI-Native SecOps Automation Platform",
+  "description": "Let AI handle your security operations — from alert triage to threat response, fully automated with 10x efficiency",
+  "getStarted": "Setup Guide",
+  "adminControls": "Local Controls",
+  "systemCard": {
+    "title": "Local System",
+    "tagline": "AI-Native Security Platform",
+    "cannotConnect": "Cannot connect to backend service"
+  },
+  "stats": {
+    "weeklyTasks": "7-day Tasks",
+    "systemStatus": "System Status",
+    "scheduledTasks": "Scheduled",
+    "workflows": "Workflows",
+    "normal": "Normal",
+    "abnormal": "Abnormal",
+    "checking": "Checking...",
+    "activeScheduled": "Active Scheduled",
+    "agentCount": "Agents",
+    "workflowCount": "Workflows",
+    "skillCount": "Skills",
+    "toolCount": "Tools",
+    "modelCount": "Models",
+    "backendErrorHint": "Please ensure the backend service is running",
+    "statusMessage": {
+      "healthy": "All services running normally",
+      "warning": "Some services degraded",
+      "error": "Service unavailable"
+    }
+  },
+  "quickActions": {
+    "sessions": {
+      "title": "Sessions",
+      "description": "Chat with AI to complete complex security tasks"
+    },
+    "workflows": {
+      "title": "Workflows",
+      "description": "Visually orchestrate security automation pipelines"
+    },
+    "agents": {
+      "title": "Agents",
+      "description": "Manage and configure AI agents"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+name: plan
+description: "Hidden planning-mode agent used by plan_enter/plan_exit transitions."
+mode: subagent
+hidden: true
+tags: [system]
+delegatable: false
+tools:
+  - read
+  - grep
+  - glob
+  - bash
+  - question
+  - todoread
+  - todowrite

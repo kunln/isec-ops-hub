@@ -1,0 +1,101 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "asset.search",
+  "target": "assets",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["id", "asset_id", "assetId", "uuid", "hostId", "host_id", "ip", "hostIp", "host_ip", "assetIp", "asset_ip"], "target": "id" },
+    { "raw": ["name", "asset_name", "assetName", "hostname", "hostName", "host_name", "asset_hostname", "computerName", "computer_name", "ip", "hostIp", "host_ip", "assetIp", "asset_ip"], "target": "name", "default": "AsiaInfo TDA Asset" },
+    {
+      "raw": ["type", "asset_type", "assetType", "asset_type_name", "host_type", "deviceType", "device_type", "category"],
+      "target": "asset_type",
+      "default": "server",
+      "enum_default": "other",
+      "enum": {
+        "server": "server",
+        "host": "server",
+        "endpoint": "endpoint",
+        "pc": "endpoint",
+        "terminal": "endpoint",
+        "network_device": "network_device",
+        "network": "network_device",
+        "security_device": "security_device",
+        "web_app": "web_app",
+        "web": "web_app",
+        "api": "api",
+        "database": "database",
+        "db": "database",
+        "cloud_resource": "cloud_resource",
+        "other": "other"
+      }
+    },
+    { "raw": ["ip", "hostIp", "host_ip", "assetIp", "asset_ip", "src_ip", "dst_ip", "serverIp", "server_ip"], "target": "ip" },
+    { "raw": ["hostname", "hostName", "host_name", "asset_hostname", "computerName", "computer_name"], "target": "hostname" },
+    { "raw": ["domain", "domainName", "domain_name", "asset_domain"], "target": "domain" },
+    { "raw": ["department", "departmentName", "department_name", "asset_department", "business_system", "businessSystem", "system", "group", "group_name"], "target": "business_system" },
+    { "raw": ["owner", "manager", "business_owner", "businessOwner", "asset_owner"], "target": "business_owner" },
+    {
+      "raw": ["importance", "criticality", "level", "riskLevel", "risk_level", "assetLevel", "asset_level", "asset_level_name", "severity"],
+      "target": "importance",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "0": "low",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "critical",
+        "正常": "low",
+        "普通": "low",
+        "低危": "low",
+        "中危": "medium",
+        "高危": "high",
+        "失陷": "critical",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical",
+        "info": "low"
+      }
+    },
+    {
+      "raw": ["exposure", "exposure_level", "isPublic", "is_public", "public", "internet", "internet_access", "outbound_conn"],
+      "target": "exposure_level",
+      "default": "unknown",
+      "enum_default": "unknown",
+      "enum": {
+        "true": "external",
+        "false": "internal",
+        "1": "external",
+        "0": "internal",
+        "internal": "internal",
+        "external": "external",
+        "unknown": "unknown"
+      }
+    },
+    {
+      "raw": ["environment", "env"],
+      "target": "environment",
+      "default": "unknown",
+      "enum_default": "unknown",
+      "enum": {
+        "production": "production",
+        "prod": "production",
+        "staging": "staging",
+        "stage": "staging",
+        "testing": "testing",
+        "test": "testing",
+        "development": "development",
+        "dev": "development",
+        "unknown": "unknown"
+      }
+    },
+    { "raw": ["service", "services", "serviceName", "service_name", "server_detail"], "target": "services", "default": [], "transform": "list" },
+    { "raw": ["os", "osName", "os_name", "os_info", "asset_status_name", "systemType", "system_type"], "target": "tags", "default": [], "transform": "list" },
+    { "raw": ["description", "desc", "remark", "memo", "asset_location"], "target": "description" }
+  ]
+}

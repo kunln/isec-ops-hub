@@ -1,0 +1,40 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "asset.search",
+  "transport": "tool",
+  "tool": {
+    "name": "asiainfo_tda_assets",
+    "params": {
+      "time_type": 2,
+      "page": 1,
+      "limit": 100,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": [
+        "result",
+        "asset_list",
+        "ar_list",
+        "data.result",
+        "data.asset_list",
+        "data.ar_list",
+        "data.list",
+        "data.rows",
+        "data.items",
+        "data.records",
+        "list",
+        "rows",
+        "items",
+        "records",
+        "assets"
+      ],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/asset.search.mapping.json",
+  "pagination": {
+    "type": "page",
+    "page_param": "page",
+    "size_param": "limit"
+  }
+}

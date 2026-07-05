@@ -1,0 +1,55 @@
+name: ndr-analyst
+description: >-
+  NDR network traffic analyst: analyzes flow logs and alerts, identifies attack techniques,
+  and determines whether attacks succeeded.
+description_cn: NDR网络流量分析专家，擅长分析网络流量日志和告警，识别攻击手法、判定攻击是否成功
+
+mode: subagent
+strategy: react
+delegatable: true
+hidden: false
+tags: [security]
+
+prompt_file: prompt.md
+
+color: "#3498DB"
+temperature: 0.3
+
+tools:
+  - read
+  - glob
+  - grep
+  - edit
+  - write
+  - bash
+  - todoread
+  - todowrite
+  - tool_search
+  - websearch
+  - webfetch
+  - threatbook_mcp_ip_query
+  - threatbook_mcp_domain_query
+  - threatbook_mcp_hash_query
+  - threatbook_mcp_vuln_query
+  - threatbook_mcp_vuln_vendors_products_match
+  - virustotal_ip_query
+  - virustotal_domain_query
+  - virustotal_url_query
+  - virustotal_file_query
+
+prompt_metadata:
+  category: security
+  cost: medium
+  triggers:
+    - domain: network
+      trigger: "网络流量分析、日志分析、NDR告警分析"
+    - domain: security
+      trigger: "攻击手法分析、攻击是否成功判定"
+  use_when:
+    - 用户要求分析网络流量日志
+    - 用户要求分析 NDR 告警
+    - 用户要求判断攻击是否成功
+    - 用户要求分析网络攻击载荷
+  avoid_when:
+    - 单纯的代码编写或修改任务
+    - 主机入侵检测取证（应使用 host-forensics）

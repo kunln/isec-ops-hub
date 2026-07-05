@@ -1,0 +1,9 @@
+{
+  "name": "告警研判通道通知",
+  "description": "扫描新同步的 high/critical 告警，执行本地 AI/规则研判，去重后通过可选通道推送。",
+  "category": "security",
+  "status": "active",
+  "createdBy": "codex",
+  "createdAt": 1780930000000,
+  "updatedAt": 1780930000000
+}

@@ -1,0 +1,40 @@
+name: 明御 APT 攻击预警平台
+vendor: 安恒信息
+service_id: dbappsecurity_mingyu_apt_api
+version: "2.0R77"
+integration_type: device
+description: DBAPPSecurity Mingyu APT attack warning platform external OpenAPI for health checks, dashboard metrics, risks, security events, assets, and detectors.
+description_cn: 安恒信息明御 APT 攻击预警平台对外 OpenAPI，提供健康检查、导航概览、风险查询、安全事件分析、资产查询和探测器状态等只读能力。
+auth:
+  type: apikey
+  header: apikey
+  secret: dbappsecurity_mingyu_apt_api_key
+  description: |
+    在明御 APT 页面「系统 -> 权限管理 -> 认证授权 -> OpenApi -> API Key」生成 API Key。
+    V2.0R76 之后的新接口使用 API Key；Flocks 的 api_key 字段填写该记录的 APPSecret。
+    所有接口请求头使用 `apikey: <APPSecret>`，且 APT 侧会校验授权时绑定的访问 IP/MAC。
+credential_fields:
+  - key: api_key
+    label: API Key / APPSecret
+    description: 明御 APT OpenApi API Key 记录中的 APPSecret。APT 侧会校验 APPSecret 以及授权时绑定的访问 IP/MAC。
+    storage: secret
+    config_key: apiKey
+    secret_id: dbappsecurity_mingyu_apt_api_key
+    input_type: password
+    required: true
+  - key: base_url
+    label: Base URL
+    description: 明御 APT 平台地址，例如 https://apt.example.com 或 https://192.0.2.10:443。不要在末尾填写 /openapi。
+    storage: config
+    config_key: base_url
+    input_type: url
+    default: "https://{secret:dbappsecurity_mingyu_apt_host}:443"
+    required: true
+defaults:
+  base_url: "https://{secret:dbappsecurity_mingyu_apt_host}:443"
+  timeout: 30
+  category: custom
+  product_version: "2.0R77"
+notes: |
+  首批客户侧能力只暴露低风险只读接口：版本健康、导航概览、风险查询、安全事件分析、资产查询、探测器和系统资源。
+  文档中的下载、导出、风险处理、白名单编辑、IDS 规则启停、资产保存/删除等写入或敏感动作暂不暴露到 8080 客户侧设备 API。

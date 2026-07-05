@@ -1,0 +1,90 @@
+name: mingyu_apt_safe_event
+description: 查询明御 APT 安全事件分析，包括安全事件列表、事件枚举、客户端/服务端 IP TOP、事件 TOP、弹框详情、二级事件列表和趋势。
+description_cn: 查询明御 APT 安全事件分析，只读支持列表、枚举、TOP、IP/事件详情和趋势。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingyu_apt_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: list=安全事件列表；incident_map=事件枚举；sip_top30=异常客户端IP TOP30；event_top=安全事件发生次数；sip_pop=客户端IP详情；dip_pop=服务端IP详情；event_pop=事件详情；second_eventlist=全部安全事件；second_trend_safeevent=安全事件趋势TOP10；second_trend_attackstatus=攻击状态时间趋势；second_singlebasic=基本信息。
+      enum:
+        - list
+        - incident_map
+        - sip_top30
+        - event_top
+        - sip_pop
+        - dip_pop
+        - event_pop
+        - second_eventlist
+        - second_trend_safeevent
+        - second_trend_attackstatus
+        - second_singlebasic
+      default: list
+    begin:
+      type: string
+      description: 开始时间，格式 yyyy-MM-dd HH:mm:ss。不填时默认最近 7 天。
+    end:
+      type: string
+      description: 结束时间，格式 yyyy-MM-dd HH:mm:ss。不填时默认当前时间。
+    days:
+      type: integer
+      description: 默认时间范围天数，仅 begin/end 未同时提供时生效。
+      default: 7
+    offset:
+      type: integer
+      description: 起始条数，从 0 开始。
+      default: 0
+    limit:
+      type: integer
+      description: 每页数量。
+      default: 20
+    sips:
+      type: array
+      description: 客户端 IP 数组，用于 list。
+      items:
+        type: string
+    dips:
+      type: array
+      description: 服务端 IP 数组，用于 list。
+      items:
+        type: string
+    siprange:
+      type: string
+      description: 客户端 IP 段。
+    diprange:
+      type: string
+      description: 服务端 IP 段。
+    incidentid:
+      type: integer
+      description: 安全事件 ID，可从 incident_map 获取。
+    sip:
+      type: string
+      description: 客户端 IP。sip_pop、second_* 动作需要。
+    dip:
+      type: string
+      description: 服务端 IP。dip_pop、second_* 动作需要。
+    order:
+      type: string
+      description: event_pop 排序字段，count=风险次数，attackStatus=攻击状态。
+      enum:
+        - count
+        - attackStatus
+      default: count
+    order_type:
+      type: string
+      description: event_pop 排序方向。
+      enum:
+        - asc
+        - desc
+      default: desc
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_apt.handler.py
+  function: safe_event

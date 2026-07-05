@@ -1,0 +1,19 @@
+name: virustotal_file_scan
+description: Upload a file to VirusTotal for sandbox analysis.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    file_path:
+      type: string
+      description: Path to the file to upload for analysis.
+  required: [file_path]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: file_scan

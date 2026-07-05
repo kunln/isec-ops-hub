@@ -1,0 +1,23 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "honeypot.event.search",
+  "target": "honeypot_events",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["id", "alarm_id", "alarmId", "uuid", "eventId", "event_id"], "target": "id" },
+    { "raw": ["serial_num", "serialNum", "sensor", "sensor_id"], "target": "sensor_id" },
+    { "raw": ["attack_sip", "attackSip", "src_ip", "source_ip", "clientIp", "client_ip"], "target": "source_ip" },
+    { "raw": ["alarm_sip", "alarmSip", "asset_ip", "assetIp", "dst_ip", "target_ip", "host"], "target": "target_ip" },
+    { "raw": ["protocol", "proto"], "target": "protocol" },
+    { "raw": ["service", "port_service", "dst_port", "targetPort"], "target": "service" },
+    { "raw": ["threat_type", "threatType", "event_type", "type"], "target": "event_type", "default": "honeypot" },
+    { "raw": ["payload", "request", "detail", "description"], "target": "payload" },
+    { "raw": ["geo", "location"], "target": "geo", "default": {}, "transform": "dict" },
+    { "raw": ["threat_name", "threatName", "label", "name", "alarm_name"], "target": "threat_label" },
+    { "raw": ["time", "timestamp", "alarm_time", "alarmTime", "occurred_at", "occurredAt"], "target": "occurred_at" }
+  ]
+}

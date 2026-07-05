@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "fixture": "alerts_search",
+    "vendor": "ReplayDemo",
+    "captured_at": "2026-06-01T00:00:00Z"
+  },
+  "items": [
+    {
+      "id": "alr_replay_webshell",
+      "asset_id": "ast_replay_portal",
+      "source": "xdr",
+      "name": "Replay suspicious upload followed by command execution",
+      "severity": "high",
+      "type": "webshell_or_command_execution",
+      "description": "Replay fixture alert for upload followed by shell execution.",
+      "iocs": ["198.51.100.77", "replay-portal.example.com"],
+      "mitre": "T1059",
+      "status": "new",
+      "timestamp": "2026-06-01T08:00:00Z"
+    },
+    {
+      "id": "alr_replay_scan",
+      "asset_id": "ast_replay_legacy",
+      "source": "ndr",
+      "name": "Replay repeated API probing",
+      "severity": "medium",
+      "type": "reconnaissance",
+      "iocs": ["198.51.100.78"],
+      "status": "new",
+      "timestamp": "2026-06-01T08:20:00Z"
+    }
+  ]
+}

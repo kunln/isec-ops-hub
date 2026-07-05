@@ -1,0 +1,37 @@
+name: fofa_host
+description: >
+  Get detailed host information from FOFA including ports, services, banners, and certificates.
+  Use when investigating a specific IP address for open ports and running services.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: fofa
+
+inputSchema:
+  type: object
+  properties:
+    host:
+      type: string
+      description: IP address or hostname to query
+      required: true
+    detail:
+      type: boolean
+      description: Return detailed banner information
+      default: false
+  required: [host]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/info/host"
+  query_params:
+    email: "{secret:fofa_email}"
+    key: "{secret:fofa_api_key}"
+    host: "{host}"
+    detail: "{detail}"
+  timeout: 30
+  headers:
+    User-Agent: "Flocks-FOFA-Client/1.0"
+
+response:
+  extract: ""

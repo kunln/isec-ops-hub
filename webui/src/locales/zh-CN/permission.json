@@ -1,0 +1,32 @@
+{
+  "pageTitle": "权限管理",
+  "pageDescription": "管理工具权限规则",
+  "addRule": "添加规则",
+  "ruleCount": "共 {{count}} 条规则",
+  "emptyTitle": "暂无权限规则",
+  "emptyDescription": "添加规则来控制工具访问权限",
+  "confirmDelete": "确定要删除这条权限规则吗？",
+  "deleteFailed": "删除失败",
+  "addFailed": "添加失败",
+  "fillToolName": "请填写工具名称",
+  "table": {
+    "tool": "工具",
+    "action": "动作",
+    "pattern": "模式",
+    "createdAt": "创建时间",
+    "operations": "操作"
+  },
+  "action": {
+    "allow": "允许",
+    "deny": "拒绝"
+  },
+  "dialog": {
+    "title": "添加权限规则",
+    "toolName": "工具名称",
+    "action": "动作",
+    "pattern": "模式",
+    "patternHint": "使用 * 匹配所有",
+    "adding": "添加中...",
+    "add": "添加"
+  }
+}

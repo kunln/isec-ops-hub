@@ -1,0 +1,20 @@
+{
+  "name": "asset_risk_profile_workflow",
+  "description": "Security Extension workflow for building an asset risk profile through the centralized Security Tool.",
+  "description_cn": "安全扩展资产风险画像工作流：通过统一 Security Tool 输出画像、证据和建议",
+  "start": "build_profile",
+  "nodes": [
+    {
+      "id": "build_profile",
+      "type": "python",
+      "description": "Call security_asset_risk_profile and expose structured workflow outputs.",
+      "code": "import json\n\nasset_id = inputs.get('asset_id') or inputs.get('assetId')\nif not asset_id:\n    raise ValueError('asset_id is required')\n\nresult = tool.run_safe('security_asset_risk_profile', asset_id=asset_id)\nif not result['success']:\n    raise RuntimeError(result.get('error') or 'security_asset_risk_profile failed')\n\ntry:\n    profile = json.loads(result.get('text') or '{}')\nexcept Exception:\n    profile = result.get('obj') or result.get('text')\n\nif not isinstance(profile, dict):\n    raise RuntimeError('security_asset_risk_profile returned an unsupported payload')\n\noutputs['asset'] = profile.get('asset')\noutputs['vulnerabilities'] = profile.get('vulnerabilities', [])\noutputs['alerts'] = profile.get('alerts', [])\noutputs['incidents'] = profile.get('incidents', [])\noutputs['honeypot_events'] = profile.get('honeypot_events', [])\noutputs['risk_profile'] = profile\noutputs['risk_score'] = profile.get('risk_score')\noutputs['confirmed_facts'] = profile.get('confirmed_facts', [])\noutputs['evidence'] = profile.get('evidence', [])\noutputs['inferences'] = profile.get('inferences', [])\noutputs['uncertainties'] = profile.get('uncertainties', [])\noutputs['recommended_actions'] = profile.get('recommended_actions', [])\n"
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "sampleInputs": {
+      "asset_id": "ast_sample_internet_portal"
+    }
+  }
+}

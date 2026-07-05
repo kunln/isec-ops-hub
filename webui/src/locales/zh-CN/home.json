@@ -1,0 +1,48 @@
+{
+  "productName": "安全运营平台",
+  "badge": "AI 原生的安全运营",
+  "subtitle": "AI 原生的安全运营自动化平台",
+  "description": "让 AI 替你做安全运营，从告警研判到威胁处置，全流程智能化，效率提升 10 倍",
+  "getStarted": "新手引导",
+  "adminControls": "本地管控",
+  "systemCard": {
+    "title": "本地系统",
+    "tagline": "AI 原生安全平台",
+    "cannotConnect": "无法连接到后端服务"
+  },
+  "stats": {
+    "weeklyTasks": "7 日任务数",
+    "systemStatus": "系统状态",
+    "scheduledTasks": "计划任务",
+    "workflows": "工作流",
+    "normal": "正常",
+    "abnormal": "异常",
+    "checking": "检测中...",
+    "activeScheduled": "启动计划任务",
+    "agentCount": "Agent 数量",
+    "workflowCount": "工作流数量",
+    "skillCount": "Skills 数量",
+    "toolCount": "Tools 数量",
+    "modelCount": "模型数量",
+    "backendErrorHint": "请确认后端服务正在运行",
+    "statusMessage": {
+      "healthy": "所有服务运行正常",
+      "warning": "部分服务降级",
+      "error": "服务不可用"
+    }
+  },
+  "quickActions": {
+    "sessions": {
+      "title": "会话管理",
+      "description": "与 AI 对话，完成复杂的安全任务"
+    },
+    "workflows": {
+      "title": "工作流",
+      "description": "可视化编排安全自动化流程"
+    },
+    "agents": {
+      "title": "Agent 智能体",
+      "description": "管理和配置 AI 智能体"
+    }
+  }
+}

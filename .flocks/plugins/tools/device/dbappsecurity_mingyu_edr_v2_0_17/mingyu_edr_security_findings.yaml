@@ -1,0 +1,62 @@
+name: mingyu_edr_security_findings
+description: Query Mingyu EDR read-only webshell, antivirus, isolation, and Windows/Linux vulnerability findings.
+description_cn: 查询明御 EDR 安全结果，只读支持网马扫描状态/结果、病毒查杀设置/结果、隔离区列表、病毒区详情、Windows/Linux 漏洞列表、关联资产和级别枚举。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 只读动作，不包含扫描、停止、隔离、信任、恢复、删除、修复。
+      enum:
+        - horse_scan_status
+        - horse_scan_list
+        - horse_current_scan
+        - horse_last_scan
+        - horse_read_scan_file
+        - horse_get_sub_item
+        - antivirus_scan_setting
+        - antivirus_virus_list
+        - antivirus_isolation_list
+        - antivirus_scan_detail
+        - win_vuln_list
+        - win_vuln_nodes
+        - win_vuln_level
+        - linux_vuln_list
+        - linux_vuln_nodes
+        - linux_vuln_level
+      default: antivirus_virus_list
+    page:
+      type: integer
+      default: 1
+    limit:
+      type: integer
+      default: 50
+    node_id:
+      type: string
+      description: 资产/终端 ID。
+    keyword:
+      type: string
+      description: 关键字过滤。
+    start_time:
+      type: string
+      description: 开始时间。
+    end_time:
+      type: string
+      description: 结束时间。
+    params:
+      type: object
+      additionalProperties: true
+    body:
+      type: object
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: security_findings

@@ -1,0 +1,106 @@
+{
+  "pageTitle": "Skills",
+  "pageDescription": "Manage Agent skills",
+  "searchPlaceholder": "Search skills...",
+  "createSkill": "Create Skill",
+  "installSkill": "Install Skill",
+  "refresh": "Refresh",
+  "refreshing": "Refreshing...",
+  "refreshed": "Refreshed ✓",
+  "refreshFailed": "Refresh failed",
+  "fetchDetailFailed": "Failed to fetch details",
+  "fetchListFailed": "Failed to fetch skill list",
+  "installFailed": "Install failed",
+  "installDepsFailed": "Dependency install failed",
+  "emptyState": {
+    "noSkills": "No Skills",
+    "noResults": "No skills found",
+    "createFirst": "Create your first skill",
+    "tryOtherKeywords": "Try different search keywords",
+    "tryOtherFilters": "No skills match the current filters — try adjusting or clearing them"
+  },
+  "section": {
+    "custom": "Custom Skills",
+    "builtin": "Built-in Skills"
+  },
+  "table": {
+    "type": "Type",
+    "name": "Name",
+    "source": "Source",
+    "status": "Status",
+    "enabled": "Enabled",
+    "actions": "Actions",
+    "edit": "Edit",
+    "builtin": "Built-in",
+    "custom": "Custom",
+    "totalCount_one": "{{count}} skill",
+    "totalCount_other": "{{count}} skills"
+  },
+  "pagination": {
+    "info": "Showing {{start}}–{{end}} of {{total}}"
+  },
+  "toggle": {
+    "enabledTip": "Enabled — click to remove from agent system prompt",
+    "disabledTip": "Disabled — click to add to agent system prompt",
+    "failed": "Toggle failed"
+  },
+  "eligibility": {
+    "ready": "Ready",
+    "missingDeps": "Missing deps",
+    "missingDepsInline": "Missing: {{list}}",
+    "installDeps": "Install deps",
+    "installing": "Installing...",
+    "installSuccess": "Dependencies installed",
+    "installFailed": "Dependency install failed"
+  },
+  "filter": {
+    "aria": "Skill source filter",
+    "all": "All",
+    "builtin": "Built-in",
+    "custom": "Custom",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "showAll": "Show all",
+    "clear": "Clear filter"
+  },
+  "installDialog": {
+    "title": "Install Skill",
+    "sourceLabel": "Source",
+    "sourcePlaceholder": "Enter a source, e.g.:\nclawhub:github\ngithub:owner/repo\nhttps://raw.githubusercontent.com/...\n/local/path/to/skill",
+    "sourceHint": "Supports clawhub, GitHub, URL, local path, and future safeskill: sources",
+    "scopeLabel": "Install scope",
+    "scopeGlobal": "Global (~/.flocks/plugins/skills/)",
+    "scopeProject": "Project (.flocks/plugins/skills/)",
+    "install": "Install",
+    "installing": "Installing...",
+    "cancel": "Cancel",
+    "success": "Skill \"{{name}}\" installed successfully",
+    "failed": "Install failed: {{error}}",
+    "missingDepsWarning": "Skill installed, but missing dependencies: {{missing}}",
+    "runInstallDeps": "Click \"Install deps\" to complete setup"
+  },
+  "sheet": {
+    "entityType": "Skill",
+    "path": "Path",
+    "readonlyNote": "Built-in Skill is read-only, cannot be modified",
+    "skillName": "Skill Name",
+    "description": "Description",
+    "content": "Content",
+    "preview": "Preview",
+    "edit": "Edit",
+    "noDescription": "(No description)",
+    "noContent": "(No content)",
+    "contentPlaceholder": "# Skill Instructions\n\nDetailed skill instructions...",
+    "descriptionPlaceholder": "Skill description",
+    "saving": "Saving...",
+    "deleting": "Deleting...",
+    "deleteSkill": "Delete this Skill",
+    "delete": "Delete",
+    "deleteBuiltinTip": "Built-in skills cannot be deleted",
+    "submitClose": "Close",
+    "operationFailed": "Operation Failed",
+    "deleteConfirm": "Are you sure to delete Skill \"{{name}}\"?",
+    "deleteFailed": "Delete Failed",
+    "saveFailed": "Save Failed"
+  }
+}

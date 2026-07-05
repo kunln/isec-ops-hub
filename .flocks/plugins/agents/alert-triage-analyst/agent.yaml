@@ -1,0 +1,39 @@
+name: alert-triage-analyst
+description: Security alert triage analyst for correlation, severity judgment, false-positive reasoning and incident escalation.
+description_cn: 告警研判专家，负责告警关联、分级、误报判断和事件升级建议
+
+mode: subagent
+strategy: react
+delegatable: true
+hidden: false
+tags: [security, alert, triage]
+
+prompt_file: prompt.md
+
+color: "#DC2626"
+temperature: 0.15
+
+skills:
+  - security-alert-triage-sop
+  - honeypot-event-analysis-sop
+
+tools:
+  - security_alert_search
+  - security_alert_get
+  - security_alert_triage
+  - security_correlate_alert
+  - security_asset_get
+  - security_vulnerability_search
+  - security_honeypot_event_search
+
+prompt_metadata:
+  category: security
+  cost: low
+  triggers:
+    - domain: security
+      trigger: "告警研判、误报判断、是否升级事件"
+  use_when:
+    - 用户要求分析告警是否需要升级
+    - 用户要求输出告警处置建议
+  avoid_when:
+    - 用户只需要资产台账维护

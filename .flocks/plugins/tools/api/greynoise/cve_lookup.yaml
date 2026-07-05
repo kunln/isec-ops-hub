@@ -1,0 +1,31 @@
+name: greynoise_cve_lookup
+description: >
+  Query GreyNoise CVE database to find IPs associated with a specific CVE.
+  Returns IPs that have been observed exploiting or targeting this vulnerability.
+  Requires Enterprise API subscription.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    cve_id:
+      type: string
+      description: CVE ID (e.g., "CVE-2021-44228")
+  required: [cve_id]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v1/cve/{cve_id}"
+  timeout: 30
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded"
+    404: "CVE not found"
+    400: "Invalid CVE ID format"

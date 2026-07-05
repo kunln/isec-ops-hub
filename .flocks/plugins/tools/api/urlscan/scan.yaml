@@ -1,0 +1,37 @@
+name: urlscan_scan
+description: >
+  Submit a URL to URLScan.io for automated scanning. URLScan browses the URL
+  like a regular user and records domains/IPs contacted, resources loaded,
+  and page content. Use when analyzing suspicious URLs, phishing pages, or
+  investigating malicious websites.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: The full URL to scan (must include protocol, e.g. https://example.com)
+    visibility:
+      type: string
+      description: Visibility of the scan result
+      enum: [public, unlisted, private]
+      default: "public"
+  required: [url]
+
+handler:
+  type: http
+  method: POST
+  url: "{base_url}/api/v1/scan"
+  headers:
+    Content-Type: "application/json"
+  body:
+    url: "{url}"
+    visibility: "{visibility}"
+  timeout: 30
+
+response:
+  extract: ""

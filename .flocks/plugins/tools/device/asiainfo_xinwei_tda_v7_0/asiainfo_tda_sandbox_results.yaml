@@ -1,0 +1,37 @@
+name: asiainfo_tda_sandbox_results
+description: Query AsiaInfo Security Xinwei TDA 2025.6 sandbox delivery records without downloading files.
+description_cn: 查询亚信安全信桅 TDA 2025.6 投递记录，仅返回记录信息，不下载样本或报告文件。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties:
+    start_ts:
+      type: integer
+      description: 起始时间戳。
+    end_ts:
+      type: integer
+      description: 结束时间戳。
+    file_md5:
+      type: string
+      description: 文件 MD5。
+    file_sha1:
+      type: string
+      description: 文件 SHA1。
+    page:
+      type: integer
+      description: 第几页，默认 1。
+      default: 1
+    limit:
+      type: integer
+      description: 每页条数，默认 100，最大 500。
+      default: 100
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: sandbox_results

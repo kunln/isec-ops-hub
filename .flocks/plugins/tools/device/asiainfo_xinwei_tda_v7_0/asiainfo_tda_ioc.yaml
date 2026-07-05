@@ -1,0 +1,23 @@
+name: asiainfo_tda_ioc
+description: Query custom threat-intelligence IOC MD5 rules from AsiaInfo Security Xinwei TDA by rule ID or MD5 content.
+description_cn: 查询亚信安全信桅 TDA 自定义威胁情报 IOC MD5 规则，可按规则号 sid 或 MD5 content 过滤。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties:
+    sid:
+      type: string
+      description: 规则号，例如 250000001。
+    content:
+      type: string
+      description: 自定义 IOC 的 MD5 内容，例如 68CCC2EFC570A8CE52AD7A6EEE30ADBC。
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: ioc

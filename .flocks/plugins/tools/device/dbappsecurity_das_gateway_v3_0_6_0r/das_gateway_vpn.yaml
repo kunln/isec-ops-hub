@@ -1,0 +1,53 @@
+name: das_gateway_vpn
+description: Read DAS-Gateway IKE/IPSec VPN configuration and SA monitoring data.
+description_cn: 只读查询明御安全网关 IKE/IPSec VPN 配置、隧道接口和 SA 监控数据。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - ike_list
+        - ike_filter
+        - ike_detail
+        - ipsec_by_ike
+        - ipsec_filter
+        - ipsec_detail
+        - ipsec_tunnel_list
+        - ipsec_tunnel_filter
+        - ipsec_tunnel_detail
+        - ike_sa_list
+        - ike_sa_filter
+        - ipsec_sa_list
+        - ipsec_sa_detail
+        - easy_ipsec
+        - easy_ipsec_sa_list
+        - easy_ipsec_sa_filter
+        - easy_ipsec_sa_detail
+      default: ike_list
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：name、ike_name、tunnel_ifname、sa_id、local_addr、peer_addr、peer_subnet。peer_subnet 若包含 /，厂商要求可传入已双重编码的 %252f。
+      additionalProperties: true
+    query:
+      type: object
+      additionalProperties: true
+    page:
+      type: integer
+    count:
+      type: integer
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: vpn

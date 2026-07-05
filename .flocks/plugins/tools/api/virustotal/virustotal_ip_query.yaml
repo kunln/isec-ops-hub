@@ -1,0 +1,19 @@
+name: virustotal_ip_query
+description: Query IP address threat intelligence from VirusTotal.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    ip:
+      type: string
+      description: The IP address to query, for example 8.8.8.8.
+  required: [ip]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: ip_query

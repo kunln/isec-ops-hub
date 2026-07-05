@@ -1,0 +1,63 @@
+{
+  "description": "File uploads, agent artifacts and memory browser",
+  "tabs": {
+    "files": "File Manager",
+    "memory": "Memory Files"
+  },
+  "files": {
+    "back": "Go up",
+    "refresh": "Refresh current folder",
+    "newDir": "New folder",
+    "upload": "Upload file",
+    "dirNamePlaceholder": "Folder name",
+    "create": "Create",
+    "dropHere": "Drop files here to upload",
+    "emptyDir": "Empty folder — drop files or click upload",
+    "columns": {
+      "name": "Name",
+      "size": "Size",
+      "modified": "Modified"
+    },
+    "download": "Download",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "uploading": "Uploading...",
+    "binaryPreview": "Binary files cannot be previewed",
+    "downloadFile": "Download File",
+    "toast": {
+      "loadDirFailed": "Failed to load directory",
+      "readFileFailed": "Failed to read file",
+      "saveSuccess": "Saved successfully",
+      "saveFailed": "Failed to save",
+      "deleteSuccess": "Deleted successfully",
+      "deleteFailed": "Failed to delete",
+      "uploadSuccess": "Uploaded {{count}} file(s) successfully",
+      "uploadPartialFail": "{{count}} file(s) failed to upload",
+      "uploadFailed": "Upload failed",
+      "createDirFailed": "Failed to create folder"
+    },
+    "confirm": {
+      "deleteTitle": "Confirm Delete",
+      "deleteDesc": "Delete \"{{name}}\" cannot be undone. Continue?",
+      "deleteBtn": "Delete"
+    }
+  },
+  "memory": {
+    "title": "Memory Files",
+    "refresh": "Refresh",
+    "searchPlaceholder": "Search files...",
+    "loadFailed": "Load failed",
+    "retry": "Retry",
+    "noFiles": "No memory files",
+    "noMatch": "No matching results",
+    "readOnly": "Read-only · Written by agents",
+    "readFailed": "Read failed",
+    "selectPrompt": "Select a file on the left to preview",
+    "selectDesc": "Memory files are written automatically by agents like Rex to record task context and key information",
+    "loadMemoryFailed": "Failed to load memory files",
+    "readFileFailed": "Failed to read file"
+  }
+}

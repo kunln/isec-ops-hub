@@ -1,0 +1,315 @@
+{
+  "title": "商业化后台",
+  "description": "{{productName}} 商业化配置与本地管控",
+  "actions": {
+    "refresh": "刷新",
+    "save": "保存",
+    "saving": "保存中",
+    "saved": "已保存",
+    "import": "导入",
+    "importing": "导入中",
+    "imported": "已导入",
+    "install": "安装",
+    "installing": "安装中",
+    "export": "导出",
+    "rollback": "回滚"
+  },
+  "nav": {
+    "overview": "总览",
+    "branding": "品牌设置",
+    "license": "许可证",
+    "features": "功能开关",
+    "update": "更新策略",
+    "connectivity": "外联管控",
+    "notifications": "通知策略",
+    "telemetry": "遥测策略",
+    "packages": "离线包",
+    "diagnostics": "诊断",
+    "audit": "审计日志"
+  },
+  "status": {
+    "true": "已启用",
+    "false": "已禁用",
+    "active": "启用",
+    "available": "可用",
+    "baseline": "基础可用",
+    "community": "社区版",
+    "denied": "已拒绝",
+    "disabled": "已禁用",
+    "enabled": "已启用",
+    "excluded": "不包含",
+    "expired": "已过期",
+    "failed": "失败",
+    "imported": "已导入",
+    "included": "已包含",
+    "inactive": "未激活",
+    "license": "许可证",
+    "local": "本地",
+    "missing": "缺失",
+    "off": "关闭",
+    "optional": "可选",
+    "required": "必需",
+    "revoked": "已吊销",
+    "stable": "稳定版",
+    "success": "成功",
+    "suspended": "已暂停",
+    "unlicensed": "未授权"
+  },
+  "risk": {
+    "low": "低",
+    "medium": "中",
+    "high": "高",
+    "critical": "严重"
+  },
+  "packageTypes": {
+    "agent": "Agent",
+    "tool": "工具",
+    "skill": "技能",
+    "workflow": "工作流",
+    "runtime": "运行时"
+  },
+  "telemetryModes": {
+    "off": "关闭",
+    "basic": "基础",
+    "support": "支持"
+  },
+  "features": {
+    "audit": "商业化审计日志",
+    "branding": "品牌设置",
+    "connectivity": "外联管控",
+    "diagnostics": "诊断导出",
+    "license": "许可证导入与状态",
+    "packages": "离线包安装",
+    "telemetry": "商业化遥测",
+    "telemetrySecurityData": "安全数据遥测",
+    "updates": "更新策略"
+  },
+  "featureMessages": {
+    "availableWithoutLicense": "无需商业许可证即可使用。",
+    "enabledByLicense": "当前商业许可证已启用。",
+    "disabledInactiveLicense": "当前许可证未激活、已过期或缺失，因此该能力已禁用。",
+    "disabledMissingFeature": "当前许可证不包含该能力，因此已禁用。",
+    "defaultDisabled": "当前商业许可证未启用该能力。"
+  },
+  "errors": {
+    "notFound": "接口未找到，请确认后端已加载商业化路由",
+    "unauthorized": "未登录或登录已失效",
+    "forbidden": "当前账号没有权限",
+    "requestFailed": "请求失败"
+  },
+  "messages": {
+    "loadFailureItem": "{{section}}：{{message}}",
+    "partialLoadFailed": "部分配置加载失败：{{details}}",
+    "partialRefreshFailed": "部分状态刷新失败：{{details}}",
+    "saveFailed": "保存失败：{{message}}"
+  },
+  "format": {
+    "itemSeparator": "；"
+  },
+  "loadSections": {
+    "branding": "品牌设置",
+    "license": "许可证",
+    "update": "更新策略",
+    "connectivity": "外联管控",
+    "notifications": "通知策略",
+    "telemetry": "遥测策略",
+    "packages": "离线包",
+    "diagnostics": "诊断",
+    "features": "功能开关",
+    "audit": "审计日志"
+  },
+  "overview": {
+    "cards": {
+      "license": "许可证",
+      "outbound": "主动外联",
+      "telemetry": "遥测",
+      "packages": "离线包"
+    },
+    "controlStatus": "管控状态",
+    "updateChannel": "更新通道",
+    "allowedHostCount": "允许主机数",
+    "featureFlags": "功能开关",
+    "enabledFeatureCount": "{{enabled}} 个已启用 / 共 {{total}} 个",
+    "signatureRequired": "是否强制签名",
+    "securityTelemetry": "安全数据遥测"
+  },
+  "values": {
+    "yes": "是",
+    "no": "否",
+    "included": "包含",
+    "excluded": "不包含",
+    "notDeclared": "未声明",
+    "set": "已设置",
+    "missing": "缺失"
+  },
+  "fields": {
+    "productName": "产品名称",
+    "companyName": "公司名称",
+    "logoLight": "浅色 Logo",
+    "logoDark": "深色 Logo",
+    "favicon": "网站图标",
+    "supportUrl": "支持地址",
+    "loginTitle": "登录页标题",
+    "loginSubtitle": "登录页副标题",
+    "copyright": "版权信息"
+  },
+  "license": {
+    "title": "许可证",
+    "licensedTo": "授权对象",
+    "licenseId": "许可证 ID",
+    "expiresAt": "到期时间",
+    "importedAt": "导入时间",
+    "licensedFeatures": "授权能力",
+    "noLicensedFeatures": "未启用商业化能力",
+    "importLabel": "导入许可证",
+    "importPlaceholder": "粘贴许可证密钥或 JSON 清单"
+  },
+  "featuresTable": {
+    "title": "功能开关",
+    "columns": {
+      "capability": "能力",
+      "requiredFeatures": "所需授权能力",
+      "status": "状态",
+      "source": "来源",
+      "description": "说明"
+    },
+    "empty": "未加载功能开关"
+  },
+  "update": {
+    "fields": {
+      "updateServerUrl": "更新服务地址",
+      "updateChannel": "更新通道",
+      "updateCheckEnabled": "允许更新检查",
+      "updateApplyEnabled": "允许应用更新",
+      "legacySourcesEnabled": "允许 Flocks 原更新源",
+      "requireManualApproval": "需要人工审批",
+      "offlinePackageImport": "允许离线包导入",
+      "signatureRequired": "必须校验签名",
+      "rollbackEnabled": "允许回滚"
+    }
+  },
+  "connectivity": {
+    "fields": {
+      "outboundEnabled": "允许主动外联",
+      "tlsVerify": "校验 TLS 证书",
+      "proxyUrl": "代理地址",
+      "updateServerUrl": "更新服务地址",
+      "telemetryServerUrl": "遥测服务地址",
+      "licenseServerUrl": "许可证服务地址",
+      "allowedHosts": "允许主机"
+    }
+  },
+  "notifications": {
+    "fields": {
+      "localNotificationsEnabled": "允许本地通知",
+      "builtInNotificationsEnabled": "允许内置通知",
+      "benefitNotificationsEnabled": "允许福利提醒",
+      "whatsNewNotificationsEnabled": "允许版本更新内容",
+      "vendorNotificationsEnabled": "允许厂商推送通知",
+      "announcementNotificationsEnabled": "允许公告通知"
+    }
+  },
+  "telemetry": {
+    "fields": {
+      "enabled": "启用遥测",
+      "mode": "模式",
+      "includeLogs": "包含日志",
+      "includeMetrics": "包含指标",
+      "includeSecurityData": "包含安全数据",
+      "redactionEnabled": "启用脱敏"
+    }
+  },
+  "packages": {
+    "installTitle": "安装本地离线包",
+    "listTitle": "本地离线包",
+    "permissionSummary": "{{label}}（{{risk}}）",
+    "permissionsPlaceholder": "bash | high | local execution | run local diagnostics",
+    "fields": {
+      "id": "包 ID",
+      "type": "类型",
+      "name": "名称",
+      "version": "版本",
+      "publisher": "发布方",
+      "compatibleRuntime": "兼容运行时",
+      "source": "来源",
+      "declaredRisk": "声明风险",
+      "hash": "哈希值",
+      "signature": "签名",
+      "permissions": "权限声明",
+      "riskSummary": "风险说明",
+      "description": "描述"
+    },
+    "preflight": {
+      "title": "安装前风险",
+      "signaturePolicy": "签名{{requirement}}",
+      "baseRisk": "基础风险",
+      "permissions": "权限",
+      "integrity": "完整性",
+      "integrityValue": "哈希{{hash}} / 签名{{signature}}",
+      "offlineImportDisabled": "当前更新策略已禁用离线包导入。",
+      "permissionReviewRequired": "需要确认权限声明审核。",
+      "highRiskReviewRequired": "需要确认高风险包评估。",
+      "hashRequired": "高风险包必须填写哈希值。",
+      "signatureRequired": "当前更新策略要求高风险包必须填写签名。",
+      "unsignedHighRiskAcknowledgementRequired": "未签名高风险包需要确认当前非强制签名策略。",
+      "blocked": "请先处理安装前检查项，再安装该离线包。"
+    },
+    "acknowledge": {
+      "permissions": "已审核权限声明",
+      "risk": "已确认高风险包评估",
+      "signaturePolicy": "确认在当前策略下接受未签名高风险包安装"
+    },
+    "columns": {
+      "name": "名称",
+      "type": "类型",
+      "version": "版本",
+      "risk": "风险",
+      "permissions": "权限",
+      "installedAt": "安装时间",
+      "actions": "操作"
+    },
+    "empty": "暂无本地离线包"
+  },
+  "diagnostics": {
+    "title": "诊断信息",
+    "generatedAt": "生成时间：{{time}}"
+  },
+  "audit": {
+    "title": "商业化审计",
+    "description": "最近的本地管理员操作与权限决策",
+    "columns": {
+      "time": "时间",
+      "actor": "操作者",
+      "action": "动作",
+      "target": "目标",
+      "status": "状态",
+      "summary": "摘要"
+    },
+    "empty": "暂无审计事件",
+    "metadata": "元数据"
+  },
+  "footer": {
+    "summary": "主动外联：{{outbound}} / 安全数据遥测：{{telemetry}}"
+  },
+  "commercialShell": {
+    "title": "商业化后台管理",
+    "subtitle": "厂商产品维护与安全业务后台",
+    "logout": "退出",
+    "nav": {
+      "admin": "商业化配置",
+      "securityAdmin": "安全业务后台"
+    },
+    "login": {
+      "title": "商业化后台登录",
+      "subtitle": "仅供厂商维护人员使用",
+      "username": "用户名",
+      "password": "密码",
+      "signIn": "登录",
+      "signingIn": "正在登录..."
+    },
+    "errors": {
+      "login": "登录失败",
+      "status": "无法确认商业化后台登录状态"
+    }
+  }
+}

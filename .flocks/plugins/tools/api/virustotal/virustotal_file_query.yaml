@@ -1,0 +1,19 @@
+name: virustotal_file_query
+description: Query file hash threat intelligence from VirusTotal.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    file_hash:
+      type: string
+      description: MD5, SHA1, or SHA256 hash of the file.
+  required: [file_hash]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: file_query

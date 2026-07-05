@@ -1,0 +1,38 @@
+name: greynoise_enterprise_ip_query
+description: >
+  Query GreyNoise threat intelligence for an IP address to determine if it's
+  associated with malicious scanning or attack activity. Returns classification
+  (malicious/benign), first/last seen dates, and associated tags. Use when
+  investigating suspicious IPs during security incident response or threat hunting.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    ip:
+      type: string
+      description: IPv4 address to query (e.g., "1.2.3.4")
+    quick:
+      type: boolean
+      description: Use quick mode for faster response with smaller payload
+      default: false
+  required: [ip]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v3/ip/{ip}"
+  query_params:
+    quick: "{quick}"
+  timeout: 30
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded"
+    404: "No data found for this IP"
+    400: "Invalid IP address format"

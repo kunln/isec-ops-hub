@@ -1,0 +1,37 @@
+name: greynoise_gnql_stats
+description: >
+  GreyNoise Query Language (GNQL) statistics. Returns aggregate counts
+  grouped by specified field (country, port, tag, classification, etc.).
+  Useful for threat landscape analysis. Requires Enterprise API subscription.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: GNQL query string (e.g., "last_seen:1d")
+    field:
+      type: string
+      description: Field to aggregate by (country, port, classification, tags, etc.)
+      default: "classification"
+  required: [query]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v3/gnql/stats"
+  query_params:
+    query: "{query}"
+    field: "{field}"
+  timeout: 30
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded"
+    400: "Invalid GNQL query"

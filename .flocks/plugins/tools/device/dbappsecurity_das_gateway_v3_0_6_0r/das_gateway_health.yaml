@@ -1,0 +1,21 @@
+name: das_gateway_health
+description: Query DBAPPSecurity Mingyu DAS-Gateway health with HostInfo, SystemResourceInfo, and optional License read-only APIs.
+description_cn: 查询安恒信息明御安全网关 DAS-Gateway 健康信息，包括系统信息、系统资源和可选 License 状态，可作为设备健康查询工具。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    include_license:
+      type: boolean
+      description: 是否同时读取 License 状态。
+      default: true
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: health

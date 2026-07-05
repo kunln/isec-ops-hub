@@ -1,0 +1,320 @@
+"""
+Question Tool - User interaction and confirmation
+
+Provides a way for agents to ask questions to users and receive answers.
+Supports multiple choice questions with custom options.
+"""
+
+import asyncio
+from contextvars import ContextVar
+from typing import List, Dict, Any, Optional, Callable, Awaitable
+
+from flocks.tool.registry import (
+    ToolRegistry, ToolCategory, ToolParameter, ParameterType, ToolResult, ToolContext
+)
+from flocks.utils.log import Log
+
+
+log = Log.create(service="tool.question")
+
+
+# Context variable to pass message_id to handler
+_current_message_id: ContextVar[Optional[str]] = ContextVar('current_message_id', default=None)
+_current_call_id: ContextVar[Optional[str]] = ContextVar('current_call_id', default=None)
+
+
+def get_current_message_id() -> Optional[str]:
+    """
+    Get the current message ID from context
+    
+    This is used by question handlers to get the message ID associated
+    with the current question tool call.
+    
+    Returns:
+        Message ID if available, None otherwise
+    """
+    return _current_message_id.get()
+
+
+def get_current_call_id() -> Optional[str]:
+    """
+    Get the current call ID from context
+    
+    This is used by question handlers to get the call ID associated
+    with the current question tool call.
+    
+    Returns:
+        Call ID if available, None otherwise
+    """
+    return _current_call_id.get()
+
+
+# Question callback type - should be set by the application
+QuestionCallback = Callable[[str, List[Dict[str, Any]]], Awaitable[List[List[str]]]]
+
+# Global question handler (to be set by the application)
+_question_handler: Optional[QuestionCallback] = None
+
+
+def set_question_handler(handler: QuestionCallback) -> None:
+    """
+    Set the global question handler
+    
+    The handler should be an async function that:
+    - Takes session_id and list of questions
+    - Returns list of answers (each answer is a list of selected option labels)
+    
+    Args:
+        handler: Question handler function
+    """
+    global _question_handler
+    _question_handler = handler
+
+
+class QuestionRejectedError(Exception):
+    """Raised when user rejects/declines a question"""
+    pass
+
+
+DESCRIPTION = """Ask the user a question and wait for their response.
+
+Use this tool when you need to:
+- Confirm before making significant changes
+- Get user preference between multiple options
+- Clarify ambiguous instructions
+
+Question format:
+- Each question has a text prompt
+- Optional header for context
+- List of options for the user to choose from
+- Options have label and optional description
+
+The user's answers will be returned for you to continue with."""
+
+
+async def default_question_handler(
+    session_id: str,
+    questions: List[Dict[str, Any]]
+) -> List[List[str]]:
+    """
+    Default question handler that auto-accepts
+    
+    In production, this would be replaced with actual user interaction.
+    
+    Args:
+        session_id: Session ID
+        questions: List of questions
+        
+    Returns:
+        List of answers (first option selected for each)
+    """
+    answers = []
+    for q in questions:
+        options = q.get("options", [])
+        if options:
+            # Auto-select first option
+            answers.append([options[0].get("label", "Yes")])
+        else:
+            answers.append(["Yes"])
+    return answers
+
+
+@ToolRegistry.register_function(
+    name="question",
+    description=DESCRIPTION,
+    category=ToolCategory.SYSTEM,
+    parameters=[
+        ToolParameter(
+            name="questions",
+            type=ParameterType.ARRAY,
+            description="Array of questions to ask the user",
+            required=True,
+            json_schema={
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "description": "Question text prompt",
+                        },
+                        "header": {
+                            "type": "string",
+                            "description": "Optional header/context for the question",
+                        },
+                        "type": {
+                            "type": "string",
+                            "description": (
+                                "Input type for the question. "
+                                "'choice' (default): select from options (single or multiple); "
+                                "'text': free-form text input (single or multi-line); "
+                                "'number': numeric input with optional range; "
+                                "'file': file upload (content returned to agent); "
+                                "'confirm': yes/no confirmation buttons; "
+                                "'password': masked text input for sensitive data."
+                            ),
+                            "enum": ["choice", "text", "number", "file", "confirm", "password"],
+                        },
+                        "options": {
+                            "type": "array",
+                            "description": "Options for 'choice' type questions",
+                            "items": {
+                                "anyOf": [
+                                    {"type": "string"},
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "label": {"type": "string"},
+                                            "description": {"type": "string"},
+                                        },
+                                        "required": ["label"],
+                                        "additionalProperties": False,
+                                    },
+                                ],
+                            },
+                        },
+                        "multiple": {
+                            "type": "boolean",
+                            "description": "For 'choice' type: allow selecting multiple options",
+                        },
+                        "placeholder": {
+                            "type": "string",
+                            "description": "Placeholder/hint text for text, number, password, file inputs",
+                        },
+                        "multiline": {
+                            "type": "boolean",
+                            "description": "For 'text' type: use textarea (multi-line input)",
+                        },
+                        "min_value": {
+                            "type": "number",
+                            "description": "For 'number' type: minimum allowed value",
+                        },
+                        "max_value": {
+                            "type": "number",
+                            "description": "For 'number' type: maximum allowed value",
+                        },
+                        "step": {
+                            "type": "number",
+                            "description": "For 'number' type: step increment",
+                        },
+                        "accept": {
+                            "type": "string",
+                            "description": "For 'file' type: accepted file extensions, e.g. '.txt,.log,.csv'",
+                        },
+                    },
+                    "required": ["question"],
+                    "additionalProperties": True,
+                },
+            },
+        ),
+    ]
+)
+async def question_tool(
+    ctx: ToolContext,
+    questions: List[Dict[str, Any]],
+) -> ToolResult:
+    """
+    Ask questions to the user
+    
+    Args:
+        ctx: Tool context
+        questions: List of question objects with question, header, options fields
+        
+    Returns:
+        ToolResult with user's answers
+    """
+    if not questions:
+        return ToolResult(
+            success=False,
+            error="At least one question is required"
+        )
+    
+    # Normalize questions
+    normalized_questions = []
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        
+        normalized = {
+            "question": str(q.get("question", "")),
+            "header": q.get("header", ""),
+            "type": q.get("type", "choice"),
+            "options": [],
+            "multiple": q.get("multiple", False),
+            "placeholder": q.get("placeholder", ""),
+            "multiline": q.get("multiline", False),
+        }
+        # Optional numeric range fields
+        if "min_value" in q:
+            normalized["min_value"] = q["min_value"]
+        if "max_value" in q:
+            normalized["max_value"] = q["max_value"]
+        if "step" in q:
+            normalized["step"] = q["step"]
+        if "accept" in q:
+            normalized["accept"] = q["accept"]
+
+        options = q.get("options", [])
+        for opt in options:
+            if isinstance(opt, dict):
+                normalized["options"].append({
+                    "label": str(opt.get("label", "")),
+                    "description": opt.get("description", "")
+                })
+            elif isinstance(opt, str):
+                normalized["options"].append({
+                    "label": opt,
+                    "description": ""
+                })
+        
+        normalized_questions.append(normalized)
+    
+    if not normalized_questions:
+        return ToolResult(
+            success=False,
+            error="No valid questions provided"
+        )
+    
+    # Get handler
+    handler = _question_handler or default_question_handler
+    
+    try:
+        # Set message_id and call_id in context for handler to use
+        _current_message_id.set(ctx.message_id)
+        _current_call_id.set(ctx.call_id)
+        
+        # Ask questions
+        answers = await handler(ctx.session_id, normalized_questions)
+        
+        # Format output
+        def format_answer(answer: Optional[List[str]]) -> str:
+            if not answer:
+                return "Unanswered"
+            return ", ".join(answer)
+        
+        formatted = ", ".join([
+            f'"{q["question"]}"="{format_answer(answers[i] if i < len(answers) else None)}"'
+            for i, q in enumerate(normalized_questions)
+        ])
+        
+        output = f"User has answered your questions: {formatted}. You can now continue with the user's answers in mind."
+        
+        return ToolResult(
+            success=True,
+            output=output,
+            title=f"Asked {len(normalized_questions)} question{'s' if len(normalized_questions) > 1 else ''}",
+            metadata={
+                "answers": answers
+            }
+        )
+        
+    except QuestionRejectedError:
+        return ToolResult(
+            success=False,
+            error="User rejected the question"
+        )
+    except Exception as e:
+        return ToolResult(
+            success=False,
+            error=f"Failed to get answers: {str(e)}"
+        )

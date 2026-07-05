@@ -1,0 +1,71 @@
+{
+  "pageTitle": "MCP Servers",
+  "pageDescription": "Manage and discover Model Context Protocol servers",
+  "tabs": {
+    "myServers": "My Servers",
+    "catalog": "Tool Catalog"
+  },
+  "servers": {
+    "count": "{{count}} servers total",
+    "refresh": "Refresh",
+    "empty": "No MCP Servers",
+    "emptyHint": "Switch to Tool Catalog to browse and install MCP tools",
+    "connected": "Connected",
+    "error": "Error",
+    "disconnected": "Disconnected",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "tools": "tools",
+    "resources": "resources",
+    "noTools": "No tools",
+    "noResources": "No resources",
+    "connectFailed": "Connection failed",
+    "disconnectFailed": "Disconnect failed"
+  },
+  "categories": {
+    "threat_intelligence": "Threat Intelligence",
+    "vulnerability": "Vulnerability Management",
+    "siem": "SIEM & Log Analysis",
+    "network_security": "Network Security",
+    "code_security": "Code Security",
+    "reverse_engineering": "Reverse Engineering",
+    "osint": "OSINT",
+    "cloud_security": "Cloud Security",
+    "compliance": "Compliance",
+    "forensics": "Digital Forensics",
+    "attack_framework": "Attack Framework",
+    "data_pipeline": "Data Processing",
+    "firewall": "Firewall & Network Devices",
+    "secops_platform": "SecOps Platform",
+    "identity_security": "Identity Security"
+  },
+  "detail": {
+    "removeServer": "Remove Server"
+  },
+  "alert": {
+    "confirmRemoveMCP": "Are you sure you want to remove MCP server \"{{name}}\"?"
+  },
+  "catalog": {
+    "all": "All",
+    "searchPlaceholder": "Search MCP tools...",
+    "toolCount": "{{count}} tools",
+    "official": "Official",
+    "requiresSecret": "Requires Secret",
+    "install": "Install",
+    "installing": "Installing...",
+    "installFailed": "Installation failed",
+    "noResults": "No matching tools found",
+    "noResultsHint": "Try adjusting your search or category filter",
+    "language": "Language",
+    "license": "License",
+    "transport": "Transport",
+    "tags": "Tags",
+    "envVars": "Environment Variables",
+    "systemDeps": "System Dependencies",
+    "startCommand": "Start Command",
+    "githubRepo": "GitHub Repository",
+    "addToMyServers": "Add to My Servers",
+    "requiresEnvVars": "The following environment variables need to be configured",
+    "configureEnvHint": "Please configure in ~/.flocks/config/.secret.json or environment variables"
+  }
+}

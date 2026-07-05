@@ -1,0 +1,50 @@
+{
+  "version": "connector.package.v1",
+  "id": "sangfor-xdr-v2-2",
+  "name": "Sangfor XDR Connector",
+  "vendor": "Sangfor",
+  "product": "XDR",
+  "product_version": "2.2",
+  "package_version": "2026.06.0",
+  "deployment": "device_tool",
+  "auth_methods": ["device_profile"],
+  "capabilities": [
+    "asset.search",
+    "vulnerability.search",
+    "alert.search"
+  ],
+  "adapters": {
+    "asset.search": "adapters/asset.search.adapter.json",
+    "vulnerability.search": "adapters/vulnerability.search.adapter.json",
+    "alert.search": "adapters/alert.search.adapter.json"
+  },
+  "pagination": {
+    "type": "tool",
+    "page_size": 20
+  },
+  "rate_limit": {
+    "mode": "vendor_default",
+    "requests_per_minute": 60
+  },
+  "permissions": [
+    "sangfor_xdr:asset:read",
+    "sangfor_xdr:vulnerability:read",
+    "sangfor_xdr:alert:read"
+  ],
+  "risk_level": "medium",
+  "description": "Production Sangfor XDR package backed by the existing Sangfor XDR device tools. It syncs asset inventory, vulnerability risk data, and security alerts.",
+  "compatibility": {
+    "min_flocks_version": "0.0.0"
+  },
+  "release": {
+    "channel": "stable",
+    "published_at": "2026-06-03T00:00:00Z",
+    "notes": "Adds read-only Sangfor XDR asset, vulnerability, and alert sync through the device tool registry.",
+    "changelog": [
+      "Uses tool transport instead of fixture replay.",
+      "Normalizes paginated XDR data.list responses into Flocks security entities.",
+      "Keeps device targeting configurable through FLOCKS_CONNECTOR_DEVICE_ID."
+    ]
+  },
+  "enabled": true
+}

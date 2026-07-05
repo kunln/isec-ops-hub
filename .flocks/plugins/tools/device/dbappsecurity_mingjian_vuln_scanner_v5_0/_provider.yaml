@@ -1,0 +1,53 @@
+name: 明鉴漏洞扫描系统
+vendor: 安恒信息
+service_id: dbappsecurity_mingjian_vuln_scanner_api
+version: "5.0"
+integration_type: device
+description: DBAPPSecurity Mingjian Vulnerability Scanner / DAS-RAS V5.0 RPC-style HTTPS API package. Provides customer-side low-risk read-only tools for connection health, scan engines, tasks, vulnerability results, assets, policies, and system status.
+description_cn: 安恒信息明鉴漏洞扫描系统（DAS-RAS）V5.0 HTTPS API 设备包，只暴露客户侧低风险只读查询：健康、扫描引擎、任务状态/结果、资产、策略模板和系统状态。
+auth:
+  type: token
+  description: |
+    厂商手册要求先调用 GET /api/normal/token，传入 userName 和 userCode 获取 data.Authorization。
+    userCode 是账号密码的 32 位 MD5 密文；后续请求在 Header 中直接携带 Authorization: <token>，未使用 Bearer 前缀。
+credential_fields:
+  - key: base_url
+    label: Base URL
+    description: 明鉴漏洞扫描系统管理 API 地址，例如 https://scanner.example.com 或 https://192.0.2.10。不要填写 /api/normal/token 等具体接口路径。
+    storage: config
+    config_key: base_url
+    input_type: url
+    default: "https://{secret:dbappsecurity_mingjian_host}"
+    required: true
+  - key: username
+    label: Username
+    description: 可调用明鉴 API 的账号，对应 token 接口的 userName。
+    storage: config
+    config_key: username
+    input_type: text
+    required: true
+  - key: user_code
+    label: User Code
+    description: 账号密码的 32 位 MD5 密文，对应 token 接口的 userCode。
+    storage: secret
+    config_key: user_code
+    secret_id: dbappsecurity_mingjian_user_code
+    input_type: password
+    required: true
+  - key: api_prefix
+    label: API Prefix
+    description: 可选接口前缀。厂商路径形如 /api/normal/task/list；若现场反向代理挂载在 /ras 下，可填写 ras。
+    storage: config
+    config_key: api_prefix
+    input_type: text
+    default: ""
+    required: false
+defaults:
+  base_url: "https://{secret:dbappsecurity_mingjian_host}"
+  timeout: 30
+  category: custom
+  product_version: "5.0"
+notes: |
+  客户侧 8080 只暴露低风险动作：添加设备、测试连接、启停、更新凭据、查看健康和只读查询。
+  本包只实现低风险只读能力：token 连通性、扫描引擎、任务列表/计数/状态/进度、扫描结果/漏洞数量/站点信息、资产查询/计数、策略/模板、系统版本/资源/授权信息。
+  DOCX 中任务创建、从资产创建任务、任务启动/暂停/恢复/停止/删除，资产创建/更新/删除、数据库连通性校验、报告导出、授权导入/导出、syslog 更新，以及字典新增/保存/删除/查看等写入/删除/导出/处置/维护能力默认不暴露到客户侧设备 API。

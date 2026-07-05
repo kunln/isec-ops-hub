@@ -1,0 +1,31 @@
+name: mingyu_edr_reports
+description: Query Mingyu EDR read-only report counters and charts, excluding report export and subscription actions.
+description_cn: 查询明御 EDR 日志报表只读统计，包括 EDR 事件趋势、病毒 TOP10、易被勒索资产 TOP10、风险资产 TOP10 和总体风险等级。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum: [edr_event_trend, virus_top, ransom_asset_top, risk_asset_top, overall_risk_level]
+      default: edr_event_trend
+    start_time:
+      type: string
+    end_time:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+    body:
+      type: object
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: reports

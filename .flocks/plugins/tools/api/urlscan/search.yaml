@@ -1,0 +1,33 @@
+name: urlscan_search
+description: >
+  Search URLScan.io's historical scan database. Query by domain, IP, URL, filename,
+  or other attributes to find previous scans. Useful for threat intelligence gathering,
+  investigating attack infrastructure, or finding related malicious sites.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: Search query using URLScan search syntax (e.g., domain:example.com, ip:1.2.3.4)
+    size:
+      type: integer
+      description: Number of results to return
+      default: 10
+  required: [query]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/api/v1/search"
+  query_params:
+    q: "{query}"
+    size: "{size}"
+  timeout: 30
+
+response:
+  extract: ""

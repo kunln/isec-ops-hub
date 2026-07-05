@@ -1,0 +1,50 @@
+{
+  "version": "connector.package.v1",
+  "id": "tdp-v3-3-10",
+  "name": "TDP Connector",
+  "vendor": "Sangfor",
+  "product": "TDP",
+  "product_version": "3.3.10",
+  "package_version": "2026.06.0",
+  "deployment": "device_tool",
+  "auth_methods": ["device_profile"],
+  "capabilities": [
+    "asset.search",
+    "vulnerability.search",
+    "alert.search"
+  ],
+  "adapters": {
+    "asset.search": "adapters/asset.search.adapter.json",
+    "vulnerability.search": "adapters/vulnerability.search.adapter.json",
+    "alert.search": "adapters/alert.search.adapter.json"
+  },
+  "pagination": {
+    "type": "tool",
+    "page_size": 20
+  },
+  "rate_limit": {
+    "mode": "vendor_default",
+    "requests_per_minute": 60
+  },
+  "permissions": [
+    "tdp:asset:read",
+    "tdp:vulnerability:read",
+    "tdp:alert:read"
+  ],
+  "risk_level": "medium",
+  "description": "Production TDP package backed by the existing TDP device tools. It syncs host assets, vulnerability findings, and alert/log investigation results.",
+  "compatibility": {
+    "min_flocks_version": "0.0.0"
+  },
+  "release": {
+    "channel": "stable",
+    "published_at": "2026-06-03T00:00:00Z",
+    "notes": "Adds read-only TDP asset, vulnerability, and alert sync through the device tool registry.",
+    "changelog": [
+      "Uses TDP host asset, vulnerability, and log search tools.",
+      "Normalizes common TDP list/page response shapes into Flocks entities.",
+      "Keeps device targeting configurable through FLOCKS_CONNECTOR_DEVICE_ID."
+    ]
+  },
+  "enabled": true
+}

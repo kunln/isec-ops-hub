@@ -1,0 +1,11 @@
+name: greynoise
+description: GreyNoise Threat Intelligence - Internet-wide scan and attack traffic analysis
+auth:
+  secret: greynoise_api_key
+  inject_as: header
+  header_name: key
+  header_prefix: ""
+defaults:
+  base_url: "https://api.greynoise.io"
+  timeout: 30
+  category: custom

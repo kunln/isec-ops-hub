@@ -1,0 +1,35 @@
+name: mingyu_edr_policy
+description: Query Mingyu EDR read-only policy template and micro-isolation policy lists and details.
+description_cn: 查询明御 EDR 策略管理只读数据，包括策略模板列表/详情/绑定资产/未绑定资产和微隔离策略列表。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum: [template_list, template_detail, template_bound_nodes, template_unbound_nodes, microisolation_list]
+      default: template_list
+    page:
+      type: integer
+      default: 1
+    limit:
+      type: integer
+      default: 50
+    keyword:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+    body:
+      type: object
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: policy

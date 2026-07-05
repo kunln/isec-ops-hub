@@ -1,0 +1,17 @@
+name: asiainfo_tda_health
+description: Check AsiaInfo Security Xinwei TDA connectivity using the signed read-only system-resource endpoint.
+description_cn: 使用签名只读设备资源接口检测亚信安全信桅 TDA 连接、API Key、Secret 和基础只读接口是否可用。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties: {}
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: health

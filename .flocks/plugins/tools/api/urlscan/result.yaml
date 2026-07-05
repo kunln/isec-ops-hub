@@ -1,0 +1,26 @@
+name: urlscan_result
+description: >
+  Retrieve the scan result from URLScan.io using the UUID returned from a scan.
+  Returns detailed information including page content, screenshots, DOM snapshot,
+  and network connections. Use after submitting a URL with urlscan_scan.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties:
+    scan_id:
+      type: string
+      description: The UUID of the scan result (e.g., 0196d976-07f6-7aae-8a57-aa019145f31c)
+  required: [scan_id]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/api/v1/result/{scan_id}/"
+  timeout: 30
+
+response:
+  extract: ""

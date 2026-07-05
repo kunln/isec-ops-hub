@@ -1,0 +1,79 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "alert.search",
+  "target": "alerts",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["id", "uuid", "eventId", "event_id", "eventid", "incidentid", "accessid", "_id"], "target": "id" },
+    { "raw": ["asset_id", "assetId", "hostId", "host_id", "dst_ip", "dest_ip", "dip", "serverIp", "server_ip", "ip"], "target": "asset_id" },
+    {
+      "target": "source",
+      "default": "ndr",
+      "enum_default": "ndr",
+      "enum": {
+        "xdr": "xdr",
+        "edr": "edr",
+        "ndr": "ndr",
+        "waf": "waf",
+        "siem": "siem",
+        "honeypot": "honeypot",
+        "scanner": "scanner",
+        "manual": "manual",
+        "other": "other"
+      }
+    },
+    { "raw": ["title", "name", "eventName", "event_name", "incidentName", "incident_name", "signature", "riskName", "risk_name"], "target": "title", "default": "Mingyu APT Event" },
+    {
+      "raw": ["severity", "level", "riskLevel", "risk_level", "threatLevel", "threat_level"],
+      "target": "severity",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "0": "info",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "critical",
+        "info": "info",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical",
+        "严重": "critical",
+        "危急": "critical",
+        "高危": "high",
+        "中危": "medium",
+        "低危": "low",
+        "信息": "info"
+      }
+    },
+    { "raw": ["type", "event_type", "eventType", "incidentType", "incident_type"], "target": "alert_type" },
+    { "raw": ["description", "desc", "detail", "summary", "eventDesc", "event_desc"], "target": "description" },
+    { "raw": "$", "target": "raw_event", "transform": "copy" },
+    { "raw": ["iocs", "ioc", "tags", "riskTag", "sip", "dip"], "target": "ioc", "default": [], "transform": "list" },
+    { "raw": ["mitre", "attck", "attckTechnique", "attackTechnique"], "target": "mitre_technique" },
+    {
+      "raw": ["status", "attackStatus", "attack_status", "result"],
+      "target": "status",
+      "default": "new",
+      "enum_default": "new",
+      "enum": {
+        "new": "new",
+        "triaging": "triaging",
+        "open": "new",
+        "active": "new",
+        "success": "confirmed",
+        "confirmed": "confirmed",
+        "false_positive": "false_positive",
+        "incident_created": "incident_created",
+        "closed": "closed",
+        "误报": "false_positive"
+      }
+    },
+    { "raw": ["timestamp", "time", "@timestamp", "occurred_at", "occurredAt", "eventTime", "event_time", "begin"], "target": "occurred_at" }
+  ]
+}

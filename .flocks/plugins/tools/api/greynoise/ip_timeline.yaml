@@ -1,0 +1,31 @@
+name: greynoise_ip_timeline
+description: >
+  Get IP activity timeline showing when an IP was observed by GreyNoise sensors.
+  Returns timestamps of scanning activity. Useful for understanding attack timing.
+  Requires Enterprise API subscription.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    ip:
+      type: string
+      description: IPv4 address to query (e.g., "1.2.3.4")
+  required: [ip]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v3/noise/ips/{ip}/timeline"
+  timeout: 30
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded"
+    404: "IP not found in dataset"
+    400: "Invalid IP address"

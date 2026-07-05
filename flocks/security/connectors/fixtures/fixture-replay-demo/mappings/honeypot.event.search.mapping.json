@@ -1,0 +1,23 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "honeypot.event.search",
+  "target": "honeypot_events",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": "id", "target": "id", "required": true },
+    { "raw": "sensor", "target": "sensor_id" },
+    { "raw": "src_ip", "target": "source_ip", "required": true },
+    { "raw": "dst_ip", "target": "target_ip", "required": true },
+    { "raw": "protocol", "target": "protocol" },
+    { "raw": "service", "target": "service" },
+    { "raw": "type", "target": "event_type" },
+    { "raw": "payload", "target": "payload" },
+    { "raw": "geo", "target": "geo", "default": {}, "transform": "dict" },
+    { "raw": "label", "target": "threat_label" },
+    { "raw": "timestamp", "target": "occurred_at" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "honeypot.event.search",
+  "transport": "fixture",
+  "fixture": {
+    "path": "../honeypot_events_search.json"
+  },
+  "mapping": "../mappings/honeypot.event.search.mapping.json",
+  "request": {
+    "method": "GET",
+    "path": "/honeypot/events/search",
+    "auth": { "type": "none" }
+  },
+  "pagination": {
+    "type": "fixture",
+    "page_size": "all"
+  }
+}

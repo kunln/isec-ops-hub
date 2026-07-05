@@ -1,0 +1,60 @@
+name: host-forensics
+description: >-
+  Linux host compromise detection and forensics subagent. Use when the user asks to inspect,
+  analyze, or investigate whether a host is compromised, cryptomining, backdoors, webshells,
+  persistence, or mentions host anomalies or security checks. Runs staged collection:
+  Step 0 triage.sh → Step 1 analyze output → Step 2 deep forensics → Step 3 threat intelligence.
+  Analyzes suspicious indicators, validates IoCs with threat intelligence, preferring
+  ThreatBook for external IP lookups and falling back to VirusTotal when needed, and
+  produces structured assessment reports.
+description_cn: >
+  Linux 主机入侵检测取证。当用户要求检查/分析/调查某台主机是否被入侵、是否有挖矿程序、
+  是否有后门/webshell/持久化、或提到"主机异常"、"主机安全检查"时使用。
+  执行分阶段取证采集：Step 0 运行 triage.sh → Step 1 分析输出 → Step 2 深度取证 → Step 3 威胁情报查询。
+  分析可疑指标，使用威胁情报验证 IoC；对外部 IP 查询默认优先使用 ThreatBook，
+  必要时再使用 VirusTotal，输出结构化研判报告。
+
+mode: subagent
+delegatable: true
+hidden: false
+tags: [security]
+color: "#E74C3C"
+
+temperature: 0.3
+
+tools:
+  - read
+  - glob
+  - grep
+  - edit
+  - write
+  - bash
+  - todoread
+  - todowrite
+  - tool_search
+  - ssh_run_script
+  - ssh_host_cmd
+  - threatbook_mcp_ip_query
+  - threatbook_mcp_domain_query
+  - threatbook_mcp_hash_query
+  - threatbook_io_url_query
+  - threatbook_cn_file_upload
+  - virustotal_ip_query
+  - virustotal_domain_query
+  - virustotal_file_query
+  - virustotal_url_query
+  - websearch
+  - webfetch
+
+prompt_metadata:
+  category: security
+  cost: medium
+  triggers:
+    - domain: security
+      trigger: "Linux host compromise detection, forensic analysis, cryptomining, backdoor, webshell"
+  use_when:
+    - User asks to investigate a Linux host for compromise
+    - User mentions host security check, backdoor detection, cryptomining
+    - User asks to analyze if a host is compromised
+  avoid_when:
+    - Non-security related tasks

@@ -1,0 +1,53 @@
+{
+  "version": "connector.package.v1",
+  "id": "dbappsecurity-mingjian-vuln-scanner-v5-0",
+  "name": "DBAPPSecurity Mingjian Vulnerability Scanner Connector",
+  "vendor": "DBAPPSecurity",
+  "product": "Mingjian Vuln Scanner",
+  "product_version": "5.0",
+  "package_version": "2026.06.0",
+  "deployment": "device_tool",
+  "auth_methods": ["device_profile"],
+  "capabilities": [
+    "asset.search",
+    "vulnerability.search"
+  ],
+  "health_tool": {
+    "name": "mingjian_vuln_scanner_health",
+    "params": {
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    }
+  },
+  "adapters": {
+    "asset.search": "adapters/asset.search.adapter.json",
+    "vulnerability.search": "adapters/vulnerability.search.adapter.json"
+  },
+  "pagination": {
+    "type": "tool",
+    "page_size": 100
+  },
+  "rate_limit": {
+    "mode": "vendor_default",
+    "requests_per_minute": 60
+  },
+  "permissions": [
+    "mingjian_vuln_scanner:asset:read",
+    "mingjian_vuln_scanner:vulnerability:read"
+  ],
+  "risk_level": "medium",
+  "description": "Read-only connector package for DBAPPSecurity Mingjian Vulnerability Scanner. It syncs scanned assets and vulnerability findings through the device tool registry.",
+  "compatibility": {
+    "min_flocks_version": "0.0.0"
+  },
+  "release": {
+    "channel": "stable",
+    "published_at": "2026-06-08T00:00:00Z",
+    "notes": "Adds read-only Mingjian asset and vulnerability sync through the device tool registry.",
+    "changelog": [
+      "Uses mingjian_vuln_scanner_assets for scanned asset ingestion.",
+      "Uses mingjian_vuln_scanner_results for vulnerability finding ingestion.",
+      "Keeps device targeting configurable through FLOCKS_CONNECTOR_DEVICE_ID."
+    ]
+  },
+  "enabled": true
+}

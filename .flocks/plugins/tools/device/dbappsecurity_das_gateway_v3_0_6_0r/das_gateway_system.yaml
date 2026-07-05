@@ -1,0 +1,64 @@
+name: das_gateway_system
+description: Read DAS-Gateway system, license, management, time, deployment, DHCP, application cache, and shared-access status.
+description_cn: 只读查询明御安全网关系统、License、管理设定、时间、部署模式、DHCP、应用缓存和共享接入状态。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - host_info
+        - system_resource_info
+        - license
+        - management_config
+        - timezone
+        - time_config
+        - auto_update
+        - update_log
+        - interface_deploy_list
+        - interface_deploy_detail
+        - dhcp_service_list
+        - dhcp_service_interface
+        - dhcp_server_list
+        - dhcp_server_detail
+        - dhcp_server_filter
+        - dhcp_exclusion_list
+        - dhcp_exclusion_detail_v4
+        - dhcp_exclusion_detail_v6
+        - dhcp_exclusion_filter
+        - dhcp_ipbind_list
+        - dhcp_ipbind_detail
+        - dhcp_ipbind_filter
+        - dhcp_ipstatus_list
+        - dhcp_ipstatus_filter
+        - app_cache_list
+        - app_cache_domain_list
+        - app_cache_domain_detail
+        - user_share_config
+      default: host_info
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：interface_name、ifname、server_name、filter_name、id、ip_start、ip_end、start_ip、end_ip、filter_srcaddr、filter_dstaddr、bind_name、filter_ip、domain。
+      additionalProperties: true
+    query:
+      type: object
+      additionalProperties: true
+    page:
+      type: integer
+    count:
+      type: integer
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: system

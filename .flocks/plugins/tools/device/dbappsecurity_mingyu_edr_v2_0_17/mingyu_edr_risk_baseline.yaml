@@ -1,0 +1,48 @@
+name: mingyu_edr_risk_baseline
+description: Query Mingyu EDR read-only risk assessment and baseline inspection data. Assessment execution and task mutation APIs are omitted.
+description_cn: 查询明御 EDR 风险评估和基线检查只读数据，包括资产风险列表/详情、基线策略、任务列表、任务结果、影响资产和检查项详情。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - risk_assets
+        - risk_detail
+        - baseline_policy
+        - baseline_task_list
+        - baseline_task_info
+        - baseline_task_nodes
+        - baseline_task_node_risks
+        - baseline_item_info
+        - baseline_levels
+        - baseline_unbound_nodes
+        - baseline_bound_nodes
+      default: risk_assets
+    page:
+      type: integer
+      default: 1
+    limit:
+      type: integer
+      default: 50
+    node_id:
+      type: string
+    keyword:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+    body:
+      type: object
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: risk_baseline

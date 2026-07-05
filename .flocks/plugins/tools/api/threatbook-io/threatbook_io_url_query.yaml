@@ -1,0 +1,35 @@
+name: threatbook_io_url_query
+description: >
+  Query URL threat intelligence including scan engine detection results,
+  sandbox analysis reports, and downloaded file analysis. Use when analyzing
+  suspicious URLs from phishing or malware distribution.
+description_cn: 查询URL威胁情报，包括扫描引擎检测结果、沙箱分析报告和下载文件分析。用于分析钓鱼或恶意软件分发中的可疑URL。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: URL to query (must be URL-encoded)
+  required: [url]
+
+handler:
+  type: http
+  method: POST
+  url: "{base_url}/v2/url/query"
+  query_params:
+    url: "{url}"
+  timeout: 30
+
+response:
+  extract: "data"
+  error_mapping:
+    400: "Invalid request parameters"
+    401: "API key invalid or expired"
+    405: "Invalid API method"
+    429: "Rate limit exceeded"
+    500: "System error"

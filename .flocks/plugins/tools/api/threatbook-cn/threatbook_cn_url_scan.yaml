@@ -1,0 +1,30 @@
+name: threatbook_cn_url_scan
+description: >
+  Submit a URL to ThreatBook for scanning by 11 URL scanning engines and URL/domain blacklists.
+  Also analyzes files downloaded from the URL. Use when analyzing suspicious URLs from emails, 
+  web downloads, or phishing investigations.
+description_cn: 提交URL到微步在线进行扫描，检测恶意URL及下载文件
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-cn
+
+inputSchema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: URL to scan (must include protocol, e.g., https://example.com)
+  required: [url]
+
+handler:
+  type: http
+  method: POST
+  url: "{base_url}/v3/url/scan"
+  query_params:
+    url: "{url}"
+  timeout: 30
+  content_type: application/x-www-form-urlencoded
+
+response:
+  extract: "data"

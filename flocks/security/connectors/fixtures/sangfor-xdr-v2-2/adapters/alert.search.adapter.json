@@ -1,0 +1,24 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "alert.search",
+  "transport": "tool",
+  "tool": {
+    "name": "sangfor_xdr_alerts",
+    "params": {
+      "action": "list",
+      "page_size": 20,
+      "page_num": 1,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": ["data.list", "data.rows", "data.items", "result.list", "list", "rows", "items"],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/alert.search.mapping.json",
+  "pagination": {
+    "type": "page",
+    "page_param": "page_num",
+    "size_param": "page_size"
+  }
+}

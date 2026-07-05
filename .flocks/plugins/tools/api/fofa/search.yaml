@@ -1,0 +1,57 @@
+name: fofa_search
+description: >
+  Search FOFA network space for assets matching query syntax.
+  Use for asset discovery, attack surface enumeration, and vulnerability assessment.
+  Supports queries like app="Nginx", ip="1.1.1.1", port="3389", domain="example.com".
+category: custom
+enabled: true
+requires_confirmation: false
+provider: fofa
+
+inputSchema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: "FOFA search query syntax (e.g. app=\"Nginx\", ip=\"1.1.1.1\", domain=\"example.com\")"
+      required: true
+    page:
+      type: integer
+      description: Page number (default 1)
+      default: 1
+    size:
+      type: integer
+      description: Results per page (default 100, max 10000)
+      default: 100
+    fields:
+      type: string
+      description: "Comma-separated fields to return (default: host,ip,port,protocol)"
+      default: "host,ip,port,protocol"
+    full:
+      type: boolean
+      description: Return full banner information
+      default: false
+  required: [query]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/search/all"
+  query_params:
+    email: "{secret:fofa_email}"
+    key: "{secret:fofa_api_key}"
+    q: "{query}"
+    page: "{page}"
+    size: "{size}"
+    fields: "{fields}"
+    full: "{full}"
+  timeout: 60
+  headers:
+    User-Agent: "Flocks-FOFA-Client/1.0"
+
+response:
+  extract: ""
+  error_mapping:
+    401: "Invalid API key"
+    429: "Rate limit exceeded"
+    500: "FOFA server error"

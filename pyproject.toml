@@ -1,0 +1,147 @@
+[project]
+name = "flocks"
+version = "v2026.5.27"
+description = "AI-Native SecOps platform with multi-agent collaboration"
+authors = [
+    {name = "Flocks Team", email = "team@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = {text = "MIT"}
+keywords = ["ai", "security", "secops", "assistant", "llm", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=1.8.2",
+    "websockets>=12.0",
+    "aiohttp>=3.13.3",
+    "requests>=2.32.5",
+    # Data Validation & Schema
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    # CLI & Terminal UI
+    "click>=8.1.7",
+    "rich>=13.7.0",
+    "typer>=0.9.0",
+    # AI & LLM
+    "litellm>=1.30.0",
+    "anthropic>=0.86.0",
+    "openai>=1.12.0",
+    "google-genai>=0.3.0",
+    "tiktoken>=0.12.0",
+    # Async & HTTP
+    "httpx[socks]>=0.26.0",
+    "aiofiles>=23.2.1",
+    # File & Code Processing
+    "tree-sitter>=0.21.0",
+    "watchdog>=4.0.0",
+    "gitpython>=3.1.41",
+    # LSP Support
+    "pygls>=1.3.0",
+    "lsprotocol>=2023.0.0",
+    # Storage & Database
+    "aiosqlite>=0.19.0",
+    "sqlalchemy>=2.0.25",
+    # Utilities
+    "ulid-py>=1.1.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.1",
+    "toml>=0.10.2",
+    "jsonschema>=4.20.0",
+    "striprtf>=0.0.26",
+    "claude>=0.4.11",
+    "mcp>=1.26.0",
+    "croniter>=6.0.0",
+    "langfuse",
+    "asyncssh>=2.22.0",
+    # WeCom AI Bot (WebSocket long-connection)
+    "wecom-aibot-sdk>=1.0.0",
+    # Feishu / Lark (WebSocket long-connection + Open API)
+    "lark-oapi>=1.3.0",
+    # DingTalk Stream Mode (WebSocket long-connection)
+    "dingtalk-stream>=0.20",
+    "python-socks>=2.8.1",
+    "pytz>=2026.1.post1",
+    # docs parser
+    "pypdf>=6.8.0",
+    "markitdown>=0.1.5",
+    "pymupdf>=1.27.2.2",
+    "olefile>=0.47",
+    "defusedxml>=0.7.1",
+    "markdown>=3.10.2",
+    "jinja2>=3.1.6",
+    # browser
+    "cdp-use>=1.4.5",
+    "pillow>=12.2.0",
+    "datasketch>=1.10.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipython>=8.18.0",
+    "mypy>=1.7.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+flocks = "flocks.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["flocks"]
+
+[tool.hatch.build.targets.wheel.force-include]
+".flocks/flockshub" = ".flocks/flockshub"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+]
+ignore = [
+    "E501",  # line too long; formatting is handled by Ruff
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"
+markers = [
+    "integration: marks tests as integration tests (require API keys)",
+    "slow: marks tests as slow running (>30s per test)",
+    "live: marks tests as requiring live services; enable with FLOCKS_LIVE_TEST=1 and running dev server",
+]

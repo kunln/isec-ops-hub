@@ -1,0 +1,14 @@
+{
+  "pageTitle": "Config",
+  "pageDescription": "System configuration management",
+  "editor": {
+    "title": "Configuration Editor",
+    "description": "Edit system configuration (JSON format)",
+    "reset": "Reset",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Configuration saved",
+    "jsonError": "JSON format error",
+    "saveFailed": "Save failed"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "version": "connector.package.v1",
+  "id": "skyeye-v4-0-14-sp2",
+  "name": "SkyEye Connector",
+  "vendor": "Sangfor",
+  "product": "SkyEye",
+  "product_version": "4.0.14.0 SP2",
+  "package_version": "2026.06.0",
+  "deployment": "device_tool",
+  "auth_methods": ["device_profile"],
+  "capabilities": [
+    "alert.search",
+    "honeypot.event.search"
+  ],
+  "adapters": {
+    "alert.search": "adapters/alert.search.adapter.json",
+    "honeypot.event.search": "adapters/honeypot.event.search.adapter.json"
+  },
+  "pagination": {
+    "type": "tool",
+    "page_size": 20
+  },
+  "rate_limit": {
+    "mode": "vendor_default",
+    "requests_per_minute": 60
+  },
+  "permissions": [
+    "skyeye:alert:read",
+    "skyeye:honeypot:read"
+  ],
+  "risk_level": "medium",
+  "description": "Production SkyEye package backed by the existing SkyEye device tools. It syncs security alarms and honeypot-source alarms into Flocks alerts and honeypot events.",
+  "compatibility": {
+    "min_flocks_version": "0.0.0"
+  },
+  "release": {
+    "channel": "stable",
+    "published_at": "2026-06-03T00:00:00Z",
+    "notes": "Adds read-only SkyEye alarm and honeypot event sync through the device tool registry.",
+    "changelog": [
+      "Uses SkyEye alarm list for general alert ingestion.",
+      "Uses data_source=7 to ingest honeypot-originated events.",
+      "Keeps device targeting configurable through FLOCKS_CONNECTOR_DEVICE_ID."
+    ]
+  },
+  "enabled": true
+}

@@ -1,0 +1,37 @@
+{
+  "name": "security_alert_triage_notify",
+  "description": "Scan newly synced high/critical security alerts, run local triage, deduplicate notifications, and send a summary through a selected IM channel.",
+  "description_cn": "扫描新同步的高危/严重告警，执行本地研判，去重后通过可选 IM 通道推送摘要。",
+  "category": "security",
+  "start": "triage_and_notify",
+  "nodes": [
+    {
+      "id": "triage_and_notify",
+      "type": "python",
+      "description": "Filter alerts, run triage, deduplicate, and send channel notification.",
+      "code": "from pathlib import Path\n\nscript = None\nfor base in [Path.cwd(), *Path.cwd().parents]:\n    candidate = base / '.flocks' / 'plugins' / 'workflows' / 'security_alert_triage_notify' / 'notify.py'\n    if candidate.is_file():\n        script = candidate\n        break\nif script is None:\n    raise FileNotFoundError('security_alert_triage_notify/notify.py not found')\nexec(compile(script.read_text(encoding='utf-8'), str(script), 'exec'), globals(), globals())\n"
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "sampleInputs": {
+      "channel_id": "weixin",
+      "to": "",
+      "account_id": "",
+      "severity_levels": [
+        "critical",
+        "high"
+      ],
+      "statuses": [
+        "new"
+      ],
+      "lookback_minutes": 1440,
+      "max_alerts": 10,
+      "scan_limit": 500,
+      "create_incident": true,
+      "dry_run": false,
+      "reset_state": false,
+      "send_when_empty": false
+    }
+  }
+}

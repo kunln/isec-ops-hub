@@ -1,0 +1,20 @@
+{
+  "name": "incident_report_workflow",
+  "description": "Security Extension MVP workflow for generating a Markdown incident report.",
+  "description_cn": "安全扩展 MVP 事件报告工作流：生成 Markdown 安全事件报告",
+  "start": "generate_report",
+  "nodes": [
+    {
+      "id": "generate_report",
+      "type": "python",
+      "description": "Call security_report_generate for an incident.",
+      "code": "import json\n\nincident_id = inputs.get('incident_id') or inputs.get('incidentId')\nif not incident_id:\n    raise ValueError('incident_id is required')\n\nresult = tool.run_safe('security_report_generate', incident_id=incident_id, format='markdown')\nif not result['success']:\n    outputs['success'] = False\n    outputs['error'] = result['error']\nelse:\n    try:\n        report = json.loads(result['text'])\n    except Exception:\n        report = {'content': result.get('text', '')}\n    outputs['success'] = True\n    outputs['incident_id'] = incident_id\n    outputs['report'] = report.get('content', '') if isinstance(report, dict) else str(report)\n"
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "sampleInputs": {
+      "incident_id": "inc_xxx"
+    }
+  }
+}

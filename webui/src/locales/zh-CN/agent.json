@@ -1,0 +1,86 @@
+{
+  "pageTitle": "AI Agents",
+  "pageDescription": "管理和配置 AI Agent",
+  "createSubAgent": "创建子 Agent",
+  "confirmDelete": "确定要删除 Agent \"{{name}}\" 吗？",
+  "deleteFailed": "删除失败",
+  "emptyState": {
+    "title": "暂无 Agent",
+    "description": "创建您的第一个 Agent"
+  },
+  "section": {
+    "primary": {
+      "title": "主 Agent",
+      "subtitle": "直接与用户交互、分析任务并协调子 Agent 执行"
+    },
+    "sub": {
+      "title": "子 Agent",
+      "subtitle": "由主 Agent 调度的专业执行者，各司其职完成特定任务"
+    }
+  },
+  "totalCount": "共 {{total}} 个 Agent",
+  "badge": {
+    "native": "内置",
+    "custom": "自定义",
+    "delegatable": "可委托",
+    "delete": "删除",
+    "edit": "编辑",
+    "nativeDeleteDisabled": "内置 Agent 不支持删除"
+  },
+  "filter": {
+    "all": "全部",
+    "builtin": "内置",
+    "custom": "自定义",
+    "aria": "按来源筛选"
+  },
+  "pagination": {
+    "info": "{{start}}–{{end}} / 共 {{total}} 个"
+  },
+  "form": {
+    "name": "名称",
+    "description": "描述（英文）",
+    "descriptionHint": "用于委派与模型上下文，请使用英文",
+    "descriptionPlaceholder": "Short English description for delegation",
+    "descriptionCn": "描述（中文）",
+    "descriptionCnPlaceholder": "中文界面展示（可选）",
+    "mode": "模式",
+    "model": "模型",
+    "temperature": "温度",
+    "systemDefault": "系统默认",
+    "otherCategory": "其他",
+    "selectAll": "全选",
+    "selected": "{{count}} 已选",
+    "clearSelection": "清空",
+    "noTools": "暂无可用 Tool",
+    "noSkills": "暂无可用 Skill",
+    "loadingTools": "加载工具列表...",
+    "loadingSkills": "加载 Skill 列表...",
+    "primaryModeLabel": "Primary（主 Agent）",
+    "subagentModeLabel": "Subagent（子 Agent）",
+    "nativeReadOnlyPrefix": "内置 Agent 仅支持修改",
+    "nativeReadOnlyAnd": "和",
+    "nativeReadOnlySuffix": "，其他配置由系统维护",
+    "rexAssistWrite": "Rex 协助编写",
+    "color": "颜色",
+    "colorOptional": "（可选）"
+  },
+  "error": {
+    "updateFailed": "更新失败: {{detail}}",
+    "extractTimeout": "提取超时。请在对话中让 Rex 输出 JSON 格式的配置，然后再试。",
+    "requiredFields": "请填写必填字段",
+    "createFailed": "创建失败: {{message}}"
+  },
+  "sheet": {
+    "done": "完成"
+  },
+  "chat": {
+    "createTitle": "创建子 Agent",
+    "subtitle": "通过对话描述需求，AI 自动生成配置",
+    "preparing": "正在准备创建助手...",
+    "placeholder": "描述你想创建的 Agent... (Enter 发送)"
+  },
+  "dialog": {
+    "createTitle": "创建 Agent",
+    "editTitle": "编辑 Agent：{{name}}"
+  }
+}

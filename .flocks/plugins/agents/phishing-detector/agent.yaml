@@ -1,0 +1,51 @@
+name: phishing-detector
+description: >
+  Specialized agent for detecting and analyzing phishing emails, extracting IOCs, and assessing threat level.
+
+description_cn: 钓鱼邮件检测与分析，提取 IOC 并评估威胁等级。
+
+mode: subagent
+strategy: read_only
+delegatable: true
+hidden: false
+tags: [security]
+
+color: "#E74C3C"
+temperature: 0.3
+
+tools:
+  - read
+  - glob
+  - grep
+  - edit
+  - write
+  - bash
+  - todoread
+  - todowrite
+  - tool_search
+  - websearch
+  - webfetch
+  - virustotal_ip_query
+  - virustotal_domain_query
+  - virustotal_url_query
+  - virustotal_file_query
+  - threatbook_mcp_ip_query
+  - threatbook_mcp_domain_query
+  - threatbook_mcp_hash_query
+  - threatbook_io_url_query
+
+prompt_metadata:
+  category: security
+  cost: medium
+  triggers:
+    - domain: security
+      trigger: "phishing email detection, suspicious email analysis"
+  use_when:
+    - User asks to analyze a suspicious email
+    - User asks to check if an email is phishing
+    - User asks to extract IOCs from an email
+    - User mentions phishing detection or email security
+  avoid_when:
+    - User asks to send emails
+    - User asks to modify email settings
+    - Non-security related tasks

@@ -1,0 +1,37 @@
+name: mingyu_apt_navigation
+description: 查询明御 APT 导航概览数据，包括紧急事件/恶意文件统计、风险趋势、高危类别、地图、攻击源区域和紧急事件/高风险列表。
+description_cn: 查询明御 APT 导航概览，只读返回最近 24 小时、7 天、1 个月或 2 个月的风险与事件统计。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingyu_apt_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 查询动作：latest_hours=紧急事件/恶意文件统计，risk_trend=风险趋势，risk_category=高危风险类别，map_list=地图，attack_region=攻击源区域排名，event_list=紧急事件/高风险列表。
+      enum:
+        - latest_hours
+        - risk_trend
+        - risk_category
+        - map_list
+        - attack_region
+        - event_list
+      default: latest_hours
+    time_ago:
+      type: string
+      description: 时间范围：h24=最近24小时，d7=最近7天，m1=最近1个月，m2=最近2个月。
+      enum:
+        - h24
+        - d7
+        - m1
+        - m2
+      default: d7
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_apt.handler.py
+  function: navigation

@@ -1,0 +1,95 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "alert.search",
+  "target": "alerts",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["_id", "flow_id", "merge_key", "log_id", "event_id", "eventId", "id", "uuid", "rule_id"], "target": "id" },
+    {
+      "raw": ["asset_id", "assetId", "victim_addr.0", "dst.0", "victim_addr", "dst", "dst_ip", "dest_ip", "victim_ip", "ip"],
+      "target": "asset_id",
+      "transform": "string"
+    },
+    {
+      "target": "source",
+      "default": "ndr",
+      "enum_default": "ndr",
+      "enum": {
+        "xdr": "xdr",
+        "edr": "edr",
+        "ndr": "ndr",
+        "waf": "waf",
+        "siem": "siem",
+        "honeypot": "honeypot",
+        "scanner": "scanner",
+        "manual": "manual",
+        "other": "other"
+      }
+    },
+    { "raw": ["threat_desc", "rule_name", "name", "title", "event_name", "eventName", "signature"], "target": "title", "default": "AsiaInfo TDA Alert" },
+    {
+      "raw": ["severity", "level", "risk_level", "riskLevel"],
+      "target": "severity",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "0x1": "low",
+        "0x2": "medium",
+        "0x3": "high",
+        "0x4": "critical",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "critical",
+        "信息": "info",
+        "低危": "low",
+        "可疑": "medium",
+        "中危": "medium",
+        "高危": "high",
+        "超危": "critical",
+        "失陷": "critical",
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low",
+        "info": "info"
+      }
+    },
+    { "raw": ["threat_class", "threat_tag", "sub_threat_type", "attack_tac", "attack_tec", "rule_source"], "target": "alert_type" },
+    { "raw": ["description", "desc", "detail", "threat_desc", "rule_name"], "target": "description" },
+    { "raw": "$", "target": "raw_event", "transform": "copy" },
+    { "raw": ["ioc_resource", "file_hash_md5", "file_hash_sha1", "domain", "url", "src", "dst", "attacker_addr", "victim_addr"], "target": "ioc", "default": [], "transform": "list" },
+    { "raw": ["attck_tec", "attck_tac", "attack_tec", "attack_tac"], "target": "mitre_technique" },
+    {
+      "raw": ["disposal", "disposal_name", "status", "reading", "attack_res"],
+      "target": "status",
+      "default": "new",
+      "enum_default": "new",
+      "enum": {
+        "0": "new",
+        "1": "triaging",
+        "2": "closed",
+        "3": "false_positive",
+        "4": "closed",
+        "未处置": "new",
+        "处置中": "triaging",
+        "忽略": "closed",
+        "误报": "false_positive",
+        "已处置": "closed",
+        "成功": "confirmed",
+        "攻陷": "confirmed",
+        "失败": "new",
+        "侦察": "new"
+      }
+    },
+    {
+      "raw": ["latest_time", "first_time", "event_time", "timestamp", "time", "occurred_at"],
+      "target": "occurred_at",
+      "transform": "string"
+    }
+  ]
+}

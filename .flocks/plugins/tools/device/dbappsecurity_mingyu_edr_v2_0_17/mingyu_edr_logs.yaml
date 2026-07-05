@@ -1,0 +1,39 @@
+name: mingyu_edr_logs
+description: Query Mingyu EDR read-only protection logs, operation logs, and log type enumerations. Export APIs are intentionally omitted.
+description_cn: 查询明御 EDR 防护日志、运维日志和日志类型枚举。导出 CSV/Excel 接口不暴露到客户侧。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum: [protection_list, protection_top_type, protection_type, operation_list, operation_event, operation_type]
+      default: protection_list
+    page:
+      type: integer
+      default: 1
+    limit:
+      type: integer
+      default: 50
+    keyword:
+      type: string
+    start_time:
+      type: string
+    end_time:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+    body:
+      type: object
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: logs

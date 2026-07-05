@@ -1,0 +1,30 @@
+{
+  "pageTitle": "System Monitoring",
+  "pageDescription": "Real-time system status and performance monitoring",
+  "systemStatus": "System Status",
+  "uptime": "Uptime",
+  "activeSessions": "Active Sessions",
+  "activeAgents": "Active Agents",
+  "messagesPerMin": "Messages/min",
+  "status": {
+    "healthy": "Healthy",
+    "degraded": "Degraded",
+    "down": "Down"
+  },
+  "realTimeMetrics": "Real-time Metrics",
+  "metrics": {
+    "messageRate": "Message Rate",
+    "toolCallRate": "Tool Calls",
+    "errorRate": "Error Rate",
+    "avgResponse": "Avg Response",
+    "activeRequests": "Active Requests"
+  },
+  "llmPerformance": "LLM Response Time",
+  "toolPerformance": "Tool Execution Time",
+  "noData": "No data",
+  "calls": "calls",
+  "errors": "errors",
+  "performanceTrend": "Performance Trend",
+  "chartHint": "Chart requires recharts",
+  "chartInstall": "Run: npm install recharts"
+}

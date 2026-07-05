@@ -1,0 +1,94 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your feature suggestion! Please describe your request in detail to help us better understand and evaluate it.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Related Component
+      description: Which component does this feature relate to?
+      options:
+        - Backend (Python/FastAPI)
+        - WebUI (React)
+        - TUI (Solid.js)
+        - CLI (flocks command)
+        - Agent / Session
+        - Workflow Engine
+        - Plugin / Tool
+        - MCP / LSP
+        - Channel (WeCom/Lark/DingTalk)
+        - Docker / Deployment
+        - New Component
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New Feature
+        - Enhancement
+        - Performance
+        - UX Improvement
+        - DX Improvement
+        - Security
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Describe the problem you are facing or the motivation behind this feature request.
+      placeholder: When using Flocks for security operations, I often need to... but currently there is no way to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Clearly describe the feature or improvement you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or workarounds you have considered.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Suggested Priority
+      description: How urgent do you think this feature is?
+      options:
+        - Low - Nice to have
+        - Medium - Worth improving
+        - High - Significantly impacts usability
+        - Critical - Blocks key workflows
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Willingness to Contribute
+      options:
+        - label: I am willing to submit a PR to implement this feature
+          required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context that helps explain the feature request, such as screenshots, reference links, use cases, etc.

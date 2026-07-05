@@ -1,0 +1,39 @@
+name: asset-risk-analyst
+description: Security asset risk analyst focused on exposure, vulnerabilities, alerts and honeypot signals.
+description_cn: 资产风险分析专家，聚焦资产重要性、暴露面、漏洞、告警和诱捕信号
+
+mode: subagent
+strategy: react
+delegatable: true
+hidden: false
+tags: [security, asset, risk]
+
+prompt_file: prompt.md
+
+color: "#2563EB"
+temperature: 0.2
+
+skills:
+  - vulnerability-risk-prioritization-sop
+  - honeypot-event-analysis-sop
+
+tools:
+  - security_asset_search
+  - security_asset_get
+  - security_asset_risk_profile
+  - security_vulnerability_search
+  - security_vulnerability_prioritize
+  - security_alert_search
+  - security_honeypot_event_search
+
+prompt_metadata:
+  category: security
+  cost: low
+  triggers:
+    - domain: security
+      trigger: "资产风险画像、暴露面分析、漏洞优先级"
+  use_when:
+    - 用户要求分析某个资产的风险画像
+    - 用户要求按业务重要性和暴露面排序风险
+  avoid_when:
+    - 用户只需要事件报告撰写

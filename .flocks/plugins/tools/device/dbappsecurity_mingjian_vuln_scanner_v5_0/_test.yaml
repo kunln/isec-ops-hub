@@ -1,0 +1,29 @@
+schema_version: "1.0"
+provider: dbappsecurity_mingjian_vuln_scanner_api
+connectivity:
+  tool: mingjian_vuln_scanner_health
+  required_fields:
+    - base_url
+    - username
+    - user_code
+  success_condition: result.success == true
+fixtures:
+  - name: health
+    tool: mingjian_vuln_scanner_health
+    input: {}
+  - name: engines
+    tool: mingjian_vuln_scanner_engines
+    input:
+      action: engines_v5
+  - name: tasks
+    tool: mingjian_vuln_scanner_tasks
+    input:
+      action: list_v2
+      offset: 0
+      limit: 10
+  - name: assets
+    tool: mingjian_vuln_scanner_assets
+    input:
+      action: get_v2
+      offset: 0
+      limit: 10

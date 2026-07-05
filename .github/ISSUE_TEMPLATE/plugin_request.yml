@@ -1,0 +1,73 @@
+name: Plugin / Integration Request
+description: Request a new plugin, tool, or third-party integration
+title: "[Plugin] "
+labels: ["plugin", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Flocks supports six plugin categories: **agents**, **skills**, **workflows**, **tools**, **channels**, and **tasks**.
+        Please describe the plugin or integration capability you need.
+
+  - type: dropdown
+    id: plugin-type
+    attributes:
+      label: Plugin Type
+      description: What type of plugin do you need?
+      options:
+        - Tool
+        - Skill
+        - Workflow
+        - Agent
+        - Channel (IM Integration)
+        - Task (Scheduled / Background)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Plugin Description
+      description: Describe the plugin functionality you need and the problem it solves.
+      placeholder: |
+        Example: A Jira integration tool that supports:
+        - Creating / updating tickets
+        - Querying ticket status
+        - Auto-syncing security incidents to Jira tickets
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe how you plan to use this plugin in your security operations workflow.
+    validations:
+      required: true
+
+  - type: input
+    id: target-service
+    attributes:
+      label: Target Service / Platform
+      description: The external service or platform to integrate with.
+      placeholder: "e.g. Jira, Splunk, Elasticsearch, Slack, PagerDuty ..."
+
+  - type: textarea
+    id: api-docs
+    attributes:
+      label: API Documentation / References
+      description: If available, provide links to relevant API documentation or reference materials.
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Willingness to Contribute
+      options:
+        - label: I am willing to submit a PR to implement this plugin
+          required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context that helps explain the plugin request.

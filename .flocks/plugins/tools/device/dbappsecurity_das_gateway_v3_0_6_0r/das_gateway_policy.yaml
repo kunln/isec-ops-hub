@@ -1,0 +1,51 @@
+name: das_gateway_policy
+description: Read DAS-Gateway policy inventory, including control policies, audit policies, policy routing, VRF, and global whitelist entries.
+description_cn: 只读查询明御安全网关策略清单，包括控制策略、审计策略、策略路由、VRF 和全局白名单。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 查询动作。需要 ID 或名称的动作通过 path_params 传入。
+      enum:
+        - security_policy_list
+        - security_policy_default_action
+        - applications_policy
+        - url_policy
+        - audit_policy_list
+        - audit_policy_detail
+        - route_policy_list
+        - route_policy_detail
+        - vrf_list
+        - vrf_detail
+        - global_whitelist_list
+        - global_whitelist_detail
+        - global_whitelist_filter
+      default: security_policy_list
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：policy_id、id、vrf_name、name、filter_name。
+      additionalProperties: true
+    query:
+      type: object
+      description: 额外查询参数字典。
+      additionalProperties: true
+    page:
+      type: integer
+    count:
+      type: integer
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: policy

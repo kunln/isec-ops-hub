@@ -1,0 +1,37 @@
+name: incident-report-writer
+description: Security incident report writer that turns technical triage into customer-readable Markdown reports.
+description_cn: 安全事件报告专家，将技术研判转换为客户可读的 Markdown 报告
+
+mode: subagent
+strategy: react
+delegatable: true
+hidden: false
+tags: [security, incident, report]
+
+prompt_file: prompt.md
+
+color: "#7C3AED"
+temperature: 0.25
+
+skills:
+  - incident-report-writing-sop
+  - customer-communication-sop
+
+tools:
+  - security_incident_get
+  - security_report_generate
+  - security_asset_get
+  - security_alert_search
+  - security_vulnerability_search
+
+prompt_metadata:
+  category: security
+  cost: low
+  triggers:
+    - domain: security
+      trigger: "事件报告、客户汇报、日报周报"
+  use_when:
+    - 用户要求生成安全事件报告
+    - 用户要求把技术研判改写为客户可读内容
+  avoid_when:
+    - 用户要求真实安全设备处置

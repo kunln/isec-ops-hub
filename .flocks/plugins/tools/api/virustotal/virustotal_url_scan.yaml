@@ -1,0 +1,19 @@
+name: virustotal_url_scan
+description: Submit a URL to VirusTotal for scanning.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: The URL to submit for scanning.
+  required: [url]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: url_scan

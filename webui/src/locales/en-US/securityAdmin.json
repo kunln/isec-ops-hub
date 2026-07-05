@@ -1,0 +1,8 @@
+{
+  "modes": {
+    "admin": {
+      "title": "Security Admin",
+      "description": "A business administration console for maintaining security operations data, sample data, and response results."
+    }
+  }
+}

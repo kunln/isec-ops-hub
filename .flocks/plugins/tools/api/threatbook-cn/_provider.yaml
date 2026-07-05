@@ -1,0 +1,11 @@
+name: threatbook-cn
+description: ThreatBook Threat Intelligence Platform
+description_cn: 微步在线威胁情报平台，提供文件样本分析与URL扫描能力
+auth:
+  secret: threatbook_cn_api_key
+  inject_as: query_param
+  param_name: apikey
+defaults:
+  base_url: "https://api.threatbook.cn"
+  timeout: 60
+  category: custom

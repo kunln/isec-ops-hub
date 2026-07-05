@@ -1,0 +1,17 @@
+name: mingyu_edr_health
+description: Check DBAPPSecurity Mingyu EDR connectivity with a minimal read-only asset-list probe.
+description_cn: 使用最小化资产列表查询检测安恒信息明御 EDR 管理平台连通性、认证凭据和只读查询能力。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties: {}
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: health

@@ -1,0 +1,46 @@
+name: 明御安全网关 DAS-Gateway（上网行为管理）
+vendor: 安恒信息
+service_id: dbappsecurity_das_gateway_api
+version: "3.0-6.0r"
+integration_type: device
+description: DBAPPSecurity Mingyu DAS-Gateway / DAS-AC V3.0-6.0r RESTful API package. Provides customer-side low-risk read-only tools for connection health, network objects, policies, security protections, QoS, monitoring, VPN, DHCP, and system status.
+description_cn: 安恒信息明御安全网关 DAS-Gateway（明御网络安全审计系统/上网行为管理，DAS-AC）V3.0-6.0r RESTful API 设备包，只暴露客户侧低风险只读查询：健康、接口/路由/NAT/DNS、对象、策略、安全防护、QoS、监控、VPN、DHCP 和系统状态。
+auth:
+  type: basic
+  description: |
+    厂商 PDF 要求在设备管理接口开启 HTTPS 服务，并在「系统管理 -> 系统设定 -> 管理设定」开启 RESTful API 服务。
+    API 使用 HTTP Basic Auth：将用户名和密码经 Base64 编码后放入 HTTP 报文认证头。
+credential_fields:
+  - key: base_url
+    label: Base URL
+    description: 明御安全网关管理接口地址，例如 https://gateway.example.com 或 https://192.0.2.10。不要在末尾填写 /api/v3。
+    storage: config
+    config_key: base_url
+    input_type: url
+    default: "https://{secret:dbappsecurity_das_gateway_host}"
+    required: true
+  - key: username
+    label: Username
+    description: 可调用 RESTful API 的设备管理账号。
+    storage: config
+    config_key: username
+    input_type: text
+    required: true
+  - key: password
+    label: Password
+    description: 设备管理账号密码，用于 HTTP Basic Auth。
+    storage: secret
+    config_key: password
+    secret_id: dbappsecurity_das_gateway_password
+    input_type: password
+    required: true
+defaults:
+  base_url: "https://{secret:dbappsecurity_das_gateway_host}"
+  timeout: 30
+  category: custom
+  product_version: "3.0-6.0r"
+notes: |
+  客户侧 8080 只暴露低风险动作：添加设备、测试连接、启停、更新凭据、查看健康和只读查询。
+  本包只实现 GET 查询接口，覆盖健康、网络、对象、策略、安全防护、QoS、监控、VPN、DHCP 和系统状态。
+  PDF 中 POST/PUT/DELETE 对应的新建、修改、删除、优先级调整、启停、配置下发等写入动作默认不暴露到客户侧设备 API。
+  PDF 中导出配置、下载抓包/异常信息、抓包配置、包管理、回滚、registry、死信、批量处置和调试诊断等维护侧能力不进入本客户侧设备包。

@@ -1,0 +1,43 @@
+name: oracle
+description: >-
+  Read-only consultation agent. Reasoning specialist for debugging
+  hard problems and high-difficulty architecture design.
+mode: subagent
+hidden: false
+tags: [system]
+delegatable: true
+# Read-only consultation tool allowlist.
+tools:
+  - read
+  - bash
+  - grep
+  - glob
+  - webfetch
+  - websearch
+  - lsp
+  - question
+  - memory_search
+prompt_metadata:
+  category: advisor
+  cost: EXPENSIVE
+  prompt_alias: Oracle
+  triggers:
+    - domain: Architecture decisions
+      trigger: Multi-system tradeoffs, unfamiliar patterns
+    - domain: Self-review
+      trigger: After completing significant implementation
+    - domain: Hard debugging
+      trigger: After 2+ failed fix attempts
+  use_when:
+    - Complex architecture design
+    - After completing significant work
+    - 2+ failed fix attempts
+    - Unfamiliar code patterns
+    - Security/performance concerns
+    - Multi-system tradeoffs
+  avoid_when:
+    - Simple file operations (use direct tools)
+    - First attempt at any fix (try yourself first)
+    - Questions answerable from code you've read
+    - Trivial decisions (variable names, formatting)
+    - Things you can infer from existing code patterns

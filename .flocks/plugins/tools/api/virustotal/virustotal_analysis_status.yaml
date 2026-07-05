@@ -1,0 +1,19 @@
+name: virustotal_analysis_status
+description: Check the status of a file or URL analysis in VirusTotal.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    analysis_id:
+      type: string
+      description: The analysis ID returned from a scan request.
+  required: [analysis_id]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: analysis_status

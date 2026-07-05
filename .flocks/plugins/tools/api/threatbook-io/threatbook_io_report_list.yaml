@@ -1,0 +1,98 @@
+name: threatbook_io_report_list
+description: >
+  Query threat intelligence reports list with filters including threat type, severity,
+  threat actor, target region/industry/organization, and time range. Use when searching
+  for threat intelligence reports for research and analysis.
+description_cn: 查询威胁情报报告列表，支持按威胁类型、严重程度、威胁组织、目标地区/行业/组织、时间范围等条件筛选。用于研究和分析威胁情报报告。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: Keyword search across report title, summary, tags, IOCs, CVEs
+    threat_type:
+      type: string
+      description: "Threat event types (comma-separated). Options: APT, Ransomware, Supply Chain Attack, Phishing, Data Leakage, Data Breach, Crypto Mining, DDoS, Others"
+    severity:
+      type: string
+      description: "Severity levels (comma-separated). Options: critical, high, low"
+    threat_actor:
+      type: string
+      description: Threat actor/hacker group names (comma-separated)
+    target_region:
+      type: string
+      description: Target countries/regions (comma-separated)
+    target_industry:
+      type: string
+      description: Target industries (comma-separated, STIX II taxonomy)
+    target_org:
+      type: string
+      description: Target organizations (comma-separated)
+    target_product:
+      type: string
+      description: Target products (comma-separated)
+    category:
+      type: string
+      description: "Report categories (comma-separated). Options: Incident Analysis, Malware Analysis, Vulnerability Analysis, Summary Report, Security News, Incident Response"
+    has_iocs:
+      type: boolean
+      description: Return only reports with IOC data
+    has_cves:
+      type: boolean
+      description: Return only reports with CVE data
+    has_rules:
+      type: boolean
+      description: Return only reports with detection rules
+    published_from:
+      type: string
+      description: Start of publication time range (ISO8601 format)
+    published_to:
+      type: string
+      description: End of publication time range (ISO8601 format)
+    from_tb_lab:
+      type: boolean
+      description: Return only ThreatBook Lab exclusive reports
+    limit:
+      type: integer
+      description: Number of records per page (default 20, max 100)
+    cursor:
+      type: string
+      description: Pagination cursor for next page
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v2/reports/list"
+  query_params:
+    query: "{query}"
+    threat_type: "{threat_type}"
+    severity: "{severity}"
+    threat_actor: "{threat_actor}"
+    target_region: "{target_region}"
+    target_industry: "{target_industry}"
+    target_org: "{target_org}"
+    target_product: "{target_product}"
+    category: "{category}"
+    has_iocs: "{has_iocs}"
+    has_cves: "{has_cves}"
+    has_rules: "{has_rules}"
+    published_from: "{published_from}"
+    published_to: "{published_to}"
+    from_tb_lab: "{from_tb_lab}"
+    limit: "{limit}"
+    cursor: "{cursor}"
+  timeout: 30
+
+response:
+  extract: "data"
+  error_mapping:
+    400: "Invalid request parameters"
+    401: "API key invalid or expired"
+    405: "Invalid API method"
+    429: "Rate limit exceeded"
+    500: "System error"

@@ -1,0 +1,21 @@
+name: urlscan_screenshot
+description: >
+  Retrieve the screenshot for a URLScan scan in PNG format.
+  Use the scan UUID to retrieve the screenshot once the scan has finished.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties:
+    scan_id:
+      type: string
+      description: The UUID of the scan result
+  required: [scan_id]
+
+handler:
+  type: script
+  script_file: urlscan.handler.py
+  function: screenshot

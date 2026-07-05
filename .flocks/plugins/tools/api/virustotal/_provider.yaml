@@ -1,0 +1,12 @@
+name: VirusTotal
+description: VirusTotal threat intelligence service for IP, domain, URL, file hash, and analysis lookups.
+description_cn: VirusTotal 威胁情报服务，提供 IP、域名、URL、文件哈希与分析结果查询能力。
+auth:
+  secret: virustotal_api_key
+  inject_as: header
+  header_name: x-apikey
+  header_prefix: ""
+defaults:
+  base_url: "https://www.virustotal.com/api/v3"
+  timeout: 30
+  category: custom

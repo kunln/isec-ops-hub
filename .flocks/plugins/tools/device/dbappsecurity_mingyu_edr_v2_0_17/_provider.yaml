@@ -1,0 +1,72 @@
+name: 明御主机安全及管理系统 EDR
+vendor: 安恒信息
+service_id: dbappsecurity_edr_api
+version: "2.0.17"
+integration_type: device
+description: DBAPPSecurity Mingyu EDR V2.0.17 management-center API paths for customer-side read-only assets, findings, policies, logs, reports, information search, risk, and baseline inspection data.
+description_cn: 安恒信息明御主机安全及管理系统 EDR V2.0.17 管理中心 API 路径，只暴露客户侧资产、检测结果、策略只读、日志、报表、信息搜索、风险评估和基线检查等查询能力。
+auth:
+  type: custom
+  secret: dbappsecurity_edr_session_cookie
+  description: |
+    厂商手册仅说明“以租户/admin 用户登录 EDR 管理平台”后访问相应管理中心页面，未给出独立 API Token 或登录接口。
+    本设备包支持两类现场接入方式：会话 Cookie（Cookie 头）或 Token（默认 Authorization: Bearer）。
+credential_fields:
+  - key: base_url
+    label: Base URL
+    description: 明御 EDR 管理平台地址，例如 https://edr.example.com 或 https://192.0.2.10。不要填写具体接口路径。
+    storage: config
+    config_key: base_url
+    input_type: url
+    default: "https://{secret:dbappsecurity_edr_host}"
+    required: true
+  - key: session_cookie
+    label: Session Cookie
+    description: 可访问 EDR 管理平台 API 的登录会话 Cookie；若现场使用 Token 认证，可留空并填写 Auth Token。
+    storage: secret
+    config_key: session_cookie
+    secret_id: dbappsecurity_edr_session_cookie
+    input_type: password
+    required: false
+  - key: auth_token
+    label: Auth Token
+    description: |
+      可选 Token。默认写入 `Authorization: Bearer <token>`；如现场使用其他头名，请填写 Token Header。
+    storage: secret
+    config_key: auth_token
+    secret_id: dbappsecurity_edr_auth_token
+    input_type: password
+    required: false
+  - key: token_header
+    label: Token Header
+    description: Token 认证头名，默认 Authorization。可按现场网关改为 X-Auth-Token、apikey 等。
+    storage: config
+    config_key: token_header
+    input_type: text
+    default: "Authorization"
+    required: false
+  - key: api_prefix
+    label: API Prefix
+    description: 可选接口前缀。厂商 PDF 路径形如 /node/list；若现场部署在 /api 下，可填写 api。
+    storage: config
+    config_key: api_prefix
+    input_type: text
+    default: ""
+    required: false
+  - key: read_method
+    label: Read Method
+    description: 只读查询请求方法，默认 POST。若现场接口要求 GET，可填写 GET。
+    storage: config
+    config_key: read_method
+    input_type: text
+    default: "POST"
+    required: false
+defaults:
+  base_url: "https://{secret:dbappsecurity_edr_host}"
+  timeout: 30
+  category: custom
+  product_version: "2.0.17"
+notes: |
+  客户侧 8080 只暴露低风险动作：添加设备、测试连接、启停、更新凭据、查看健康和只读查询。
+  本包只包含只读接口：资产、扫描/漏洞结果、策略模板/微隔离列表、日志、报表、信息搜索结果、风险评估结果、基线检查结果。
+  PDF 中的卸载、解绑、重启、关机、开启/关闭防护、扫描执行/停止、隔离/恢复/信任/删除、漏洞修复、策略新增/更新/删除/导入/导出、日志导出、信息搜索刷新/导出/结束进程、文件推送、巡检增删改、流量模板保存/删除、升级包/库上传、用户新增/更新/删除等写入/删除/导出/处置/维护能力默认不暴露到客户侧设备 API。

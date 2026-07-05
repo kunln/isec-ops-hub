@@ -1,0 +1,21 @@
+name: urlscan_dom
+description: >
+  Retrieve the DOM snapshot for a URLScan scan.
+  Use the scan UUID to retrieve the DOM snapshot once the scan has finished.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties:
+    scan_id:
+      type: string
+      description: The UUID of the scan result
+  required: [scan_id]
+
+handler:
+  type: script
+  script_file: urlscan.handler.py
+  function: dom

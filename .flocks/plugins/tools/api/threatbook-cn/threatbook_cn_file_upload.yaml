@@ -1,0 +1,42 @@
+name: threatbook_cn_file_upload
+description: >
+  Submit a file to ThreatBook sandbox for malware analysis.
+  Supports PE, Office documents, PDF, HTML, Script, MSI, SWF, JAR, LNK, ELF,
+  and compressed files (ZIP, RAR, 7Z). Max file size 100MB.
+  Use when analyzing suspicious files from endpoints, email attachments, or web downloads.
+description_cn: 提交文件到微步在线沙箱进行恶意软件分析，支持 PE、Office、PDF、压缩包等格式
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-cn
+
+inputSchema:
+  type: object
+  properties:
+    file_path:
+      type: string
+      description: Local path to the file to upload and analyze
+    sandbox_type:
+      type: string
+      description: Sandbox environment to run the file
+      enum:
+        - win7_sp1_enx64_office2013
+        - win7_sp1_enx86_office2013
+        - win7_sp1_enx86_office2010
+        - win7_sp1_enx86_office2007
+        - win7_sp1_enx86_office2003
+        - win10_1903_enx64_office2016
+        - ubuntu_1704_x64
+        - centos_7_x64
+        - kylin_desktop_v10
+      default: win7_sp1_enx86_office2013
+    run_time:
+      type: integer
+      description: Sandbox run time in seconds (max 300, default 60)
+      default: 60
+  required: [file_path]
+
+handler:
+  type: script
+  script_file: threatbook_cn_file_upload.handler.py
+  function: file_upload

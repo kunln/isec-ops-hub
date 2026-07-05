@@ -1,0 +1,34 @@
+{
+  "version": "connector.package.v1",
+  "id": "fixture-replay-demo",
+  "name": "Fixture Replay Demo Connector",
+  "vendor": "Flocks",
+  "product": "Fixture Replay",
+  "product_version": "2026.06",
+  "deployment": "local_fixture",
+  "auth_methods": ["none"],
+  "capabilities": [
+    "asset.search",
+    "vulnerability.search",
+    "alert.search",
+    "honeypot.event.search"
+  ],
+  "adapters": {
+    "asset.search": "adapters/asset.search.adapter.json",
+    "vulnerability.search": "adapters/vulnerability.search.adapter.json",
+    "alert.search": "adapters/alert.search.adapter.json",
+    "honeypot.event.search": "adapters/honeypot.event.search.adapter.json"
+  },
+  "pagination": {
+    "type": "fixture",
+    "page_size": "all"
+  },
+  "rate_limit": {
+    "mode": "offline",
+    "requests_per_minute": null
+  },
+  "permissions": ["fixture:read"],
+  "risk_level": "low",
+  "description": "Offline fixture replay connector for developing and testing adapters, mappings and capability downgrade behavior without vendor resources.",
+  "enabled": true
+}

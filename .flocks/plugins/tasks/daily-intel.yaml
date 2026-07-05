@@ -1,0 +1,35 @@
+dedupKey: "builtin:daily-threat-intel"
+title: "Daily Threat Intelligence"
+description: >-
+  At 9:00 AM every day, delegate to the hrti-threat-intelligence sub-agent to query
+  the latest 24-hour situational threat intelligence across all industries. Forward
+  the sub-agent's raw output as-is to WeCom via channel_message — do NOT reformat,
+  summarize, or add any content.
+
+userPrompt: >-
+  Delegate to the hrti-threat-intelligence sub-agent to query the latest 24 hours of
+  situational threat intelligence. Once the sub-agent responds, take its output
+  exactly as-is and send it to WeCom via channel_message. Do NOT reformat, summarize,
+  translate, add headers, add statistics, or modify the sub-agent's output in any way.
+  The message sent to WeCom must be a verbatim copy of the sub-agent's response.
+
+agentName: rex
+executionMode: agent
+type: scheduled
+priority: normal
+
+enabled: false
+cron: "0 9 * * *"
+timezone: Asia/Shanghai
+cronDescription: "Every day at 9:00 AM"
+
+tags:
+  - builtin
+  - threat-intel
+  - daily
+
+context:
+  report_count: 5
+  additional_info: >-
+    Forward the hrti-threat-intelligence sub-agent's raw output directly to WeCom.
+    Do NOT summarize, reformat, or add any content — send verbatim.

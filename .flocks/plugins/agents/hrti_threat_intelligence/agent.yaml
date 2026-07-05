@@ -1,0 +1,40 @@
+name: hrti-threat-intelligence
+description: >-
+  Situational threat intelligence subagent for querying and analyzing trending cybersecurity events.
+  Understands natural language queries, retrieves hot threat intelligence reports via HRTI_list_query
+  (supports filtering by keyword, time range, threat actor, targeted industry/region/country, asset type,
+  and event type), and fetches full report details via HRTI_query using the report IDs returned from the list.
+  Returns structured intelligence including attack campaigns, threat actors, targeted sectors, and IOCs.
+description_cn: >-
+  热点威胁情报子 Agent：用自然语言查询网络安全态势事件；通过 HRTI 列表与详情接口获取报告，
+  支持关键词、时间范围、威胁体、目标行业/地区/国家、资产与事件类型等筛选，
+  输出攻击活动、威胁体、目标行业与 IOC 等结构化情报。
+mode: subagent
+hidden: false
+color: "#8E44AD"
+delegatable: true
+tags:
+  - security
+  - threat-intelligence
+tools:
+  - read
+  - glob
+  - grep
+  - edit
+  - write
+  - bash
+  - todoread
+  - todowrite
+  - tool_search
+  - threatbook_mcp_hrti_list_query
+  - threatbook_mcp_hrti_query
+  - threatbook_mcp_web_search
+  - websearch
+  - webfetch
+  - virustotal_ip_query
+  - virustotal_domain_query
+  - virustotal_url_query
+  - virustotal_file_query
+  - threatbook_mcp_ip_query
+  - threatbook_mcp_domain_query
+  - threatbook_mcp_hash_query

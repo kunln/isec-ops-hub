@@ -1,0 +1,50 @@
+name: das_gateway_monitoring
+description: Read DAS-Gateway logging, SNMP, online user, blocked user, and traffic monitoring data.
+description_cn: 只读查询明御安全网关日志配置、SNMP、在线用户、阻断用户和应用/用户流量监控数据。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_das_gateway_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - syslog_server
+        - log_saved
+        - snmp_config
+        - snmp_user_list
+        - snmp_user_detail
+        - monitor_app
+        - monitor_app_users
+        - monitor_user
+        - monitor_user_apps
+        - monitor_app_trend_by_app
+        - monitor_app_trend_by_user
+        - monitor_app_trend_by_user_app
+        - who_online
+        - admin_block_user
+      default: monitor_app
+    path_params:
+      type: object
+      description: 路径参数字典。常见键：name、range、appname、username。
+      additionalProperties: true
+    query:
+      type: object
+      additionalProperties: true
+    page:
+      type: integer
+    count:
+      type: integer
+    language:
+      type: string
+      enum: [CN, EN]
+      default: CN
+  required: []
+
+handler:
+  type: script
+  script_file: das_gateway.handler.py
+  function: monitoring

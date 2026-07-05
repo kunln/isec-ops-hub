@@ -1,0 +1,22 @@
+name: urlscan_quotas
+description: >
+  Get current API quota usage and limits for the authenticated user.
+  Returns information about remaining scans, search quota, and rate limits.
+  Use to check available quota before making bulk API calls.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties: {}
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/api/v1/quotas"
+  timeout: 30
+
+response:
+  extract: ""

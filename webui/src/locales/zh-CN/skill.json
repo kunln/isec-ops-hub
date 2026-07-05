@@ -1,0 +1,105 @@
+{
+  "pageTitle": "技能",
+  "pageDescription": "管理 Agent 技能",
+  "searchPlaceholder": "搜索技能...",
+  "createSkill": "创建技能",
+  "installSkill": "安装技能",
+  "refresh": "刷新",
+  "refreshing": "刷新中...",
+  "refreshed": "已刷新 ✓",
+  "refreshFailed": "刷新失败",
+  "fetchDetailFailed": "获取详情失败",
+  "fetchListFailed": "获取技能列表失败",
+  "installFailed": "安装失败",
+  "installDepsFailed": "依赖安装失败",
+  "emptyState": {
+    "noSkills": "暂无技能",
+    "noResults": "未找到技能",
+    "createFirst": "创建您的第一个技能",
+    "tryOtherKeywords": "试试其他搜索关键词",
+    "tryOtherFilters": "当前筛选条件下暂无技能，请调整筛选或清除过滤"
+  },
+  "section": {
+    "custom": "自定义技能",
+    "builtin": "内置技能"
+  },
+  "table": {
+    "type": "类型",
+    "name": "名称",
+    "source": "来源",
+    "status": "状态",
+    "enabled": "启用",
+    "actions": "操作",
+    "edit": "编辑",
+    "builtin": "内置",
+    "custom": "自定义",
+    "totalCount_other": "共 {{count}} 个技能"
+  },
+  "pagination": {
+    "info": "显示 {{start}}–{{end}} / 共 {{total}} 个"
+  },
+  "toggle": {
+    "enabledTip": "已启用，点击后将从 Agent System Prompt 中移除",
+    "disabledTip": "已禁用，点击后将加入 Agent System Prompt",
+    "failed": "切换失败"
+  },
+  "eligibility": {
+    "ready": "就绪",
+    "missingDeps": "缺少依赖",
+    "missingDepsInline": "缺少依赖：{{list}}",
+    "installDeps": "安装依赖",
+    "installing": "安装中...",
+    "installSuccess": "依赖安装成功",
+    "installFailed": "依赖安装失败"
+  },
+  "filter": {
+    "aria": "技能来源过滤",
+    "all": "全部",
+    "builtin": "内置",
+    "custom": "自定义",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "showAll": "查看全部",
+    "clear": "清除筛选"
+  },
+  "installDialog": {
+    "title": "安装技能",
+    "sourceLabel": "来源",
+    "sourcePlaceholder": "输入来源，例如：\nclawhub:github\ngithub:owner/repo\nhttps://raw.githubusercontent.com/...\n/local/path/to/skill",
+    "sourceHint": "支持 clawhub、GitHub、URL、本地路径，以及未来的 safeskill: 来源",
+    "scopeLabel": "安装范围",
+    "scopeGlobal": "全局（~/.flocks/plugins/skills/）",
+    "scopeProject": "当前项目（.flocks/plugins/skills/）",
+    "install": "安装",
+    "installing": "安装中...",
+    "cancel": "取消",
+    "success": "技能 \"{{name}}\" 安装成功",
+    "failed": "安装失败：{{error}}",
+    "missingDepsWarning": "技能已安装，但缺少以下依赖：{{missing}}",
+    "runInstallDeps": "运行 \"安装依赖\" 以完成配置"
+  },
+  "sheet": {
+    "entityType": "技能",
+    "path": "路径",
+    "readonlyNote": "内置 Skill 为只读，无法修改",
+    "skillName": "技能名称",
+    "description": "描述",
+    "content": "内容",
+    "preview": "预览",
+    "edit": "编辑",
+    "noDescription": "（无描述）",
+    "noContent": "（无内容）",
+    "contentPlaceholder": "# 技能说明\n\n详细的技能使用说明...",
+    "descriptionPlaceholder": "技能描述",
+    "saving": "保存中...",
+    "deleting": "删除中...",
+    "deleteSkill": "删除此技能",
+    "delete": "删除",
+    "deleteBuiltinTip": "内置技能不支持删除",
+    "submitClose": "关闭",
+    "operationFailed": "操作失败",
+    "deleteConfirm": "确定要删除 Skill \"{{name}}\" 吗？",
+    "deleteFailed": "删除失败",
+    "saveFailed": "保存失败"
+  }
+}

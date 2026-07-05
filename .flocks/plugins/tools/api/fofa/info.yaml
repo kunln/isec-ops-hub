@@ -1,0 +1,22 @@
+name: fofa_info
+description: >
+  Get FOFA account information including user stats, VIP level, and API usage quota.
+  Use to check account status and available API credits.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: fofa
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/info/my"
+  query_params:
+    email: "{secret:fofa_email}"
+    key: "{secret:fofa_api_key}"
+  timeout: 30
+  headers:
+    User-Agent: "Flocks-FOFA-Client/1.0"
+
+response:
+  extract: ""

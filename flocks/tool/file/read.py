@@ -1,0 +1,419 @@
+"""
+Read Tool - File reading with support for text, images, and PDFs
+
+Reads files from the local filesystem, supporting:
+- Text files with line numbers
+- Image files (returns base64 data)
+- PDF files (returns base64 data)
+- Binary file detection and rejection
+"""
+
+import os
+import base64
+import mimetypes
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+from flocks.tool.registry import (
+    ToolRegistry, ToolCategory, ToolParameter, ParameterType, ToolResult, ToolContext
+)
+from flocks.tool.path_utils import resolve_tool_path
+from flocks.tool.tool_output_limits import (
+    get_read_max_lines,
+    get_read_max_bytes,
+    get_read_max_line_length,
+)
+from flocks.utils.log import Log
+from flocks.utils.id import Identifier
+
+
+log = Log.create(service="tool.read")
+
+# Built-in defaults — overridable via ``toolOutput`` in flocks.json.
+# Use the helpers from tool_output_limits instead of these constants directly
+# when performing a read, so that config overrides take effect at runtime.
+DEFAULT_READ_LIMIT = 2000
+MAX_LINE_LENGTH = 2000
+MAX_BYTES = 50 * 1024  # 50 KB
+
+# Binary file extensions
+BINARY_EXTENSIONS = {
+    '.zip', '.tar', '.gz', '.exe', '.dll', '.so', '.class', '.jar', '.war',
+    '.7z', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods',
+    '.odp', '.bin', '.dat', '.obj', '.o', '.a', '.lib', '.wasm', '.pyc', '.pyo'
+}
+
+# Image MIME types that are supported
+IMAGE_MIME_TYPES = {
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'
+}
+
+# Description matching Flocks' read.txt
+DESCRIPTION = """Reads a file from the local filesystem. You can access any file directly by using this tool.
+Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
+
+Do not use this tool when a dedicated tool is a better fit:
+- Load SKILL.md for one specific skill -> `skill_load`
+
+Usage:
+- filePath may be absolute, use `~`, or be relative to the current project directory
+- By default, it reads up to 2000 lines starting from the beginning of the file
+- For files longer than 2000 lines, you MUST use offset and limit to read in segments (e.g. offset=0 limit=2000, then offset=2000 limit=2000, etc.)
+- Any lines longer than 2000 characters will be truncated
+- Text results are returned with a 5-digit, zero-padded 1-based line number prefix in the form `00001| `
+- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful.
+- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.
+- You can read image files using this tool."""
+
+
+async def _resolve_sandbox_file_path(ctx: ToolContext, filePath: str) -> tuple[Optional[str], Optional[str]]:
+    try:
+        resolution = await resolve_tool_path(ctx, filePath)
+    except ValueError as exc:
+        return None, str(exc)
+    sandbox = ctx.extra.get("sandbox") if ctx.extra else None
+    sandbox_root = sandbox.get("workspace_dir") if isinstance(sandbox, dict) else None
+    if sandbox_root:
+        expanded = os.path.expanduser(str(filePath).strip())
+        if os.path.isabs(expanded):
+            return os.path.normpath(os.path.abspath(expanded)), None
+        return os.path.normpath(os.path.join(str(sandbox_root), expanded)), None
+    return resolution.resolved_path, None
+
+
+def is_binary_file(filepath: str) -> bool:
+    """
+    Check if a file is binary
+    
+    Uses extension check and content analysis.
+    
+    Args:
+        filepath: Path to file
+        
+    Returns:
+        True if file is binary
+    """
+    # Check extension first
+    ext = Path(filepath).suffix.lower()
+    if ext in BINARY_EXTENSIONS:
+        return True
+    
+    # Check content for binary markers
+    try:
+        with open(filepath, 'rb') as f:
+            # Read first 4KB
+            chunk = f.read(4096)
+            if not chunk:
+                return False
+            
+            # Check for null bytes
+            if b'\x00' in chunk:
+                return True
+            
+            # Count non-printable characters
+            non_printable = sum(
+                1 for byte in chunk
+                if byte < 9 or (byte > 13 and byte < 32)
+            )
+            
+            # If >30% non-printable, consider binary
+            return non_printable / len(chunk) > 0.3
+            
+    except Exception:
+        return False
+
+
+def get_mime_type(filepath: str) -> str:
+    """
+    Get MIME type for a file
+    
+    Args:
+        filepath: Path to file
+        
+    Returns:
+        MIME type string
+    """
+    mime_type, _ = mimetypes.guess_type(filepath)
+    return mime_type or 'application/octet-stream'
+
+
+def find_similar_files(directory: str, filename: str, max_suggestions: int = 3) -> List[str]:
+    """
+    Find similar files in directory for suggestions
+    
+    Args:
+        directory: Directory to search
+        filename: Target filename
+        max_suggestions: Maximum suggestions to return
+        
+    Returns:
+        List of similar file paths
+    """
+    try:
+        entries = os.listdir(directory)
+        filename_lower = filename.lower()
+        
+        suggestions = []
+        for entry in entries:
+            entry_lower = entry.lower()
+            if filename_lower in entry_lower or entry_lower in filename_lower:
+                suggestions.append(os.path.join(directory, entry))
+        
+        return suggestions[:max_suggestions]
+    except Exception:
+        return []
+
+
+@ToolRegistry.register_function(
+    name="read",
+    description=DESCRIPTION,
+    category=ToolCategory.FILE,
+    parameters=[
+        ToolParameter(
+            name="filePath",
+            type=ParameterType.STRING,
+            description="The path to the file to read",
+            required=True
+        ),
+        ToolParameter(
+            name="offset",
+            type=ParameterType.INTEGER,
+            description="The line number to start reading from (0-based)",
+            required=False,
+            default=0
+        ),
+        ToolParameter(
+            name="limit",
+            type=ParameterType.INTEGER,
+            description="The number of lines to read (defaults to 2000)",
+            required=False,
+            default=DEFAULT_READ_LIMIT
+        ),
+    ]
+)
+async def read_tool(
+    ctx: ToolContext,
+    filePath: str,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None
+) -> ToolResult:
+    """
+    Read a file from the local filesystem
+    
+    Supports text files, images, and PDFs.
+    
+    Args:
+        ctx: Tool context
+        filePath: Path to file
+        offset: Starting line (0-based)
+        limit: Number of lines to read
+        
+    Returns:
+        ToolResult with file contents
+    """
+    try:
+        resolution = await resolve_tool_path(ctx, filePath)
+    except ValueError as exc:
+        return ToolResult(
+            success=False,
+            error=str(exc),
+            title=filePath,
+        )
+
+    filepath = resolution.resolved_path
+    title = resolution.display_path
+    
+    # Request permission
+    await ctx.ask(
+        permission="read",
+        patterns=[resolution.permission_pattern],
+        always=["*"],
+        metadata={}
+    )
+    
+    # Check file exists
+    if not os.path.exists(filepath):
+        directory = os.path.dirname(filepath)
+        basename = os.path.basename(filepath)
+        
+        suggestions = find_similar_files(directory, basename)
+        
+        if suggestions:
+            error_msg = f"Could not find file: {filepath}\n\nDid you mean one of these?\n" + "\n".join(suggestions)
+        else:
+            error_msg = f"Could not find file: {filepath}"
+        
+        return ToolResult(
+            success=False,
+            error=error_msg,
+            title=title
+        )
+    
+    # Get MIME type
+    mime_type = get_mime_type(filepath)
+    
+    # Handle images (excluding SVG)
+    is_image = (
+        mime_type.startswith('image/') and 
+        mime_type not in ('image/svg+xml', 'image/vnd.fastbidsheet')
+    )
+    
+    if is_image:
+        try:
+            with open(filepath, 'rb') as f:
+                content = f.read()
+            
+            data_url = f"data:{mime_type};base64,{base64.b64encode(content).decode('utf-8')}"
+            
+            return ToolResult(
+                success=True,
+                output="Image read successfully",
+                title=title,
+                metadata={
+                    "preview": "Image read successfully",
+                    "truncated": False
+                },
+                attachments=[{
+                    "id": Identifier.ascending("part"),
+                    "sessionID": ctx.session_id,
+                    "messageID": ctx.message_id,
+                    "type": "file",
+                    "mime": mime_type,
+                    "url": data_url
+                }]
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Failed to read image: {str(e)}",
+                title=title
+            )
+    
+    # Handle PDFs
+    if mime_type == 'application/pdf':
+        try:
+            with open(filepath, 'rb') as f:
+                content = f.read()
+            
+            data_url = f"data:{mime_type};base64,{base64.b64encode(content).decode('utf-8')}"
+            
+            return ToolResult(
+                success=True,
+                output="PDF read successfully",
+                title=title,
+                metadata={
+                    "preview": "PDF read successfully",
+                    "truncated": False
+                },
+                attachments=[{
+                    "id": Identifier.ascending("part"),
+                    "sessionID": ctx.session_id,
+                    "messageID": ctx.message_id,
+                    "type": "file",
+                    "mime": mime_type,
+                    "url": data_url
+                }]
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"Failed to read PDF: {str(e)}",
+                title=title
+            )
+    
+    # Check if binary
+    if is_binary_file(filepath):
+        return ToolResult(
+            success=False,
+            error=f"Cannot read binary file: {filepath}",
+            title=title
+        )
+    
+    # Read text file
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+            all_lines = f.read().split('\n')
+    except Exception as e:
+        return ToolResult(
+            success=False,
+            error=f"Failed to read file: {str(e)}",
+            title=title
+        )
+    
+    # Apply offset and limit — resolve at call time so flocks.json overrides
+    # take effect without restarting the server.
+    effective_max_lines = get_read_max_lines()
+    effective_max_bytes = get_read_max_bytes()
+    effective_max_line_length = get_read_max_line_length()
+
+    read_limit = limit if limit is not None else effective_max_lines
+    read_offset = offset if offset is not None else 0
+
+    # Read lines with byte limit
+    raw_lines: List[str] = []
+    total_bytes = 0
+    truncated_by_bytes = False
+
+    end_line = min(len(all_lines), read_offset + read_limit)
+
+    for i in range(read_offset, end_line):
+        line = all_lines[i]
+
+        # Truncate long lines
+        if len(line) > effective_max_line_length:
+            line = line[:effective_max_line_length] + "..."
+
+        # Check byte limit
+        line_bytes = len(line.encode('utf-8')) + (1 if raw_lines else 0)
+        if total_bytes + line_bytes > effective_max_bytes:
+            truncated_by_bytes = True
+            break
+        
+        raw_lines.append(line)
+        total_bytes += line_bytes
+    
+    # Format with the read tool's stable "00001| " line prefix.
+    content_lines = [
+        f"{str(i + read_offset + 1).zfill(5)}| {line}"
+        for i, line in enumerate(raw_lines)
+    ]
+    
+    # Build output
+    total_lines = len(all_lines)
+    last_read_line = read_offset + len(raw_lines)
+    has_more_lines = total_lines > last_read_line
+    truncated = has_more_lines or truncated_by_bytes
+    
+    output = "<file>\n"
+    output += "\n".join(content_lines)
+    
+    if truncated_by_bytes:
+        remaining = total_lines - last_read_line
+        output += (
+            f"\n\n(Output truncated at {effective_max_bytes} bytes — showed lines {read_offset + 1}-{last_read_line} of {total_lines}. "
+            f"{remaining} lines remaining. To continue reading, call read with offset={last_read_line})"
+        )
+    elif has_more_lines:
+        remaining = total_lines - last_read_line
+        output += (
+            f"\n\n(Showed lines {read_offset + 1}-{last_read_line} of {total_lines}. "
+            f"{remaining} lines remaining. To continue reading, call read with offset={last_read_line})"
+        )
+    else:
+        output += f"\n\n(End of file — total {total_lines} lines)"
+    
+    output += "\n</file>"
+    
+    # Preview is first 20 lines
+    preview = "\n".join(raw_lines[:20])
+    
+    return ToolResult(
+        success=True,
+        output=output,
+        title=title,
+        truncated=truncated,
+        metadata={
+            "preview": preview,
+            "truncated": truncated
+        }
+    )

@@ -1,0 +1,87 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "alert.search",
+  "target": "alerts",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": ["id", "alarm_id", "alarmId", "uuid", "eventId", "event_id"], "target": "id" },
+    { "raw": ["asset_id", "assetId", "alarm_sip", "asset_ip", "host", "assetIp"], "target": "asset_id" },
+    {
+      "target": "source",
+      "default": "ndr",
+      "enum_default": "ndr",
+      "enum": {
+        "xdr": "xdr",
+        "edr": "edr",
+        "ndr": "ndr",
+        "waf": "waf",
+        "siem": "siem",
+        "honeypot": "honeypot",
+        "scanner": "scanner",
+        "manual": "manual",
+        "other": "other"
+      }
+    },
+    { "raw": ["title", "name", "threat_name", "threatName", "alarm_name", "alarmName"], "target": "title", "default": "Unknown Alert" },
+    {
+      "raw": ["hazard_level", "hazardLevel", "severity", "riskLevel", "level"],
+      "target": "severity",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "0": "low",
+        "1": "medium",
+        "2": "high",
+        "3": "critical",
+        "4": "critical",
+        "informational": "info",
+        "info": "info",
+        "low": "low",
+        "medium": "medium",
+        "moderate": "medium",
+        "high": "high",
+        "critical": "critical",
+        "serious": "critical",
+        "严重": "critical",
+        "危急": "critical",
+        "高危": "high",
+        "中危": "medium",
+        "低危": "low",
+        "信息": "info"
+      }
+    },
+    { "raw": ["threat_type", "threatType", "api_type_chain", "attack_stage", "attck"], "target": "alert_type" },
+    { "raw": ["description", "desc", "detail", "summary"], "target": "description" },
+    { "raw": "$", "target": "raw_event", "transform": "copy" },
+    { "raw": ["ioc", "iocs", "marks", "focus_label", "asset_mark"], "target": "ioc", "default": [], "transform": "list" },
+    { "raw": ["mitre", "attck", "attckTechnique"], "target": "mitre_technique" },
+    {
+      "raw": ["status", "host_state", "hostState"],
+      "target": "status",
+      "default": "new",
+      "enum_default": "new",
+      "enum": {
+        "-1": "new",
+        "0": "new",
+        "1": "closed",
+        "2": "confirmed",
+        "6": "closed",
+        "7": "false_positive",
+        "new": "new",
+        "triaging": "triaging",
+        "open": "new",
+        "active": "new",
+        "confirmed": "confirmed",
+        "false_positive": "false_positive",
+        "incident_created": "incident_created",
+        "closed": "closed",
+        "误报": "false_positive"
+      }
+    },
+    { "raw": ["time", "timestamp", "alarm_time", "alarmTime", "occurred_at", "occurredAt"], "target": "occurred_at" }
+  ]
+}

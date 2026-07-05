@@ -1,0 +1,75 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "alert.search",
+  "target": "alerts",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": "id", "target": "id", "required": true },
+    { "raw": "asset_id", "target": "asset_id", "required": true },
+    {
+      "raw": "source",
+      "target": "source",
+      "default": "other",
+      "enum_default": "other",
+      "enum": {
+        "xdr": "xdr",
+        "edr": "edr",
+        "ndr": "ndr",
+        "waf": "waf",
+        "siem": "siem",
+        "honeypot": "honeypot",
+        "scanner": "scanner",
+        "manual": "manual",
+        "other": "other"
+      }
+    },
+    { "raw": "name", "target": "title", "required": true },
+    {
+      "raw": "severity",
+      "target": "severity",
+      "required": true,
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "informational": "info",
+        "info": "info",
+        "low": "low",
+        "medium": "medium",
+        "moderate": "medium",
+        "high": "high",
+        "critical": "critical",
+        "严重": "critical",
+        "高危": "high",
+        "中危": "medium",
+        "低危": "low"
+      }
+    },
+    { "raw": "type", "target": "alert_type" },
+    { "raw": "description", "target": "description" },
+    { "raw": "$", "target": "raw_event", "transform": "copy" },
+    { "raw": "iocs", "target": "ioc", "default": [], "transform": "list" },
+    { "raw": "mitre", "target": "mitre_technique" },
+    {
+      "raw": "status",
+      "target": "status",
+      "default": "new",
+      "enum_default": "new",
+      "enum": {
+        "new": "new",
+        "triaging": "triaging",
+        "open": "new",
+        "active": "new",
+        "confirmed": "confirmed",
+        "false_positive": "false_positive",
+        "incident_created": "incident_created",
+        "closed": "closed",
+        "误报": "false_positive"
+      }
+    },
+    { "raw": "timestamp", "target": "occurred_at" }
+  ]
+}

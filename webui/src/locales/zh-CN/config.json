@@ -1,0 +1,14 @@
+{
+  "pageTitle": "配置",
+  "pageDescription": "系统配置管理",
+  "editor": {
+    "title": "配置编辑器",
+    "description": "编辑系统配置（JSON 格式）",
+    "reset": "重置",
+    "save": "保存",
+    "saving": "保存中...",
+    "saved": "配置已保存",
+    "jsonError": "JSON 格式错误",
+    "saveFailed": "保存失败"
+  }
+}

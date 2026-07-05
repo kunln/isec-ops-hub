@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "fixture": "honeypot_events_search",
+    "vendor": "ReplayDemo",
+    "captured_at": "2026-06-01T00:00:00Z"
+  },
+  "items": [
+    {
+      "id": "hpt_replay_probe",
+      "sensor": "replay-edge-sensor-01",
+      "src_ip": "198.51.100.77",
+      "dst_ip": "203.0.113.30",
+      "protocol": "http",
+      "service": "web",
+      "type": "exploit_probe",
+      "payload": "GET /upload?cmd=whoami HTTP/1.1",
+      "label": "replay_exploit_probe",
+      "timestamp": "2026-06-01T08:01:00Z"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+name: mingyu_apt_health
+description: 查询安恒信息明御 APT 攻击预警平台版本与服务健康信息，用于测试连接和确认设备版本。
+description_cn: 查询明御 APT 版本、Sensor/Server/策略库版本和客服信息，可作为 Device Integration 的连接测试接口。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingyu_apt_api
+
+inputSchema:
+  type: object
+  properties: {}
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_apt.handler.py
+  function: health

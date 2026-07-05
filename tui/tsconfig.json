@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": [],
+    "noUncheckedIndexedAccess": false,
+    "customConditions": ["browser"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./flocks/*"],
+      "@tui/*": ["./flocks/cli/cmd/tui/*"],
+      "@flocks-ai/sdk": ["./sdk/index.ts"],
+      "@flocks-ai/sdk/v2": ["./sdk/v2/index.ts"],
+      "@flocks-ai/sdk/*": ["./sdk/*"],
+      "@flocks-ai/util/*": ["./util/*"]
+    }
+  },
+  "include": ["src", "flocks", "sdk", "util"]
+}

@@ -1,0 +1,317 @@
+"""
+MCP Package Installer
+
+Handles pre-flight package installation for local stdio MCP servers.
+Supports npm packages and Python packages installed into a managed virtualenv
+under ``~/.flocks/plugins/mcp/mcp-python`` so local MCPs do not depend on the system
+Python interpreter.
+"""
+
+import asyncio
+import os
+import shutil
+from pathlib import Path
+import sys
+from typing import TYPE_CHECKING, List
+
+from flocks.commercial import policy as commercial_policy
+from flocks.utils.log import Log
+
+if TYPE_CHECKING:
+    from flocks.mcp.catalog import CatalogEntry
+
+log = Log.create(service="mcp.installer")
+
+
+def _resolve_executable(cmd: List[str]) -> List[str]:
+    """Resolve the executable in *cmd* so it works on Windows.
+
+    On Windows, scripts like ``npm`` are actually ``.cmd`` batch files that
+    ``create_subprocess_exec`` cannot locate directly.  We use
+    ``shutil.which`` to find the real path and, when the result is a
+    ``.cmd`` / ``.bat`` wrapper, prepend ``cmd.exe /c`` so the OS can
+    execute it.
+    """
+    if not cmd:
+        return cmd
+    exe = cmd[0]
+    resolved = shutil.which(exe)
+    if resolved is None:
+        return cmd
+    if os.name == "nt" and resolved.lower().endswith((".cmd", ".bat")):
+        comspec = os.environ.get("COMSPEC") or "cmd.exe"
+        return [comspec, "/c", resolved, *cmd[1:]]
+    return [resolved, *cmd[1:]]
+
+
+async def _run_subprocess(cmd: List[str], timeout: float = 120.0) -> None:
+    """Run a subprocess, raise RuntimeError with stderr output on failure."""
+    cmd = _resolve_executable(cmd)
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        _stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.communicate()
+        raise RuntimeError(f"Command timed out after {timeout}s: {' '.join(cmd)}")
+
+    if proc.returncode != 0:
+        err_text = stderr.decode(errors="replace").strip()
+        raise RuntimeError(
+            f"Command failed (exit {proc.returncode}): {' '.join(cmd)}\n{err_text}"
+        )
+
+
+async def _ensure_package_install_allowed(*, package: str, manager: str) -> None:
+    await commercial_policy.ensure_outbound_allowed(
+        purpose=f"MCP {manager} package install: {package}",
+        require_initialized=False,
+        require_url_for_allowed_hosts=True,
+    )
+
+
+def _mcp_root() -> Path:
+    root = Path.home() / ".flocks" / "plugins" / "mcp"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def managed_python_env_dir() -> Path:
+    """Return the managed virtualenv directory for Python MCP packages."""
+    return _mcp_root() / "mcp-python"
+
+
+def managed_python_executable() -> str:
+    """Return the Python executable inside the managed MCP virtualenv."""
+    env_dir = managed_python_env_dir()
+    if os.name == "nt":
+        return str(env_dir / "Scripts" / "python.exe")
+    return str(env_dir / "bin" / "python")
+
+
+def managed_python_bin_dir() -> Path:
+    """Return the scripts/bin directory inside the managed MCP virtualenv."""
+    env_dir = managed_python_env_dir()
+    if os.name == "nt":
+        return env_dir / "Scripts"
+    return env_dir / "bin"
+
+
+async def _ensure_managed_python_env() -> str:
+    """Create the managed Python virtualenv on first use.
+
+    Installs the ``mcp`` SDK as a baseline dependency because every Python-based
+    MCP server needs it at runtime (``from mcp.server.fastmcp import FastMCP``).
+    Many community packages fail to declare this dependency explicitly.
+    """
+    python_bin = managed_python_executable()
+    if Path(python_bin).exists():
+        return python_bin
+
+    env_dir = managed_python_env_dir()
+    log.info("mcp.installer.python_env.create", {
+        "path": str(env_dir),
+        "base_python": sys.executable,
+    })
+    await _run_subprocess([sys.executable, "-m", "venv", str(env_dir)], timeout=180.0)
+    await _ensure_package_install_allowed(package="pip", manager="pip")
+    await _run_subprocess([python_bin, "-m", "pip", "install", "--upgrade", "pip"], timeout=180.0)
+    await _ensure_package_install_allowed(package="mcp", manager="pip")
+    await _run_subprocess([python_bin, "-m", "pip", "install", "mcp"], timeout=180.0)
+    return python_bin
+
+
+async def _ensure_mcp_sdk(python_bin: str) -> None:
+    """Ensure the ``mcp`` SDK package is installed in the managed virtualenv.
+
+    Many community Python MCP servers depend on ``mcp`` at runtime but fail to
+    declare it in their package metadata, causing ``ModuleNotFoundError`` when
+    the server process starts.  This is a no-op if already installed.
+    """
+    try:
+        await _run_subprocess(
+            [python_bin, "-c", "import mcp"],
+            timeout=10.0,
+        )
+    except RuntimeError:
+        log.info("mcp.installer.mcp_sdk_missing", {"python": python_bin})
+        await _ensure_package_install_allowed(package="mcp", manager="pip")
+        await _run_subprocess(
+            [python_bin, "-m", "pip", "install", "mcp"],
+            timeout=180.0,
+        )
+
+
+def rewrite_local_command_for_managed_python(command: List[str], pip_package: str | None = None) -> List[str]:
+    """Rewrite Python MCP commands to use the managed virtualenv.
+
+    Supports both:
+    - ``python -m package`` style commands
+    - console_scripts generated by ``pip install``
+    """
+    if not command:
+        return command
+    if command[0] != "python":
+        if pip_package and not Path(command[0]).is_absolute():
+            return [str(managed_python_bin_dir() / command[0]), *command[1:]]
+        return command
+    return [managed_python_executable(), *command[1:]]
+
+
+async def preflight_install(entry: "CatalogEntry") -> None:
+    """Install package dependencies for a catalog entry before connecting.
+
+    Supported transports:
+    - npx: runs ``npm install --prefix ~/.flocks/mcp <package>``
+    - python: creates ``~/.flocks/mcp/mcp-python`` and installs via pip
+    - uvx: fetches on demand at runtime, nothing to pre-install
+
+    All other executable types (python, java, go, cargo, …) raise a
+    RuntimeError with a clear message so the caller can surface it to the
+    user instead of hitting a cryptic 'Connection closed'.
+
+    Args:
+        entry: The catalog entry to install dependencies for.
+
+    Raises:
+        RuntimeError: If the package cannot be auto-installed.
+    """
+    if entry.transport != "local":
+        return
+
+    cmd = entry.install.local_command
+    if not cmd:
+        return
+
+    executable = cmd[0]
+
+    if executable == "npx" and entry.install.npx:
+        prefix = _mcp_root()
+        prefix.mkdir(parents=True, exist_ok=True)
+        await _ensure_package_install_allowed(package=entry.install.npx, manager="npm")
+        log.info("mcp.installer.npx", {
+            "server": entry.id,
+            "package": entry.install.npx,
+            "prefix": str(prefix),
+        })
+        try:
+            await _run_subprocess(
+                ["npm", "install", "--prefix", str(prefix), entry.install.npx],
+                timeout=300.0,
+            )
+        except RuntimeError as e:
+            if "ENOTEMPTY" in str(e):
+                # Partial install from a previous failed attempt; retry with --force
+                log.warn("mcp.installer.retrying_with_force", {
+                    "server": entry.id,
+                    "package": entry.install.npx,
+                })
+                await _run_subprocess(
+                    ["npm", "install", "--force", "--prefix", str(prefix), entry.install.npx],
+                    timeout=300.0,
+                )
+            else:
+                raise
+
+    elif entry.install.pip and executable not in {"npx", "uvx"}:
+        python_bin = await _ensure_managed_python_env()
+        await _ensure_mcp_sdk(python_bin)
+        await _ensure_package_install_allowed(package=entry.install.pip, manager="pip")
+        log.info("mcp.installer.pip", {
+            "server": entry.id,
+            "package": entry.install.pip,
+            "python": python_bin,
+        })
+        await _run_subprocess(
+            [python_bin, "-m", "pip", "install", entry.install.pip],
+            timeout=300.0,
+        )
+
+    elif executable == "uvx":
+        # uvx fetches packages on demand at runtime — nothing to pre-install
+        return
+
+    else:
+        note = entry.install.note or "See the project documentation for manual installation instructions."
+        raise RuntimeError(
+            f"'{entry.name}' does not support automatic installation. {note}"
+        )
+
+
+async def preflight_uninstall(entry: "CatalogEntry") -> None:
+    """Remove installed package dependencies for a catalog entry.
+
+    Handles:
+    - npx installs under ``~/.flocks/mcp``
+    - pip installs inside ``~/.flocks/mcp/mcp-python``
+    uvx packages are fetched on-demand and have no persistent install to clean up.
+    Other transports are silently ignored.
+
+    Args:
+        entry: The catalog entry to uninstall dependencies for.
+    """
+    if entry.transport != "local":
+        return
+
+    cmd = entry.install.local_command
+    if not cmd:
+        return
+
+    executable = cmd[0]
+
+    if executable == "npx" and entry.install.npx:
+        prefix = _mcp_root()
+        if not prefix.exists():
+            return
+        log.info("mcp.installer.npx_uninstall", {
+            "server": entry.id,
+            "package": entry.install.npx,
+            "prefix": str(prefix),
+        })
+        try:
+            await _run_subprocess(
+                ["npm", "uninstall", "--prefix", str(prefix), entry.install.npx],
+                timeout=60.0,
+            )
+        except RuntimeError as e:
+            # Non-fatal: log and continue, package may already be absent
+            log.warn("mcp.installer.npx_uninstall_failed", {
+                "server": entry.id,
+                "package": entry.install.npx,
+                "error": str(e),
+            })
+
+    elif entry.install.pip and executable not in {"npx", "uvx"}:
+        python_bin = managed_python_executable()
+        if not Path(python_bin).exists():
+            return
+        log.info("mcp.installer.pip_uninstall", {
+            "server": entry.id,
+            "package": entry.install.pip,
+            "python": python_bin,
+        })
+        try:
+            await _run_subprocess(
+                [python_bin, "-m", "pip", "uninstall", "-y", entry.install.pip],
+                timeout=120.0,
+            )
+        except RuntimeError as e:
+            log.warn("mcp.installer.pip_uninstall_failed", {
+                "server": entry.id,
+                "package": entry.install.pip,
+                "error": str(e),
+            })
+
+
+__all__ = [
+    "managed_python_env_dir",
+    "managed_python_executable",
+    "managed_python_bin_dir",
+    "preflight_install",
+    "preflight_uninstall",
+    "rewrite_local_command_for_managed_python",
+]

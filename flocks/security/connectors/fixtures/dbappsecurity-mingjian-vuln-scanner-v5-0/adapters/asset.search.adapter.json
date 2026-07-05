@@ -1,0 +1,40 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "asset.search",
+  "transport": "tool",
+  "tool": {
+    "name": "mingjian_vuln_scanner_assets",
+    "params": {
+      "action": "sync",
+      "modules": [0, 1, 5, 8],
+      "offset": 0,
+      "limit": 100,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": [
+        "data.list",
+        "data.rows",
+        "data.items",
+        "data.assetList",
+        "data.records",
+        "result.list",
+        "result.rows",
+        "result.items",
+        "assetList",
+        "assets",
+        "list",
+        "rows",
+        "items",
+        "records"
+      ],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/asset.search.mapping.json",
+  "pagination": {
+    "type": "offset",
+    "offset_param": "offset",
+    "size_param": "limit"
+  }
+}

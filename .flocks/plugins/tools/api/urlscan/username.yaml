@@ -1,0 +1,21 @@
+name: urlscan_username
+description: >
+  Get information about the current user or API key making the request.
+  Returns account details and Pro status. Use to verify API key authentication.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties: {}
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/api/v1/pro/username"
+  timeout: 30
+
+response:
+  extract: ""

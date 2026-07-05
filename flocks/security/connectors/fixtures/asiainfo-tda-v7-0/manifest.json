@@ -1,0 +1,55 @@
+{
+  "version": "connector.package.v1",
+  "id": "asiainfo-tda-v7-0",
+  "name": "AsiaInfo Xinwei TDA Connector",
+  "vendor": "AsiaInfo Security",
+  "product": "asiainfo_tda",
+  "product_version": "2025.6",
+  "package_version": "2026.06.2",
+  "deployment": "device_tool",
+  "auth_methods": ["device_profile"],
+  "capabilities": [
+    "asset.search",
+    "alert.search"
+  ],
+  "adapters": {
+    "asset.search": "adapters/asset.search.adapter.json",
+    "alert.search": "adapters/alert.search.adapter.json"
+  },
+  "health_tool": {
+    "name": "asiainfo_tda_health",
+    "params": {
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    }
+  },
+  "pagination": {
+    "type": "tool",
+    "page_size": 100
+  },
+  "rate_limit": {
+    "mode": "vendor_default",
+    "requests_per_minute": 60
+  },
+  "permissions": [
+    "asiainfo_tda:asset:read",
+    "asiainfo_tda:alert:read"
+  ],
+  "risk_level": "medium",
+  "description": "Read-only connector package for AsiaInfo Security Xinwei TDA. It syncs TDA asset and alert data through the existing signed device tool registry.",
+  "compatibility": {
+    "min_flocks_version": "0.0.0"
+  },
+  "release": {
+    "channel": "stable",
+    "published_at": "2026-06-09T00:00:00Z",
+    "notes": "Adds read-only AsiaInfo TDA 2025.6 signed asset and alert sync through the device tool registry.",
+    "changelog": [
+      "Uses asiainfo_tda_health for customer-visible signed connector testing.",
+      "Uses asiainfo_tda_assets for asset-list ingestion.",
+      "Uses asiainfo_tda_alerts for realtime alert ingestion.",
+      "Keeps device targeting configurable through FLOCKS_CONNECTOR_DEVICE_ID.",
+      "Normalizes TDA alert list address and timestamp fields for local Alert ingestion."
+    ]
+  },
+  "enabled": true
+}

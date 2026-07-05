@@ -1,0 +1,24 @@
+{
+  "version": "connector.adapter.v1",
+  "capability": "honeypot.event.search",
+  "transport": "tool",
+  "tool": {
+    "name": "skyeye_alarm_list",
+    "params": {
+      "data_source": "7",
+      "offset": 1,
+      "limit": 20,
+      "device_id": "${ENV:FLOCKS_CONNECTOR_DEVICE_ID}"
+    },
+    "output": {
+      "items_path": ["data.list", "data.rows", "data.items", "result.list", "list", "rows", "items"],
+      "wrap_items_as": "items"
+    }
+  },
+  "mapping": "../mappings/honeypot.event.search.mapping.json",
+  "pagination": {
+    "type": "page",
+    "page_param": "offset",
+    "size_param": "limit"
+  }
+}

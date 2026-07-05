@@ -1,0 +1,11 @@
+name: urlscan
+description: URLScan.io - Automated URL scanning and threat intelligence
+auth:
+  secret: urlscan_api_key
+  inject_as: header
+  header_name: API-Key
+  header_prefix: ""
+defaults:
+  base_url: "https://urlscan.io"
+  timeout: 30
+  category: custom

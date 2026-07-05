@@ -1,0 +1,96 @@
+schema_version: 1
+provider: asiainfo_tda_api
+
+# Service-level connectivity probe.
+# `asiainfo_tda_health` wraps the signed system-resource endpoint, which is
+# the lowest-risk documented endpoint that verifies base_url + api_key + secret.
+connectivity:
+  tool: asiainfo_tda_health
+  params: {}
+
+fixtures:
+  asiainfo_tda_health:
+    - label: "Connectivity health check"
+      label_cn: "连接健康检查"
+      tags: [smoke, health]
+      params: {}
+      assert:
+        success: true
+
+  asiainfo_tda_assets:
+    - label: "Asset list (page 1)"
+      label_cn: "资产列表（第 1 页）"
+      tags: [smoke, assets]
+      params:
+        page: 1
+        limit: 20
+      assert:
+        success: true
+
+  asiainfo_tda_alerts:
+    - label: "Realtime alerts (page 1)"
+      label_cn: "实时告警（第 1 页）"
+      tags: [smoke, alerts]
+      params:
+        time_type: 2
+        page: 1
+        limit: 20
+      assert:
+        success: true
+
+  asiainfo_tda_raw_events:
+    - label: "Raw alert events (page 1)"
+      label_cn: "原始告警（第 1 页）"
+      tags: [alerts]
+      params:
+        time_type: 2
+        page: 1
+        limit: 20
+
+  asiainfo_tda_asset_risks:
+    - label: "Asset risk list (page 1)"
+      label_cn: "资产风险（第 1 页）"
+      tags: [assets, risk]
+      params:
+        time_type: 2
+        page: 1
+        limit: 20
+
+  asiainfo_tda_attackers:
+    - label: "Attack view list (page 1)"
+      label_cn: "攻击视角（第 1 页）"
+      tags: [alerts, attacker]
+      params:
+        time_type: 2
+        page: 1
+        limit: 20
+
+  asiainfo_tda_sandbox_results:
+    - label: "Sandbox delivery records (page 1)"
+      label_cn: "投递记录（第 1 页）"
+      tags: [sandbox]
+      params:
+        page: 1
+        limit: 20
+
+  asiainfo_tda_system_resource:
+    - label: "System resource overview"
+      label_cn: "设备资源使用信息"
+      tags: [health]
+      params: {}
+      assert:
+        success: true
+
+  asiainfo_tda_alarm_pcap_detail:
+    - label: "Alarm PCAP detail by flow ID"
+      label_cn: "按 flow_id 解析告警 PCAP"
+      tags: [alarm, pcap]
+      params:
+        flow_id: "585749449644348499"
+
+  asiainfo_tda_ioc:
+    - label: "Custom IOC MD5 list"
+      label_cn: "自定义 IOC MD5 查询"
+      tags: [smoke, ioc]
+      params:
+        content: "68CCC2EFC570A8CE52AD7A6EEE30ADBC"

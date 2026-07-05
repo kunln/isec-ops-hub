@@ -1,0 +1,18 @@
+name: fofa
+description: FOFA network space mapping engine - search for internet assets, devices, and services
+description_cn: FOFA 网络空间测绘服务，用于检索互联网资产、设备与暴露服务。
+auth:
+  secret: fofa_key
+  inject_as: query_param
+  param_name: key
+compound_secret:
+  format: email:key
+  canonical_secret: fofa_key
+  derived_secrets:
+    email: fofa_email
+    api_key: fofa_api_key
+  persist_secondary_secret: false
+defaults:
+  base_url: "https://fofa.info/api/v1"
+  timeout: 30
+  category: custom

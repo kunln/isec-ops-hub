@@ -1,0 +1,51 @@
+name: threatbook_io_file_query
+description: >
+  Query file hash threat intelligence including static/dynamic analysis reports,
+  malware detection results, behavioral signatures, network behavior, and
+  multi-engine antivirus scan results. Use when analyzing suspicious file hashes.
+description_cn: 查询文件哈希威胁情报，包括静态/动态分析报告、恶意软件检测结果、行为特征、网络行为和多引擎杀毒扫描结果。用于分析可疑文件哈希。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    resource:
+      type: string
+      description: File hash to query (supports sha256/sha1/md5)
+    sandbox_type:
+      type: string
+      description: >
+        Sandbox environment. Options: win7_sp1_enx64_office2013, win7_sp1_enx86_office2013,
+        win7_sp1_enx86_office2010, win7_sp1_enx86_office2007, win7_sp1_enx86_office2003,
+        win10_1903_enx64_office2016, ubuntu_1704_x64, centos_7_x64, kylin_desktop_v10
+      required: false
+    query_fields:
+      type: string
+      description: >
+        Comma-separated fields to return. Options: summary, network, signature,
+        static, dropped, pstree, multiengines, strings
+      required: false
+  required: [resource]
+
+handler:
+  type: http
+  method: POST
+  url: "{base_url}/v2/file/query"
+  query_params:
+    resource: "{resource}"
+    sandbox_type: "{sandbox_type}"
+    query_fields: "{query_fields}"
+  timeout: 30
+
+response:
+  extract: "data"
+  error_mapping:
+    400: "Invalid request parameters"
+    401: "API key invalid or expired"
+    404: "No report found for this file hash"
+    405: "Invalid API method"
+    429: "Rate limit exceeded"
+    500: "System error"

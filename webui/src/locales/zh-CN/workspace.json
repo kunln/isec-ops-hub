@@ -1,0 +1,63 @@
+{
+  "description": "文件上传、Agent 产物和记忆浏览",
+  "tabs": {
+    "files": "文件管理",
+    "memory": "记忆文件"
+  },
+  "files": {
+    "back": "返回上级",
+    "refresh": "刷新当前目录",
+    "newDir": "新建目录",
+    "upload": "上传文件",
+    "dirNamePlaceholder": "目录名称",
+    "create": "创建",
+    "dropHere": "拖放文件到此处上传",
+    "emptyDir": "空目录 — 拖放文件或点击上传",
+    "columns": {
+      "name": "名称",
+      "size": "大小",
+      "modified": "修改时间"
+    },
+    "download": "下载",
+    "delete": "删除",
+    "edit": "编辑",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "uploading": "上传中...",
+    "binaryPreview": "二进制文件无法预览",
+    "downloadFile": "下载文件",
+    "toast": {
+      "loadDirFailed": "加载目录失败",
+      "readFileFailed": "读取文件失败",
+      "saveSuccess": "保存成功",
+      "saveFailed": "保存失败",
+      "deleteSuccess": "删除成功",
+      "deleteFailed": "删除失败",
+      "uploadSuccess": "上传成功 {{count}} 个文件",
+      "uploadPartialFail": "{{count}} 个文件上传失败",
+      "uploadFailed": "上传失败",
+      "createDirFailed": "创建目录失败"
+    },
+    "confirm": {
+      "deleteTitle": "确认删除",
+      "deleteDesc": "删除 \"{{name}}\" 后无法恢复，确认继续？",
+      "deleteBtn": "删除"
+    }
+  },
+  "memory": {
+    "title": "记忆文件",
+    "refresh": "刷新",
+    "searchPlaceholder": "搜索文件名...",
+    "loadFailed": "加载失败",
+    "retry": "重试",
+    "noFiles": "暂无记忆文件",
+    "noMatch": "无匹配结果",
+    "readOnly": "只读 · 由 Agent 自动写入",
+    "readFailed": "读取失败",
+    "selectPrompt": "选择左侧文件以预览内容",
+    "selectDesc": "记忆文件由 Rex 等 Agent 自动写入，记录任务上下文与关键信息",
+    "loadMemoryFailed": "加载记忆文件失败",
+    "readFileFailed": "读取文件失败"
+  }
+}

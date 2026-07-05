@@ -1,0 +1,41 @@
+name: asiainfo_tda_assets
+description: Query the AsiaInfo Security Xinwei TDA 2025.6 asset management list with optional time range, asset filters, and pagination.
+description_cn: 查询亚信安全信桅 TDA 2025.6 资产管理列表，支持按时间范围、资产 IP/名称和分页查看资产信息。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: asiainfo_tda_api
+
+inputSchema:
+  type: object
+  properties:
+    time_type:
+      type: integer
+      description: 时间类型：1 今日，2 最近 7 日，3 最近 14 日，4 最近 30 日，5 自定义。
+      default: 2
+    time_limit:
+      type: string
+      description: 自定义时间范围，time_type=5 时使用，格式为起止时间戳英文逗号分隔，例如 1735747200,1735833599。
+    asset_classification:
+      type: string
+      description: 资产分组 ID。部分 TDA 版本要求必填；未填时不传该筛选项。
+    asset_ip:
+      type: string
+      description: 资产 IP 模糊匹配。
+    asset_name:
+      type: string
+      description: 资产名称模糊匹配。
+    page:
+      type: integer
+      description: 第几页，默认 1。
+      default: 1
+    limit:
+      type: integer
+      description: 每页条数，默认 100，最大 500。
+      default: 100
+  required: []
+
+handler:
+  type: script
+  script_file: asiainfo_tda.handler.py
+  function: assets

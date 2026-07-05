@@ -1,0 +1,315 @@
+{
+  "title": "Commercial Admin Console",
+  "description": "{{productName}} commercial configuration and local controls",
+  "actions": {
+    "refresh": "Refresh",
+    "save": "Save",
+    "saving": "Saving",
+    "saved": "Saved",
+    "import": "Import",
+    "importing": "Importing",
+    "imported": "Imported",
+    "install": "Install",
+    "installing": "Installing",
+    "export": "Export",
+    "rollback": "Rollback"
+  },
+  "nav": {
+    "overview": "Overview",
+    "branding": "Branding",
+    "license": "License",
+    "features": "Features",
+    "update": "Update Policy",
+    "connectivity": "Connectivity",
+    "notifications": "Notification Policy",
+    "telemetry": "Telemetry Policy",
+    "packages": "Offline Packages",
+    "diagnostics": "Diagnostics",
+    "audit": "Audit Log"
+  },
+  "status": {
+    "true": "Enabled",
+    "false": "Disabled",
+    "active": "Active",
+    "available": "Available",
+    "baseline": "Baseline",
+    "community": "Community",
+    "denied": "Denied",
+    "disabled": "Disabled",
+    "enabled": "Enabled",
+    "excluded": "Excluded",
+    "expired": "Expired",
+    "failed": "Failed",
+    "imported": "Imported",
+    "included": "Included",
+    "inactive": "Inactive",
+    "license": "License",
+    "local": "Local",
+    "missing": "Missing",
+    "off": "Off",
+    "optional": "Optional",
+    "required": "Required",
+    "revoked": "Revoked",
+    "stable": "Stable",
+    "success": "Success",
+    "suspended": "Suspended",
+    "unlicensed": "Unlicensed"
+  },
+  "risk": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "packageTypes": {
+    "agent": "Agent",
+    "tool": "Tool",
+    "skill": "Skill",
+    "workflow": "Workflow",
+    "runtime": "Runtime"
+  },
+  "telemetryModes": {
+    "off": "Off",
+    "basic": "Basic",
+    "support": "Support"
+  },
+  "features": {
+    "audit": "Commercial Audit Log",
+    "branding": "Branding",
+    "connectivity": "Connectivity Controls",
+    "diagnostics": "Diagnostics Export",
+    "license": "License Import and Status",
+    "packages": "Offline Package Install",
+    "telemetry": "Commercial Telemetry",
+    "telemetrySecurityData": "Security Data Telemetry",
+    "updates": "Update Policy"
+  },
+  "featureMessages": {
+    "availableWithoutLicense": "Available without a commercial license.",
+    "enabledByLicense": "Enabled by the current commercial license.",
+    "disabledInactiveLicense": "Disabled because the current license is inactive, expired, or missing.",
+    "disabledMissingFeature": "Disabled because the current license does not include this feature.",
+    "defaultDisabled": "This capability is not enabled by the current commercial license."
+  },
+  "errors": {
+    "notFound": "API endpoint not found. Confirm that the backend loaded the commercial routes.",
+    "unauthorized": "Not signed in or the session has expired.",
+    "forbidden": "The current account does not have permission.",
+    "requestFailed": "Request failed."
+  },
+  "messages": {
+    "loadFailureItem": "{{section}}: {{message}}",
+    "partialLoadFailed": "Some configuration failed to load: {{details}}",
+    "partialRefreshFailed": "Some status data failed to refresh: {{details}}",
+    "saveFailed": "Save failed: {{message}}"
+  },
+  "format": {
+    "itemSeparator": "; "
+  },
+  "loadSections": {
+    "branding": "Branding",
+    "license": "License",
+    "update": "Update Policy",
+    "connectivity": "Connectivity",
+    "notifications": "Notification Policy",
+    "telemetry": "Telemetry Policy",
+    "packages": "Offline Packages",
+    "diagnostics": "Diagnostics",
+    "features": "Features",
+    "audit": "Audit Log"
+  },
+  "overview": {
+    "cards": {
+      "license": "License",
+      "outbound": "Outbound",
+      "telemetry": "Telemetry",
+      "packages": "Offline Packages"
+    },
+    "controlStatus": "Control Status",
+    "updateChannel": "Update Channel",
+    "allowedHostCount": "Allowed Hosts",
+    "featureFlags": "Feature Flags",
+    "enabledFeatureCount": "{{enabled}} enabled / {{total}} total",
+    "signatureRequired": "Signature Required",
+    "securityTelemetry": "Security Data Telemetry"
+  },
+  "values": {
+    "yes": "Yes",
+    "no": "No",
+    "included": "Included",
+    "excluded": "Excluded",
+    "notDeclared": "Not declared",
+    "set": "Set",
+    "missing": "Missing"
+  },
+  "fields": {
+    "productName": "Product Name",
+    "companyName": "Company Name",
+    "logoLight": "Light Logo",
+    "logoDark": "Dark Logo",
+    "favicon": "Favicon",
+    "supportUrl": "Support URL",
+    "loginTitle": "Login Page Title",
+    "loginSubtitle": "Login Page Subtitle",
+    "copyright": "Copyright"
+  },
+  "license": {
+    "title": "License",
+    "licensedTo": "Licensed To",
+    "licenseId": "License ID",
+    "expiresAt": "Expires At",
+    "importedAt": "Imported At",
+    "licensedFeatures": "Licensed Features",
+    "noLicensedFeatures": "No commercial capabilities enabled",
+    "importLabel": "Import License",
+    "importPlaceholder": "Paste a license key or JSON manifest"
+  },
+  "featuresTable": {
+    "title": "Features",
+    "columns": {
+      "capability": "Capability",
+      "requiredFeatures": "Required Features",
+      "status": "Status",
+      "source": "Source",
+      "description": "Description"
+    },
+    "empty": "No feature flags loaded"
+  },
+  "update": {
+    "fields": {
+      "updateServerUrl": "Update Server URL",
+      "updateChannel": "Update Channel",
+      "updateCheckEnabled": "Allow Update Checks",
+      "updateApplyEnabled": "Allow Applying Updates",
+      "legacySourcesEnabled": "Allow Original Flocks Update Sources",
+      "requireManualApproval": "Require Manual Approval",
+      "offlinePackageImport": "Allow Offline Package Import",
+      "signatureRequired": "Require Signature Verification",
+      "rollbackEnabled": "Allow Rollback"
+    }
+  },
+  "connectivity": {
+    "fields": {
+      "outboundEnabled": "Allow Outbound Connections",
+      "tlsVerify": "Verify TLS Certificates",
+      "proxyUrl": "Proxy URL",
+      "updateServerUrl": "Update Server URL",
+      "telemetryServerUrl": "Telemetry Server URL",
+      "licenseServerUrl": "License Server URL",
+      "allowedHosts": "Allowed Hosts"
+    }
+  },
+  "notifications": {
+    "fields": {
+      "localNotificationsEnabled": "Allow Local Notifications",
+      "builtInNotificationsEnabled": "Allow Built-in Notifications",
+      "benefitNotificationsEnabled": "Allow Benefit Reminders",
+      "whatsNewNotificationsEnabled": "Allow Version Update Content",
+      "vendorNotificationsEnabled": "Allow Vendor Push Notifications",
+      "announcementNotificationsEnabled": "Allow Announcement Notifications"
+    }
+  },
+  "telemetry": {
+    "fields": {
+      "enabled": "Enable Telemetry",
+      "mode": "Mode",
+      "includeLogs": "Include Logs",
+      "includeMetrics": "Include Metrics",
+      "includeSecurityData": "Include Security Data",
+      "redactionEnabled": "Enable Redaction"
+    }
+  },
+  "packages": {
+    "installTitle": "Install Local Offline Package",
+    "listTitle": "Local Offline Packages",
+    "permissionSummary": "{{label}} ({{risk}})",
+    "permissionsPlaceholder": "bash | high | local execution | run local diagnostics",
+    "fields": {
+      "id": "Package ID",
+      "type": "Type",
+      "name": "Name",
+      "version": "Version",
+      "publisher": "Publisher",
+      "compatibleRuntime": "Compatible Runtime",
+      "source": "Source",
+      "declaredRisk": "Declared Risk",
+      "hash": "Hash",
+      "signature": "Signature",
+      "permissions": "Permission Declarations",
+      "riskSummary": "Risk Summary",
+      "description": "Description"
+    },
+    "preflight": {
+      "title": "Pre-install Risk",
+      "signaturePolicy": "Signature {{requirement}}",
+      "baseRisk": "Base Risk",
+      "permissions": "Permissions",
+      "integrity": "Integrity",
+      "integrityValue": "Hash {{hash}} / Signature {{signature}}",
+      "offlineImportDisabled": "Offline package import is disabled by the current update policy.",
+      "permissionReviewRequired": "Permission declaration review must be acknowledged.",
+      "highRiskReviewRequired": "High-risk package assessment must be acknowledged.",
+      "hashRequired": "High-risk packages must include a hash.",
+      "signatureRequired": "The current update policy requires a signature for high-risk packages.",
+      "unsignedHighRiskAcknowledgementRequired": "Unsigned high-risk packages require acknowledgement under the current non-enforcing signature policy.",
+      "blocked": "Resolve the pre-install checks before installing this offline package."
+    },
+    "acknowledge": {
+      "permissions": "Permission declarations reviewed",
+      "risk": "High-risk package assessment confirmed",
+      "signaturePolicy": "Accept unsigned high-risk package installation under the current policy"
+    },
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "version": "Version",
+      "risk": "Risk",
+      "permissions": "Permissions",
+      "installedAt": "Installed At",
+      "actions": "Actions"
+    },
+    "empty": "No local offline packages"
+  },
+  "diagnostics": {
+    "title": "Diagnostics",
+    "generatedAt": "Generated at: {{time}}"
+  },
+  "audit": {
+    "title": "Commercial Audit",
+    "description": "Recent local administrator operations and permission decisions",
+    "columns": {
+      "time": "Time",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target",
+      "status": "Status",
+      "summary": "Summary"
+    },
+    "empty": "No audit events",
+    "metadata": "Metadata"
+  },
+  "footer": {
+    "summary": "Outbound: {{outbound}} / Security data telemetry: {{telemetry}}"
+  },
+  "commercialShell": {
+    "title": "Commercial Admin",
+    "subtitle": "Vendor product maintenance and security operations admin",
+    "logout": "Sign out",
+    "nav": {
+      "admin": "Commercial Config",
+      "securityAdmin": "Security Admin"
+    },
+    "login": {
+      "title": "Commercial Admin Sign In",
+      "subtitle": "For vendor maintenance staff only",
+      "username": "Username",
+      "password": "Password",
+      "signIn": "Sign in",
+      "signingIn": "Signing in..."
+    },
+    "errors": {
+      "login": "Sign-in failed",
+      "status": "Unable to confirm commercial admin status"
+    }
+  }
+}

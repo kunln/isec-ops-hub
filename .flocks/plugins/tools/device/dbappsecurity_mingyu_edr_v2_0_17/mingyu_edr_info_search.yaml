@@ -1,0 +1,36 @@
+name: mingyu_edr_info_search
+description: Query Mingyu EDR read-only information-search snapshots for listening ports, processes, accounts, software, and startup items.
+description_cn: 查询明御 EDR 信息搜索快照，只读支持最新时间、数量、监听信息、运行程序、账户信息、软件信息和启动项列表/详情。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_edr_api
+
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      description: 不包含采集刷新、导出和结束进程。
+      enum: [time, count, listens, listens_details, process, process_details, account, account_details, software, software_details, startup, startup_details]
+      default: time
+    page:
+      type: integer
+      default: 1
+    limit:
+      type: integer
+      default: 50
+    keyword:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+    body:
+      type: object
+      additionalProperties: true
+  required: []
+
+handler:
+  type: script
+  script_file: mingyu_edr.handler.py
+  function: info_search

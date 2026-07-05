@@ -1,0 +1,32 @@
+name: greynoise_tags
+description: >
+  List all available GreyNoise tags. Tags categorize threat actors, malware families,
+  attack techniques, and scanner types. Useful for understanding what threats GreyNoise
+  can detect and for building GNQL queries. Requires Enterprise API subscription.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: greynoise
+
+inputSchema:
+  type: object
+  properties:
+    limit:
+      type: integer
+      description: Maximum number of tags to return
+      default: 100
+  required: []
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/v3/tags"
+  query_params:
+    limit: "{limit}"
+  timeout: 30
+
+response:
+  extract: ""
+  error_mapping:
+    401: "API key invalid or expired"
+    429: "Rate limit exceeded"

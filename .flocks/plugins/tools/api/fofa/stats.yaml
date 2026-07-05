@@ -1,0 +1,37 @@
+name: fofa_stats
+description: >
+  Get statistical aggregation of FOFA search results - count by protocol, port, country, etc.
+  Use for attack surface analysis and understanding asset distribution.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: fofa
+
+inputSchema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: FOFA search query syntax
+      required: true
+    field:
+      type: string
+      description: Field to aggregate by (protocol, port, country, region, city, os, app, server)
+      required: true
+  required: [query, field]
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/search/stats"
+  query_params:
+    email: "{secret:fofa_email}"
+    key: "{secret:fofa_api_key}"
+    q: "{query}"
+    field: "{field}"
+  timeout: 60
+  headers:
+    User-Agent: "Flocks-FOFA-Client/1.0"
+
+response:
+  extract: ""

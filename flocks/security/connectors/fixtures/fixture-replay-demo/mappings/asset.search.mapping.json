@@ -1,0 +1,78 @@
+{
+  "version": "connector.mapping.v1",
+  "capability": "asset.search",
+  "target": "assets",
+  "source": {
+    "items_path": "items"
+  },
+  "include_raw_data": true,
+  "include_normalized_data": true,
+  "fields": [
+    { "raw": "id", "target": "id", "required": true },
+    { "raw": "name", "target": "name", "required": true },
+    {
+      "raw": "type",
+      "target": "asset_type",
+      "default": "other",
+      "enum_default": "other",
+      "enum": {
+        "server": "server",
+        "endpoint": "endpoint",
+        "network_device": "network_device",
+        "security_device": "security_device",
+        "web_app": "web_app",
+        "api": "api",
+        "database": "database",
+        "cloud_resource": "cloud_resource",
+        "other": "other"
+      }
+    },
+    { "raw": "ip", "target": "ip", "required": true },
+    { "raw": "hostname", "target": "hostname" },
+    { "raw": "domain", "target": "domain" },
+    { "raw": "system", "target": "business_system" },
+    { "raw": "owner", "target": "business_owner" },
+    {
+      "raw": "criticality",
+      "target": "importance",
+      "default": "medium",
+      "enum_default": "medium",
+      "enum": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical"
+      }
+    },
+    {
+      "raw": "exposure",
+      "target": "exposure_level",
+      "default": "unknown",
+      "enum_default": "unknown",
+      "enum": {
+        "internal": "internal",
+        "external": "external",
+        "unknown": "unknown"
+      }
+    },
+    {
+      "raw": "env",
+      "target": "environment",
+      "default": "unknown",
+      "enum_default": "unknown",
+      "enum": {
+        "production": "production",
+        "staging": "staging",
+        "testing": "testing",
+        "development": "development",
+        "unknown": "unknown"
+      }
+    },
+    { "raw": "ports", "target": "open_ports", "default": [], "transform": "list" },
+    { "raw": "services", "target": "services", "default": [], "transform": "list" },
+    { "raw": "protocols", "target": "protocols", "default": [], "transform": "list" },
+    { "raw": "controls", "target": "security_controls", "default": {}, "transform": "dict" },
+    { "raw": "tags", "target": "tags", "default": [], "transform": "list" },
+    { "raw": "description", "target": "description" }
+  ]
+}

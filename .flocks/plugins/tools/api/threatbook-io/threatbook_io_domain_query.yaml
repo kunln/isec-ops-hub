@@ -1,0 +1,43 @@
+name: threatbook_io_domain_query
+description: >
+  Query domain threat intelligence including verdict, WHOIS, DNS records,
+  SSL certificates, and associated malware samples. Use when analyzing
+  suspicious domains during phishing or malware distribution investigations.
+description_cn: 查询域名威胁情报，包括信誉判定、WHOIS信息、DNS记录、SSL证书和关联恶意样本。用于钓鱼或恶意软件分发调查。
+category: custom
+enabled: true
+requires_confirmation: false
+provider: threatbook-io
+
+inputSchema:
+  type: object
+  properties:
+    resource:
+      type: string
+      description: Single domain to query (e.g., example.com)
+    exclude:
+      type: string
+      description: >
+        Comma-separated parameters to exclude from response. Options:
+        pdns, whois, ssl_certs, intelligences, judgments, tags_classes,
+        samples, categories, sub_domains_count, pdns_count
+      required: false
+  required: [resource]
+
+handler:
+  type: http
+  method: POST
+  url: "{base_url}/v2/domain/query"
+  query_params:
+    resource: "{resource}"
+    exclude: "{exclude}"
+  timeout: 30
+
+response:
+  extract: "data"
+  error_mapping:
+    400: "Invalid request parameters"
+    401: "API key invalid or expired"
+    405: "Invalid API method"
+    429: "Rate limit exceeded"
+    500: "System error"

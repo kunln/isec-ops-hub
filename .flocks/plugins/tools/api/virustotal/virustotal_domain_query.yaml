@@ -1,0 +1,19 @@
+name: virustotal_domain_query
+description: Query domain threat intelligence from VirusTotal.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: virustotal
+
+inputSchema:
+  type: object
+  properties:
+    domain:
+      type: string
+      description: The domain name to query, for example example.com.
+  required: [domain]
+
+handler:
+  type: script
+  script_file: virustotal.handler.py
+  function: domain_query

@@ -1,0 +1,21 @@
+name: urlscan_user_agents
+description: >
+  Get grouped user agents that can be used with the Scan API.
+  Use this to see available browser/User-Agent options for custom scans.
+category: custom
+enabled: true
+requires_confirmation: false
+provider: urlscan
+
+inputSchema:
+  type: object
+  properties: {}
+
+handler:
+  type: http
+  method: GET
+  url: "{base_url}/api/v1/userAgents"
+  timeout: 30
+
+response:
+  extract: ""

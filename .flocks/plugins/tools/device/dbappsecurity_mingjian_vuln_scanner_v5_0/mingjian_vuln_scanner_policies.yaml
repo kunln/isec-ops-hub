@@ -1,0 +1,44 @@
+name: mingjian_vuln_scanner_policies
+description: Query DBAPPSecurity Mingjian Vulnerability Scanner policies and policy templates.
+description_cn: 查询安恒信息明鉴漏洞扫描系统策略和策略模板。
+category: security
+enabled: true
+requires_confirmation: false
+provider: dbappsecurity_mingjian_vuln_scanner_api
+inputSchema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - policies
+        - templates
+      default: templates
+    module:
+      oneOf:
+        - type: string
+        - type: integer
+      description: 厂商 module 参数。
+    offset:
+      type: integer
+      default: 0
+      minimum: 0
+    limit:
+      type: integer
+      default: 50
+      minimum: 1
+      maximum: 100
+    policy_no:
+      oneOf:
+        - type: string
+        - type: integer
+      description: 厂商 policyNo 参数。
+    params:
+      type: object
+      description: 透传查询参数，优先级高于标准字段。
+      additionalProperties: true
+  additionalProperties: false
+handler:
+  type: script
+  script_file: mingjian_vuln_scanner.handler.py
+  function: policies

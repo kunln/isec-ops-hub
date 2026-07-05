@@ -1,0 +1,20 @@
+cases:
+  - name: provider_schema_loads
+    tool: das_gateway_health
+    input: {}
+  - name: network_interface_list
+    tool: das_gateway_network
+    input:
+      action: interface_list
+      page: 1
+      count: 20
+  - name: object_address_detail
+    tool: das_gateway_objects
+    input:
+      action: address_detail
+      path_params:
+        name: addr-object
+  - name: system_host_info
+    tool: das_gateway_system
+    input:
+      action: host_info
