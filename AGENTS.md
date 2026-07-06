@@ -151,3 +151,24 @@ Rex has a dedicated `flocks_skills` tool for managing agent skills.
 ## Important
 - 涉及 `tdp`、`onesec`、`skyeye`、`qingteng` 的任务时，必须先读取并遵循对应的 skill。
 - 对上述系统，禁止绕过对应 skill 直接调用相关 tools；也不要直接使用 `browser`。
+
+## iSecOps Hub Security Extension Development Constraints
+
+- 不要改 `flocks` 包名；产品名是 iSecOps Hub，仓库名是 `isec-ops-hub`，内部核心平台仍叫 FLOCKS。
+- 不要新增独立安全分析服务；新能力必须复用现有 FLOCKS / Security Extension 架构。
+- 新增 Security 能力优先放在现有 `flocks/security` 和 `/api/security` 体系内，并优先复用 `flocks/server/routes/security.py`、`flocks/tool/security/security_ops.py`、`flocks/security/evidence_graph.py`、`flocks/security/connectors`、`webui/src/pages/Security/index.tsx`、`webui/src/api/security.ts`。
+- API 继续挂在 `/api/security` 下，权限继续使用 `security.ops.read` / `security.ops.write`。
+- Analysis Case 是 Alert 到 Incident 之间的研判对象。
+- Fact Ledger 第一阶段嵌入 Analysis Case，不设计成独立大系统。
+- 不要把 Connector Schedule 合并进 TaskScheduler。
+- 不要让 Analysis Case 取代 Incident。
+- 不要让 Alert 消失。
+- 当前阶段不做自动封禁、隔离主机、删除资源、禁用账号、修改防火墙/WAF/EDR/IAM 策略等真实处置。
+- 自动处置能力只能作为未来 Remediation Action / Approval / Audit 预留，不得作为当前阶段主线。
+- 所有 AI 结论必须引用 Facts / Evidence Gaps / source references，不能凭空下结论。
+- 缺失证据不能当成无异常；Negative Observation 必须说明查询范围、时间范围、数据源和限制。
+- 单设备高保真日志可以确认局部客观事实；多设备证据链提升完整度和置信度。
+- 设备 API 能力逐步完善，不要求一次性支持所有厂商所有 API。
+- 新增代码必须补测试；但纯文档任务只改文档。
+- 不提交 secret、`.env`、运行态数据库、credential、日志或其他敏感/运行态文件。
+
