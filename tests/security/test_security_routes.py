@@ -610,3 +610,36 @@ async def test_security_connector_package_staging_routes(client: AsyncClient):
     discarded = await client.delete(f"/api/security/connectors/packages/staging/{staged['id']}")
     assert discarded.status_code == 200
     assert discarded.json()["discarded_at"]
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_defaults_and_from_alert_fact(client: AsyncClient):
+    created = await client.post("/api/security/analysis-cases", json={"title": "Investigate signal"})
+    assert created.status_code == 201, created.text
+    case = created.json()
+    assert case["verdict"] == "insufficient_evidence"
+    assert case["evidence_coverage"] == "ec0_signal"
+    assert case["analysis_mode"] == "single_source"
+    assert case["notification_decision"] == "no_notify_store_only"
+    assert case["incident_decision"] == "continue_monitoring"
+
+    alert = await client.post(
+        "/api/security/alerts",
+        json={
+            "asset_id": "asset-1",
+            "title": "Suspicious login",
+            "description": "Multiple failed authentications followed by success",
+            "occurred_at": "2026-07-06T00:00:00+00:00",
+        },
+    )
+    assert alert.status_code == 201, alert.text
+    alert_body = alert.json()
+
+    from_alert = await client.post(f"/api/security/analysis-cases/from-alert/{alert_body['id']}")
+    assert from_alert.status_code == 200, from_alert.text
+    fact = from_alert.json()["facts"][0]
+    assert fact["fact_type"] == "alert_signal"
+    assert "Suspicious login" in fact["statement"]
+    assert fact["source_ref"] == f"alert:{alert_body['id']}"
+    assert fact["related_alert_id"] == alert_body["id"]
+    assert fact["strength"] == "medium"
