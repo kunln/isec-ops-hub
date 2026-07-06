@@ -37,6 +37,10 @@ class TestIdentifierCompatibility:
             "alert": "alr",
             "incident": "inc",
             "honeypot": "hpt",
+            "analysis_case": "acase",
+            "analysis_fact": "afact",
+            "evidence": "evd",
+            "evidence_gap": "egap",
         }
         
         assert Identifier._prefixes == expected_prefixes

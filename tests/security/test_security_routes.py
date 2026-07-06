@@ -610,3 +610,117 @@ async def test_security_connector_package_staging_routes(client: AsyncClient):
     discarded = await client.delete(f"/api/security/connectors/packages/staging/{staged['id']}")
     assert discarded.status_code == 200
     assert discarded.json()["discarded_at"]
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_backend_closed_loop(client: AsyncClient):
+    payload = {
+        "title": "Investigate suspicious login",
+        "facts": [
+            {
+                "fact_type": "alert_signal",
+                "statement": "Suspicious login alert fired",
+                "source_ref": "alert:manual",
+            }
+        ],
+        "evidence_items": [
+            {
+                "title": "Raw alert event",
+                "description": "Normalized alert payload",
+                "source_ref": "alert:manual",
+            }
+        ],
+        "evidence_gaps": [
+            {
+                "gap_type": "missing_endpoint_telemetry",
+                "description": "Endpoint process tree is unavailable",
+                "missing_source_type": "edr",
+            }
+        ],
+    }
+    created = await client.post("/api/security/analysis-cases", json=payload)
+    assert created.status_code == 201, created.text
+    case = created.json()
+    assert case["id"].startswith("acase_")
+    assert not case["id"].startswith("inc_")
+    assert case["case_status"] == "new"
+    assert case["verdict"] == "insufficient_evidence"
+    assert case["severity"] == "medium"
+    assert case["confidence"] == "medium"
+    assert case["evidence_coverage"] == "ec0_signal"
+    assert case["analysis_mode"] == "single_source"
+    assert case["notification_decision"] == "no_notify_store_only"
+    assert case["incident_decision"] == "continue_monitoring"
+    assert case["disposition"] == "open"
+    assert case["facts"][0]["id"].startswith("afact_")
+    assert case["facts"][0]["created_at"]
+    assert case["facts"][0]["confidence"] == "medium"
+    assert case["facts"][0]["strength"] == "medium"
+    assert case["evidence_items"][0]["id"].startswith("evd_")
+    assert case["evidence_items"][0]["created_at"]
+    assert case["evidence_gaps"][0]["id"].startswith("egap_")
+    assert case["evidence_gaps"][0]["created_at"]
+
+    listed = await client.get("/api/security/analysis-cases")
+    assert listed.status_code == 200
+    assert any(item["id"] == case["id"] for item in listed.json())
+
+    fetched = await client.get(f"/api/security/analysis-cases/{case['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["id"] == case["id"]
+
+    updated = await client.patch(f"/api/security/analysis-cases/{case['id']}", json={"case_status": "analyzing"})
+    assert updated.status_code == 200
+    assert updated.json()["case_status"] == "analyzing"
+
+    deleted = await client.delete(f"/api/security/analysis-cases/{case['id']}")
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is True
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_filter_matches_primary_asset_id(client: AsyncClient):
+    primary_asset_id = "ast_primary_only"
+    created = await client.post(
+        "/api/security/analysis-cases",
+        json={"title": "Primary asset only case", "primary_asset_id": primary_asset_id},
+    )
+    assert created.status_code == 201, created.text
+    case = created.json()
+    assert case["primary_asset_id"] == primary_asset_id
+    assert case["related_asset_ids"] == []
+
+    filtered = await client.get("/api/security/analysis-cases", params={"asset_id": primary_asset_id})
+    assert filtered.status_code == 200
+    assert any(item["id"] == case["id"] for item in filtered.json())
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_from_alert_returns_201_and_complete_fact(client: AsyncClient):
+    alert_payload = {
+        "asset_id": "ast_manual_asset",
+        "source": "siem",
+        "title": "Impossible travel",
+        "severity": "high",
+        "description": "User login from distant geographies",
+        "occurred_at": "2026-07-06T10:00:00+00:00",
+    }
+    alert_response = await client.post("/api/security/alerts", json=alert_payload)
+    assert alert_response.status_code == 201, alert_response.text
+    alert = alert_response.json()
+
+    response = await client.post(f"/api/security/analysis-cases/from-alert/{alert['id']}")
+    assert response.status_code == 201, response.text
+    case = response.json()
+    assert case["id"].startswith("acase_")
+    assert case["related_alert_ids"] == [alert["id"]]
+    assert case["primary_asset_id"] == alert_payload["asset_id"]
+    fact = case["facts"][0]
+    assert fact["fact_type"] == "alert_signal"
+    assert fact["statement"]
+    assert fact["source_ref"] == f"alert:{alert['id']}"
+    assert fact["related_alert_id"] == alert["id"]
+    assert fact["related_asset_id"] == alert_payload["asset_id"]
+    assert fact["confidence"] == "medium"
+    assert fact["strength"] == "medium"
+    assert fact["observed_at"] == alert_payload["occurred_at"]
