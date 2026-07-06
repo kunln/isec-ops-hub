@@ -34,6 +34,7 @@ IdPrefix = Literal[
     "alert",      # alr  (security alert)
     "incident",   # inc  (security incident)
     "honeypot",   # hpt  (security honeypot event)
+    "analysis_case", # acs (security analysis case)
 ]
 
 
@@ -70,6 +71,7 @@ class Identifier:
         "alert": "alr",
         "incident": "inc",
         "honeypot": "hpt",
+        "analysis_case": "acs",
     }
     
     # Constants

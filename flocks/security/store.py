@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from flocks.security.models import (
     Alert,
+    AnalysisCase,
     Asset,
     HoneypotEvent,
     Incident,
@@ -19,6 +20,8 @@ from flocks.security.models import (
 from flocks.security.schemas import (
     AlertCreate,
     AlertUpdate,
+    AnalysisCaseCreate,
+    AnalysisCaseUpdate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -33,7 +36,7 @@ from flocks.storage.storage import Storage
 from flocks.utils.id import Identifier
 
 
-SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent)
+SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent, AnalysisCase)
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,7 @@ HONEYPOT_EVENTS = CollectionSpec(
     HoneypotEvent,
     "honeypot",
 )
+ANALYSIS_CASES = CollectionSpec("analysis_cases", "security/analysis-cases/", AnalysisCase, "analysis_case")
 
 
 def utc_now() -> str:
@@ -170,6 +174,20 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
                 "owner",
                 "sla",
                 "created_by",
+            ],
+        )
+    if spec is ANALYSIS_CASES:
+        return _compact_dict(
+            data,
+            [
+                "id",
+                "title",
+                "status",
+                "disposition",
+                "alert_ids",
+                "incident_ids",
+                "asset_ids",
+                "owner",
             ],
         )
     if spec is HONEYPOT_EVENTS:
@@ -362,6 +380,25 @@ class SecurityStore:
 
     async def delete_vulnerability(self, vulnerability_id: str) -> bool:
         return await self._delete(VULNERABILITIES, vulnerability_id)
+
+    async def list_analysis_cases(self, filters: SecurityListFilters | None = None) -> list[AnalysisCase]:
+        return await self._list(ANALYSIS_CASES, filters)
+
+    async def get_analysis_case(self, case_id: str) -> AnalysisCase | None:
+        return await self._get(ANALYSIS_CASES, case_id)
+
+    async def create_analysis_case(self, payload: AnalysisCaseCreate | dict[str, Any]) -> AnalysisCase:
+        return await self._create(ANALYSIS_CASES, payload)
+
+    async def update_analysis_case(
+        self,
+        case_id: str,
+        payload: AnalysisCaseUpdate | dict[str, Any],
+    ) -> AnalysisCase | None:
+        return await self._update(ANALYSIS_CASES, case_id, payload)
+
+    async def delete_analysis_case(self, case_id: str) -> bool:
+        return await self._delete(ANALYSIS_CASES, case_id)
 
     async def list_alerts(self, filters: SecurityListFilters | None = None) -> list[Alert]:
         return await self._list(ALERTS, filters)

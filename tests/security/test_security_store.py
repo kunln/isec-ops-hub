@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from flocks.security.schemas import AssetCreate, SecurityListFilters
+from flocks.security.models import AnalysisFact
+from flocks.security.schemas import AnalysisCaseCreate, AssetCreate, SecurityListFilters
 from flocks.security.store import SecurityStore
 from flocks.storage.storage import Storage
 
@@ -60,3 +61,17 @@ async def test_security_store_asset_crud_and_filters(store: SecurityStore):
 
     assert await store.delete_asset(asset.id) is True
     assert await store.delete_asset(asset.id) is False
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_defaults_and_fact_strength(store: SecurityStore):
+    case = await store.create_analysis_case(
+        AnalysisCaseCreate(
+            title="Suspicious alert review",
+            facts=[AnalysisFact(fact_type="alert_signal", statement="Alert fired")],
+        )
+    )
+
+    assert case.status == "new"
+    assert case.disposition == "open"
+    assert case.facts[0].strength == "medium"
