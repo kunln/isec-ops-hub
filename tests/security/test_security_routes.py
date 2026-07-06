@@ -610,3 +610,59 @@ async def test_security_connector_package_staging_routes(client: AsyncClient):
     discarded = await client.delete(f"/api/security/connectors/packages/staging/{staged['id']}")
     assert discarded.status_code == 200
     assert discarded.json()["discarded_at"]
+
+
+@pytest.mark.asyncio
+async def test_security_routes_analysis_case_crud_and_from_alert(client: AsyncClient):
+    create = await client.post(
+        "/api/security/analysis-cases",
+        json={
+            "title": "Investigate endpoint beacon",
+            "severity": "medium",
+            "related_asset_ids": ["asset-route-1"],
+            "facts": [{"fact_type": "manual", "statement": "Endpoint beacon observed in proxy logs."}],
+        },
+    )
+    assert create.status_code == 201, create.text
+    case = create.json()
+    assert case["id"].startswith("case_")
+    assert case["facts"][0]["id"].startswith("fact_")
+
+    fetched = await client.get(f"/api/security/analysis-cases/{case['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["title"] == "Investigate endpoint beacon"
+
+    updated = await client.patch(
+        f"/api/security/analysis-cases/{case['id']}",
+        json={"case_status": "investigating", "summary": "Human analyst review started."},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["case_status"] == "investigating"
+
+    listed = await client.get("/api/security/analysis-cases", params={"status": "investigating"})
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [case["id"]]
+
+    alert = await client.post(
+        "/api/security/alerts",
+        json={
+            "asset_id": "asset-route-2",
+            "source": "siem",
+            "title": "Suspicious authentication",
+            "severity": "high",
+            "description": "Multiple failed logins followed by success.",
+            "occurred_at": "2026-07-06T00:00:00+00:00",
+        },
+    )
+    assert alert.status_code == 201, alert.text
+
+    from_alert = await client.post(f"/api/security/analysis-cases/from-alert/{alert.json()['id']}")
+    assert from_alert.status_code == 201, from_alert.text
+    from_alert_body = from_alert.json()
+    assert from_alert_body["related_alert_ids"] == [alert.json()["id"]]
+    assert from_alert_body["primary_asset_id"] == "asset-route-2"
+    assert from_alert_body["facts"][0]["source_ref"] == f"alert:{alert.json()['id']}"
+
+    deleted = await client.delete(f"/api/security/analysis-cases/{case['id']}")
+    assert deleted.status_code == 200
+    assert deleted.json() == {"deleted": True}

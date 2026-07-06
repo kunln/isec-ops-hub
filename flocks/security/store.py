@@ -11,6 +11,8 @@ from pydantic import BaseModel
 
 from flocks.security.models import (
     Alert,
+    AnalysisCase,
+    AnalysisFact,
     Asset,
     HoneypotEvent,
     Incident,
@@ -19,6 +21,8 @@ from flocks.security.models import (
 from flocks.security.schemas import (
     AlertCreate,
     AlertUpdate,
+    AnalysisCaseCreate,
+    AnalysisCaseUpdate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -33,7 +37,7 @@ from flocks.storage.storage import Storage
 from flocks.utils.id import Identifier
 
 
-SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent)
+SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent, AnalysisCase)
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,7 @@ VULNERABILITIES = CollectionSpec(
     "vulnerability",
 )
 ALERTS = CollectionSpec("alerts", "security/alerts/", Alert, "alert")
+ANALYSIS_CASES = CollectionSpec("analysis_cases", "security/analysis-cases/", AnalysisCase, "analysis_case")
 INCIDENTS = CollectionSpec("incidents", "security/incidents/", Incident, "incident")
 HONEYPOT_EVENTS = CollectionSpec(
     "honeypot_events",
@@ -80,6 +85,10 @@ def _text(value: Any) -> str:
         return ""
     if isinstance(value, str):
         return value
+    if isinstance(value, BaseModel):
+        value = value.model_dump(mode="json")
+    elif isinstance(value, list):
+        value = [item.model_dump(mode="json") if isinstance(item, BaseModel) else item for item in value]
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
@@ -154,6 +163,28 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
                 "occurred_at",
             ],
         )
+    if spec is ANALYSIS_CASES:
+        return _compact_dict(
+            data,
+            [
+                "id",
+                "title",
+                "case_status",
+                "verdict",
+                "severity",
+                "confidence",
+                "evidence_coverage",
+                "analysis_mode",
+                "notification_decision",
+                "incident_decision",
+                "disposition",
+                "primary_asset_id",
+                "related_asset_ids",
+                "related_alert_ids",
+                "related_vulnerability_ids",
+                "related_incident_id",
+            ],
+        )
     if spec is INCIDENTS:
         return _compact_dict(
             data,
@@ -190,6 +221,23 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
     return _compact_dict(data, common)
 
 
+def _prepare_analysis_case(data: dict[str, Any], now: str) -> None:
+    for prefix, field in (("fact", "facts"), ("evidence", "evidence_items"), ("gap", "evidence_gaps")):
+        prepared = []
+        for item in data.get(field, []) or []:
+            item_data = _dump(item)
+            if not item_data.get("id"):
+                item_data["id"] = Identifier.create(prefix)
+            if not item_data.get("created_at"):
+                item_data["created_at"] = now
+            prepared.append(item_data)
+        data[field] = prepared
+    fact_alerts = [fact.get("related_alert_id") for fact in data.get("facts", []) if fact.get("related_alert_id")]
+    for alert_id in fact_alerts:
+        if alert_id not in data.get("related_alert_ids", []):
+            data.setdefault("related_alert_ids", []).append(alert_id)
+
+
 class SecurityStore:
     async def _put(self, spec: CollectionSpec, data: dict[str, Any]) -> SecurityObject:
         now = utc_now()
@@ -201,6 +249,8 @@ class SecurityStore:
             data["raw_data"] = data["raw_event"]
         if not data.get("normalized_data"):
             data["normalized_data"] = _default_normalized_data(spec, data)
+        if spec is ANALYSIS_CASES:
+            _prepare_analysis_case(data, now)
         obj = spec.model.model_validate(data)
         await Storage.set(_key(spec, obj.id), obj, f"security.{spec.name}")
         return obj
@@ -256,14 +306,16 @@ class SecurityStore:
     def _matches(self, item: SecurityObject, filters: SecurityListFilters) -> bool:
         if filters.asset_id and getattr(item, "asset_id", None) != filters.asset_id:
             if not (
-                isinstance(item, Incident)
-                and filters.asset_id in item.asset_ids
+                (isinstance(item, Incident) and filters.asset_id in item.asset_ids)
+                or (isinstance(item, AnalysisCase) and filters.asset_id in item.related_asset_ids)
+                or getattr(item, "primary_asset_id", None) == filters.asset_id
             ):
                 return False
         if filters.severity and getattr(item, "severity", None) != filters.severity:
             return False
         if filters.status and getattr(item, "status", None) != filters.status:
-            return False
+            if getattr(item, "case_status", None) != filters.status:
+                return False
         if filters.source and getattr(item, "source", None) != filters.source:
             return False
         if filters.importance and getattr(item, "importance", None) != filters.importance:
@@ -320,6 +372,8 @@ class SecurityStore:
         haystack += " " + _text(getattr(item, "tags", []))
         haystack += " " + _text(getattr(item, "ioc", []))
         haystack += " " + _text(getattr(item, "raw_event", {}))
+        haystack += " " + _text(getattr(item, "facts", []))
+        haystack += " " + _text(getattr(item, "evidence_gaps", []))
         haystack += " " + _text(getattr(item, "geo", {}))
         return keyword.lower() in haystack.lower()
 
@@ -380,6 +434,29 @@ class SecurityStore:
 
     async def delete_alert(self, alert_id: str) -> bool:
         return await self._delete(ALERTS, alert_id)
+
+
+    async def list_analysis_cases(self, filters: SecurityListFilters | None = None) -> list[AnalysisCase]:
+        return await self._list(ANALYSIS_CASES, filters)
+
+    async def get_analysis_case(self, case_id: str) -> AnalysisCase | None:
+        return await self._get(ANALYSIS_CASES, case_id)
+
+    async def create_analysis_case(self, payload: AnalysisCaseCreate | dict[str, Any]) -> AnalysisCase:
+        return await self._create(ANALYSIS_CASES, payload)
+
+    async def upsert_analysis_case(self, payload: AnalysisCase | dict[str, Any]) -> AnalysisCase:
+        return await self._upsert(ANALYSIS_CASES, payload)
+
+    async def update_analysis_case(
+        self,
+        case_id: str,
+        payload: AnalysisCaseUpdate | dict[str, Any],
+    ) -> AnalysisCase | None:
+        return await self._update(ANALYSIS_CASES, case_id, payload)
+
+    async def delete_analysis_case(self, case_id: str) -> bool:
+        return await self._delete(ANALYSIS_CASES, case_id)
 
     async def list_incidents(self, filters: SecurityListFilters | None = None) -> list[Incident]:
         return await self._list(INCIDENTS, filters)
