@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from flocks.security.schemas import AssetCreate, SecurityListFilters
+from flocks.security.schemas import AlertCreate, AnalysisCaseCreate, AssetCreate, SecurityListFilters
 from flocks.security.store import SecurityStore
 from flocks.storage.storage import Storage
 
@@ -60,3 +60,38 @@ async def test_security_store_asset_crud_and_filters(store: SecurityStore):
 
     assert await store.delete_asset(asset.id) is True
     assert await store.delete_asset(asset.id) is False
+
+
+@pytest.mark.asyncio
+async def test_security_store_analysis_case_crud_defaults_and_from_alert(store: SecurityStore):
+    case = await store.create_analysis_case(
+        AnalysisCaseCreate(
+            title="Investigate suspicious login",
+            facts=[{"title": "login spike", "description": "Multiple failures"}],
+        )
+    )
+
+    assert case.id.startswith("ana_")
+    assert case.case_status == "new"
+    assert case.disposition == "open"
+    assert case.facts[0].strength == "medium"
+
+    updated = await store.update_analysis_case(case.id, {"case_status": "analyzing", "disposition": "monitoring"})
+    assert updated is not None
+    assert updated.case_status == "analyzing"
+    assert updated.disposition == "monitoring"
+
+    alert = await store.create_alert(
+        AlertCreate(
+            asset_id="asset-1",
+            title="Suspicious process",
+            severity="high",
+            description="Endpoint alert",
+        )
+    )
+    from_alert = await store.create_analysis_case_from_alert(alert.id)
+    assert from_alert is not None
+    assert from_alert.related_alert_ids == [alert.id]
+    assert from_alert.primary_asset_id == "asset-1"
+    assert from_alert.facts[0].title == "alert_signal"
+    assert from_alert.facts[0].strength == "medium"
