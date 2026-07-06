@@ -9,9 +9,12 @@ from pydantic import BaseModel, Field
 from flocks.security.models import (
     AlertSource,
     AlertStatus,
+    AnalysisCaseStatus,
+    AnalysisDisposition,
     AssetImportance,
     AssetType,
     Confidence,
+    FactStrength,
     Environment,
     ExposureLevel,
     IncidentSeverity,
@@ -190,6 +193,67 @@ class IncidentUpdate(BaseModel):
     created_by: str | None = None
     raw_data: dict[str, Any] | None = None
     normalized_data: dict[str, Any] | None = None
+
+
+class AnalysisFactCreate(BaseModel):
+    id: str = ""
+    title: str = ""
+    description: str = ""
+    strength: FactStrength = FactStrength.MEDIUM
+    source_references: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisCaseCreate(BaseModel):
+    title: str
+    description: str = ""
+    case_status: AnalysisCaseStatus = AnalysisCaseStatus.NEW
+    verdict: str | None = None
+    severity: SecuritySeverity = SecuritySeverity.MEDIUM
+    confidence: Confidence = Confidence.MEDIUM
+    evidence_coverage: str = "unknown"
+    analysis_mode: str = "manual"
+    notification_decision: str | None = None
+    incident_decision: str | None = None
+    disposition: AnalysisDisposition = AnalysisDisposition.OPEN
+    primary_asset_id: str | None = None
+    related_asset_ids: list[str] = Field(default_factory=list)
+    related_alert_ids: list[str] = Field(default_factory=list)
+    related_vulnerability_ids: list[str] = Field(default_factory=list)
+    related_incident_id: str | None = None
+    facts: list[AnalysisFactCreate] = Field(default_factory=list)
+    evidence_items: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_gaps: list[dict[str, Any]] = Field(default_factory=list)
+    hypotheses: list[dict[str, Any]] = Field(default_factory=list)
+    timeline: list[dict[str, Any]] = Field(default_factory=list)
+    summary: str = ""
+    recommendations: list[str] = Field(default_factory=list)
+
+
+class AnalysisCaseUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    case_status: AnalysisCaseStatus | None = None
+    verdict: str | None = None
+    severity: SecuritySeverity | None = None
+    confidence: Confidence | None = None
+    evidence_coverage: str | None = None
+    analysis_mode: str | None = None
+    notification_decision: str | None = None
+    incident_decision: str | None = None
+    disposition: AnalysisDisposition | None = None
+    primary_asset_id: str | None = None
+    related_asset_ids: list[str] | None = None
+    related_alert_ids: list[str] | None = None
+    related_vulnerability_ids: list[str] | None = None
+    related_incident_id: str | None = None
+    facts: list[AnalysisFactCreate] | None = None
+    evidence_items: list[dict[str, Any]] | None = None
+    evidence_gaps: list[dict[str, Any]] | None = None
+    hypotheses: list[dict[str, Any]] | None = None
+    timeline: list[dict[str, Any]] | None = None
+    summary: str | None = None
+    recommendations: list[str] | None = None
 
 
 class HoneypotEventCreate(BaseModel):

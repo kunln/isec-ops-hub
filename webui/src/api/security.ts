@@ -3,6 +3,28 @@ import client from './client';
 export type SecuritySeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type Confidence = 'low' | 'medium' | 'high';
+export type FactStrength = 'weak' | 'medium' | 'strong' | 'critical';
+export type AnalysisCaseStatus =
+  | 'new'
+  | 'collecting_evidence'
+  | 'analyzing'
+  | 'awaiting_confirmation'
+  | 'monitoring'
+  | 'resolved'
+  | 'escalated'
+  | 'merged'
+  | 'reopened';
+export type AnalysisDisposition =
+  | 'open'
+  | 'closed_blocked_attempt'
+  | 'closed_false_positive'
+  | 'closed_benign'
+  | 'closed_insufficient_evidence'
+  | 'closed_duplicate'
+  | 'merged_into_case'
+  | 'merged_into_incident'
+  | 'escalated_to_incident'
+  | 'monitoring';
 
 export interface SecurityAsset {
   id: string;
@@ -64,6 +86,45 @@ export interface SecurityAlert {
   status: string;
   occurred_at?: string | null;
   normalized_data: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+
+export interface AnalysisFact {
+  id: string;
+  title: string;
+  description: string;
+  strength: FactStrength;
+  source_references: string[];
+  metadata: Record<string, any>;
+}
+
+export interface AnalysisCase {
+  id: string;
+  title: string;
+  description: string;
+  case_status: AnalysisCaseStatus;
+  verdict?: string | null;
+  severity: SecuritySeverity;
+  confidence: Confidence;
+  evidence_coverage: string;
+  analysis_mode: string;
+  notification_decision?: string | null;
+  incident_decision?: string | null;
+  disposition: AnalysisDisposition;
+  primary_asset_id?: string | null;
+  related_asset_ids: string[];
+  related_alert_ids: string[];
+  related_vulnerability_ids: string[];
+  related_incident_id?: string | null;
+  facts: AnalysisFact[];
+  evidence_items: Record<string, any>[];
+  evidence_gaps: Record<string, any>[];
+  hypotheses: Record<string, any>[];
+  timeline: Record<string, any>[];
+  summary: string;
+  recommendations: string[];
   created_at: string;
   updated_at: string;
 }
@@ -1218,6 +1279,15 @@ export const securityAPI = {
   triageAlert: (id: string, createIncident = true) =>
     client.post(`/api/security/triage/alert/${id}`, null, { params: { createIncident } }),
   createIncidentFromAlert: (id: string) => client.post(`/api/security/incidents/from-alert/${id}`),
+
+  listAnalysisCases: (params?: SecurityFilters) => client.get<AnalysisCase[]>('/api/security/analysis-cases', { params }),
+  getAnalysisCase: (id: string) => client.get<AnalysisCase>(`/api/security/analysis-cases/${id}`),
+  createAnalysisCase: (data: Partial<AnalysisCase>) => client.post<AnalysisCase>('/api/security/analysis-cases', data),
+  createAnalysisCaseFromAlert: (id: string) =>
+    client.post<AnalysisCase>(`/api/security/analysis-cases/from-alert/${id}`),
+  updateAnalysisCase: (id: string, data: Partial<AnalysisCase>) =>
+    client.patch<AnalysisCase>(`/api/security/analysis-cases/${id}`, data),
+  deleteAnalysisCase: (id: string) => client.delete(`/api/security/analysis-cases/${id}`),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),

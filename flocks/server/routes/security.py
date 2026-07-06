@@ -22,6 +22,8 @@ from flocks.security.sample_data import clear_sample_data, load_sample_data
 from flocks.security.schemas import (
     AlertCreate,
     AlertUpdate,
+    AnalysisCaseCreate,
+    AnalysisCaseUpdate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -1129,6 +1131,53 @@ async def update_alert(alert_id: str, payload: AlertUpdate):
 @router.delete("/alerts/{alert_id}", dependencies=[Depends(require_capability("security.ops.write"))])
 async def delete_alert(alert_id: str):
     return {"deleted": await default_store.delete_alert(alert_id)}
+
+
+@router.get("/analysis-cases")
+async def list_analysis_cases(filters: SecurityListFilters = Depends(_filters)):
+    return await default_store.list_analysis_cases(filters)
+
+
+@router.post(
+    "/analysis-cases",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_analysis_case(payload: AnalysisCaseCreate):
+    return await default_store.create_analysis_case(payload)
+
+
+@router.post(
+    "/analysis-cases/from-alert/{alert_id}",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_analysis_case_from_alert(alert_id: str):
+    case = await default_store.create_analysis_case_from_alert(alert_id)
+    if case is None:
+        raise _not_found("Alert", alert_id)
+    return case
+
+
+@router.get("/analysis-cases/{case_id}")
+async def get_analysis_case(case_id: str):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    return case
+
+
+@router.patch("/analysis-cases/{case_id}", dependencies=[Depends(require_capability("security.ops.write"))])
+async def update_analysis_case(case_id: str, payload: AnalysisCaseUpdate):
+    case = await default_store.update_analysis_case(case_id, payload)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    return case
+
+
+@router.delete("/analysis-cases/{case_id}", dependencies=[Depends(require_capability("security.ops.write"))])
+async def delete_analysis_case(case_id: str):
+    return {"deleted": await default_store.delete_analysis_case(case_id)}
 
 
 @router.get("/incidents")

@@ -113,6 +113,38 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
 
+class FactStrength(str, Enum):
+    WEAK = "weak"
+    MEDIUM = "medium"
+    STRONG = "strong"
+    CRITICAL = "critical"
+
+
+class AnalysisCaseStatus(str, Enum):
+    NEW = "new"
+    COLLECTING_EVIDENCE = "collecting_evidence"
+    ANALYZING = "analyzing"
+    AWAITING_CONFIRMATION = "awaiting_confirmation"
+    MONITORING = "monitoring"
+    RESOLVED = "resolved"
+    ESCALATED = "escalated"
+    MERGED = "merged"
+    REOPENED = "reopened"
+
+
+class AnalysisDisposition(str, Enum):
+    OPEN = "open"
+    CLOSED_BLOCKED_ATTEMPT = "closed_blocked_attempt"
+    CLOSED_FALSE_POSITIVE = "closed_false_positive"
+    CLOSED_BENIGN = "closed_benign"
+    CLOSED_INSUFFICIENT_EVIDENCE = "closed_insufficient_evidence"
+    CLOSED_DUPLICATE = "closed_duplicate"
+    MERGED_INTO_CASE = "merged_into_case"
+    MERGED_INTO_INCIDENT = "merged_into_incident"
+    ESCALATED_TO_INCIDENT = "escalated_to_incident"
+    MONITORING = "monitoring"
+
+
 class Asset(_SecurityBaseModel):
     id: str = ""
     name: str
@@ -198,6 +230,44 @@ class Incident(_SecurityBaseModel):
     created_by: str = "security_extension"
     raw_data: dict[str, Any] = Field(default_factory=dict)
     normalized_data: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class AnalysisFact(_SecurityBaseModel):
+    id: str = ""
+    title: str = ""
+    description: str = ""
+    strength: FactStrength = FactStrength.MEDIUM
+    source_references: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisCase(_SecurityBaseModel):
+    id: str = ""
+    title: str
+    description: str = ""
+    case_status: AnalysisCaseStatus = AnalysisCaseStatus.NEW
+    verdict: str | None = None
+    severity: SecuritySeverity = SecuritySeverity.MEDIUM
+    confidence: Confidence = Confidence.MEDIUM
+    evidence_coverage: str = "unknown"
+    analysis_mode: str = "manual"
+    notification_decision: str | None = None
+    incident_decision: str | None = None
+    disposition: AnalysisDisposition = AnalysisDisposition.OPEN
+    primary_asset_id: str | None = None
+    related_asset_ids: list[str] = Field(default_factory=list)
+    related_alert_ids: list[str] = Field(default_factory=list)
+    related_vulnerability_ids: list[str] = Field(default_factory=list)
+    related_incident_id: str | None = None
+    facts: list[AnalysisFact] = Field(default_factory=list)
+    evidence_items: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_gaps: list[dict[str, Any]] = Field(default_factory=list)
+    hypotheses: list[dict[str, Any]] = Field(default_factory=list)
+    timeline: list[dict[str, Any]] = Field(default_factory=list)
+    summary: str = ""
+    recommendations: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
 

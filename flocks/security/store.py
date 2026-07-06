@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from flocks.security.models import (
     Alert,
+    AnalysisCase,
     Asset,
     HoneypotEvent,
     Incident,
@@ -19,6 +20,8 @@ from flocks.security.models import (
 from flocks.security.schemas import (
     AlertCreate,
     AlertUpdate,
+    AnalysisCaseCreate,
+    AnalysisCaseUpdate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -33,7 +36,7 @@ from flocks.storage.storage import Storage
 from flocks.utils.id import Identifier
 
 
-SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent)
+SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, AnalysisCase, Incident, HoneypotEvent)
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,7 @@ VULNERABILITIES = CollectionSpec(
     "vulnerability",
 )
 ALERTS = CollectionSpec("alerts", "security/alerts/", Alert, "alert")
+ANALYSIS_CASES = CollectionSpec("analysis_cases", "security/analysis-cases/", AnalysisCase, "analysis_case")
 INCIDENTS = CollectionSpec("incidents", "security/incidents/", Incident, "incident")
 HONEYPOT_EVENTS = CollectionSpec(
     "honeypot_events",
@@ -152,6 +156,28 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
                 "mitre_technique",
                 "status",
                 "occurred_at",
+            ],
+        )
+    if spec is ANALYSIS_CASES:
+        return _compact_dict(
+            data,
+            [
+                "id",
+                "title",
+                "case_status",
+                "verdict",
+                "severity",
+                "confidence",
+                "evidence_coverage",
+                "analysis_mode",
+                "notification_decision",
+                "incident_decision",
+                "disposition",
+                "primary_asset_id",
+                "related_asset_ids",
+                "related_alert_ids",
+                "related_vulnerability_ids",
+                "related_incident_id",
             ],
         )
     if spec is INCIDENTS:
@@ -256,13 +282,14 @@ class SecurityStore:
     def _matches(self, item: SecurityObject, filters: SecurityListFilters) -> bool:
         if filters.asset_id and getattr(item, "asset_id", None) != filters.asset_id:
             if not (
-                isinstance(item, Incident)
-                and filters.asset_id in item.asset_ids
+                (isinstance(item, Incident) and filters.asset_id in item.asset_ids)
+                or (isinstance(item, AnalysisCase) and filters.asset_id in item.related_asset_ids)
+                or (isinstance(item, AnalysisCase) and filters.asset_id == item.primary_asset_id)
             ):
                 return False
         if filters.severity and getattr(item, "severity", None) != filters.severity:
             return False
-        if filters.status and getattr(item, "status", None) != filters.status:
+        if filters.status and getattr(item, "status", getattr(item, "case_status", None)) != filters.status:
             return False
         if filters.source and getattr(item, "source", None) != filters.source:
             return False
@@ -315,12 +342,22 @@ class SecurityStore:
             "service",
             "event_type",
             "threat_label",
+            "verdict",
+            "evidence_coverage",
+            "analysis_mode",
+            "notification_decision",
+            "incident_decision",
         ]
         haystack = " ".join(_text(getattr(item, field, None)) for field in fields)
         haystack += " " + _text(getattr(item, "tags", []))
         haystack += " " + _text(getattr(item, "ioc", []))
         haystack += " " + _text(getattr(item, "raw_event", {}))
         haystack += " " + _text(getattr(item, "geo", {}))
+        haystack += " " + _text(getattr(item, "facts", []))
+        haystack += " " + _text(getattr(item, "evidence_items", []))
+        haystack += " " + _text(getattr(item, "evidence_gaps", []))
+        haystack += " " + _text(getattr(item, "hypotheses", []))
+        haystack += " " + _text(getattr(item, "recommendations", []))
         return keyword.lower() in haystack.lower()
 
     async def list_assets(self, filters: SecurityListFilters | None = None) -> list[Asset]:
@@ -380,6 +417,56 @@ class SecurityStore:
 
     async def delete_alert(self, alert_id: str) -> bool:
         return await self._delete(ALERTS, alert_id)
+
+
+    async def list_analysis_cases(self, filters: SecurityListFilters | None = None) -> list[AnalysisCase]:
+        return await self._list(ANALYSIS_CASES, filters)
+
+    async def get_analysis_case(self, case_id: str) -> AnalysisCase | None:
+        return await self._get(ANALYSIS_CASES, case_id)
+
+    async def create_analysis_case(self, payload: AnalysisCaseCreate | dict[str, Any]) -> AnalysisCase:
+        return await self._create(ANALYSIS_CASES, payload)
+
+    async def upsert_analysis_case(self, payload: AnalysisCase | dict[str, Any]) -> AnalysisCase:
+        return await self._upsert(ANALYSIS_CASES, payload)
+
+    async def update_analysis_case(
+        self,
+        case_id: str,
+        payload: AnalysisCaseUpdate | dict[str, Any],
+    ) -> AnalysisCase | None:
+        return await self._update(ANALYSIS_CASES, case_id, payload)
+
+    async def delete_analysis_case(self, case_id: str) -> bool:
+        return await self._delete(ANALYSIS_CASES, case_id)
+
+    async def create_analysis_case_from_alert(self, alert_id: str) -> AnalysisCase | None:
+        alert = await self.get_alert(alert_id)
+        if alert is None:
+            return None
+        related_asset_ids = [alert.asset_id] if alert.asset_id else []
+        fact = {
+            "id": f"fact_{alert.id}",
+            "title": "alert_signal",
+            "description": alert.description or alert.title,
+            "strength": "medium",
+            "source_references": [f"alert:{alert.id}"],
+            "metadata": {"alert_id": alert.id, "source": alert.source, "severity": alert.severity},
+        }
+        return await self.create_analysis_case(
+            {
+                "title": f"Analysis case for alert: {alert.title}",
+                "description": alert.description or "",
+                "severity": alert.severity,
+                "primary_asset_id": alert.asset_id,
+                "related_asset_ids": related_asset_ids,
+                "related_alert_ids": [alert.id],
+                "facts": [fact],
+                "evidence_items": [{"kind": "alert", "reference": f"alert:{alert.id}", "alert_id": alert.id}],
+                "timeline": [{"kind": "alert_occurred", "alert_id": alert.id, "occurred_at": alert.occurred_at}],
+            }
+        )
 
     async def list_incidents(self, filters: SecurityListFilters | None = None) -> list[Incident]:
         return await self._list(INCIDENTS, filters)

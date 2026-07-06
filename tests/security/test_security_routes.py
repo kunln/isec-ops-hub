@@ -610,3 +610,43 @@ async def test_security_connector_package_staging_routes(client: AsyncClient):
     discarded = await client.delete(f"/api/security/connectors/packages/staging/{staged['id']}")
     assert discarded.status_code == 200
     assert discarded.json()["discarded_at"]
+
+
+@pytest.mark.asyncio
+async def test_security_routes_analysis_cases_crud_and_from_alert(client: AsyncClient):
+    created = await client.post(
+        "/api/security/analysis-cases",
+        json={
+            "title": "Investigate alert cluster",
+            "facts": [{"title": "cluster", "description": "Multiple related alerts"}],
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["case_status"] == "new"
+    assert body["disposition"] == "open"
+    assert body["facts"][0]["strength"] == "medium"
+
+    patched = await client.patch(
+        f"/api/security/analysis-cases/{body['id']}",
+        json={"case_status": "collecting_evidence", "disposition": "monitoring"},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["case_status"] == "collecting_evidence"
+    assert patched.json()["disposition"] == "monitoring"
+
+    listed = await client.get("/api/security/analysis-cases", params={"status": "collecting_evidence"})
+    assert listed.status_code == 200, listed.text
+    assert [item["id"] for item in listed.json()] == [body["id"]]
+
+    alert = await client.post(
+        "/api/security/alerts",
+        json={"asset_id": "asset-1", "title": "Suspicious login", "severity": "medium"},
+    )
+    assert alert.status_code == 201, alert.text
+    from_alert = await client.post(f"/api/security/analysis-cases/from-alert/{alert.json()['id']}")
+    assert from_alert.status_code == 201, from_alert.text
+    from_alert_body = from_alert.json()
+    assert from_alert_body["related_alert_ids"] == [alert.json()["id"]]
+    assert from_alert_body["facts"][0]["title"] == "alert_signal"
+    assert from_alert_body["facts"][0]["strength"] == "medium"
