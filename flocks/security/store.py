@@ -11,6 +11,8 @@ from pydantic import BaseModel
 
 from flocks.security.models import (
     Alert,
+    AnalysisCase,
+    AnalysisFact,
     Asset,
     HoneypotEvent,
     Incident,
@@ -19,6 +21,8 @@ from flocks.security.models import (
 from flocks.security.schemas import (
     AlertCreate,
     AlertUpdate,
+    AnalysisCaseCreate,
+    AnalysisCaseUpdate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -33,7 +37,7 @@ from flocks.storage.storage import Storage
 from flocks.utils.id import Identifier
 
 
-SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent)
+SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, AnalysisCase, Incident, HoneypotEvent)
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,7 @@ VULNERABILITIES = CollectionSpec(
     "vulnerability",
 )
 ALERTS = CollectionSpec("alerts", "security/alerts/", Alert, "alert")
+ANALYSIS_CASES = CollectionSpec("analysis_cases", "security/analysis-cases/", AnalysisCase, "analysis_case")
 INCIDENTS = CollectionSpec("incidents", "security/incidents/", Incident, "incident")
 HONEYPOT_EVENTS = CollectionSpec(
     "honeypot_events",
@@ -154,6 +159,22 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
                 "occurred_at",
             ],
         )
+    if spec is ANALYSIS_CASES:
+        return _compact_dict(
+            data,
+            [
+                "id",
+                "title",
+                "alert_ids",
+                "asset_ids",
+                "verdict",
+                "severity",
+                "evidence_coverage",
+                "analysis_mode",
+                "notification_decision",
+                "incident_decision",
+            ],
+        )
     if spec is INCIDENTS:
         return _compact_dict(
             data,
@@ -199,11 +220,23 @@ class SecurityStore:
         data["updated_at"] = data.get("updated_at") or now
         if spec is ALERTS and not data.get("raw_data") and data.get("raw_event"):
             data["raw_data"] = data["raw_event"]
+        if spec is ANALYSIS_CASES:
+            data["facts"] = self._prepare_analysis_facts(data.get("facts") or [])
         if not data.get("normalized_data"):
             data["normalized_data"] = _default_normalized_data(spec, data)
         obj = spec.model.model_validate(data)
         await Storage.set(_key(spec, obj.id), obj, f"security.{spec.name}")
         return obj
+
+    def _prepare_analysis_facts(self, facts: list[Any]) -> list[dict[str, Any]]:
+        prepared: list[dict[str, Any]] = []
+        for item in facts:
+            fact = _dump(item)
+            if not fact.get("id"):
+                fact["id"] = Identifier.create("analysis_fact")
+            fact["created_at"] = fact.get("created_at") or utc_now()
+            prepared.append(AnalysisFact.model_validate(fact).model_dump(mode="json"))
+        return prepared
 
     async def _create(self, spec: CollectionSpec, payload: BaseModel | dict[str, Any]) -> SecurityObject:
         data = _dump(payload)
@@ -380,6 +413,24 @@ class SecurityStore:
 
     async def delete_alert(self, alert_id: str) -> bool:
         return await self._delete(ALERTS, alert_id)
+
+    async def list_analysis_cases(self, filters: SecurityListFilters | None = None) -> list[AnalysisCase]:
+        return await self._list(ANALYSIS_CASES, filters)
+
+    async def get_analysis_case(self, case_id: str) -> AnalysisCase | None:
+        return await self._get(ANALYSIS_CASES, case_id)
+
+    async def create_analysis_case(self, payload: AnalysisCaseCreate | dict[str, Any]) -> AnalysisCase:
+        return await self._create(ANALYSIS_CASES, payload)
+
+    async def upsert_analysis_case(self, payload: AnalysisCase | dict[str, Any]) -> AnalysisCase:
+        return await self._upsert(ANALYSIS_CASES, payload)
+
+    async def update_analysis_case(self, case_id: str, payload: AnalysisCaseUpdate | dict[str, Any]) -> AnalysisCase | None:
+        return await self._update(ANALYSIS_CASES, case_id, payload)
+
+    async def delete_analysis_case(self, case_id: str) -> bool:
+        return await self._delete(ANALYSIS_CASES, case_id)
 
     async def list_incidents(self, filters: SecurityListFilters | None = None) -> list[Incident]:
         return await self._list(INCIDENTS, filters)
