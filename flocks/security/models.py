@@ -113,6 +113,53 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
 
+class AnalysisCaseVerdict(str, Enum):
+    CONFIRMED_INCIDENT = "confirmed_incident"
+    CONFIRMED_ATTACK_ATTEMPT_BLOCKED = "confirmed_attack_attempt_blocked"
+    SUSPICIOUS_TRUE_POSITIVE = "suspicious_true_positive"
+    FALSE_POSITIVE_RULE_NOISE = "false_positive_rule_noise"
+    BENIGN_BUSINESS_ACTIVITY = "benign_business_activity"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
+class AnalysisCaseSeverity(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFORMATIONAL = "informational"
+
+
+class EvidenceCoverage(str, Enum):
+    EC0_SIGNAL = "ec0_signal"
+    EC1_SINGLE_SOURCE = "ec1_single_source"
+    EC2_ENRICHED_SINGLE_SOURCE = "ec2_enriched_single_source"
+    EC3_CROSS_SOURCE = "ec3_cross_source"
+    EC4_FULL_INVESTIGATION = "ec4_full_investigation"
+
+
+class AnalysisMode(str, Enum):
+    SINGLE_SOURCE = "single_source"
+    ENRICHED_SINGLE_SOURCE = "enriched_single_source"
+    CROSS_SOURCE = "cross_source"
+    FULL_INVESTIGATION = "full_investigation"
+
+
+class NotificationDecision(str, Enum):
+    REALTIME_NOTIFY = "realtime_notify"
+    CONFIRMATION_REQUEST = "confirmation_request"
+    DAILY_DIGEST = "daily_digest"
+    NO_NOTIFY_STORE_ONLY = "no_notify_store_only"
+    ESCALATION_REMINDER = "escalation_reminder"
+
+
+class IncidentDecision(str, Enum):
+    ESCALATE_TO_INCIDENT = "escalate_to_incident"
+    DO_NOT_ESCALATE = "do_not_escalate"
+    NEEDS_HUMAN_CONFIRMATION = "needs_human_confirmation"
+    CONTINUE_MONITORING = "continue_monitoring"
+
+
 class Asset(_SecurityBaseModel):
     id: str = ""
     name: str
@@ -216,6 +263,45 @@ class HoneypotEvent(_SecurityBaseModel):
     occurred_at: str | None = None
     raw_data: dict[str, Any] = Field(default_factory=dict)
     normalized_data: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class AnalysisFact(_SecurityBaseModel):
+    id: str = ""
+    fact_type: str
+    statement: str
+    source_ref: str
+    source_connector_id: str | None = None
+    source_device_type: str | None = None
+    raw_event_ref: str | None = None
+    related_asset_id: str | None = None
+    related_alert_id: str | None = None
+    related_ioc: str | None = None
+    confidence: Confidence = Confidence.MEDIUM
+    strength: Confidence = Confidence.MEDIUM
+    supports: list[str] = Field(default_factory=list)
+    contradicts: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    observed_at: str | None = None
+    created_at: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisCase(_SecurityBaseModel):
+    id: str = ""
+    title: str
+    description: str | None = None
+    alert_ids: list[str] = Field(default_factory=list)
+    asset_ids: list[str] = Field(default_factory=list)
+    facts: list[AnalysisFact] = Field(default_factory=list)
+    verdict: AnalysisCaseVerdict = AnalysisCaseVerdict.INSUFFICIENT_EVIDENCE
+    severity: AnalysisCaseSeverity = AnalysisCaseSeverity.MEDIUM
+    evidence_coverage: EvidenceCoverage = EvidenceCoverage.EC0_SIGNAL
+    analysis_mode: AnalysisMode = AnalysisMode.SINGLE_SOURCE
+    notification_decision: NotificationDecision = NotificationDecision.NO_NOTIFY_STORE_ONLY
+    incident_decision: IncidentDecision = IncidentDecision.CONTINUE_MONITORING
+    metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
 
