@@ -220,6 +220,66 @@ class HoneypotEvent(_SecurityBaseModel):
     updated_at: str = ""
 
 
+class FactStrength(str, Enum):
+    WEAK = "weak"
+    MEDIUM = "medium"
+    STRONG = "strong"
+    CRITICAL = "critical"
+
+
+class AnalysisCaseStatus(str, Enum):
+    NEW = "new"
+    COLLECTING_EVIDENCE = "collecting_evidence"
+    ANALYZING = "analyzing"
+    AWAITING_CONFIRMATION = "awaiting_confirmation"
+    MONITORING = "monitoring"
+    RESOLVED = "resolved"
+    ESCALATED = "escalated"
+    MERGED = "merged"
+    REOPENED = "reopened"
+
+
+class AnalysisDisposition(str, Enum):
+    OPEN = "open"
+    CLOSED_BLOCKED_ATTEMPT = "closed_blocked_attempt"
+    CLOSED_FALSE_POSITIVE = "closed_false_positive"
+    CLOSED_BENIGN = "closed_benign"
+    CLOSED_INSUFFICIENT_EVIDENCE = "closed_insufficient_evidence"
+    CLOSED_DUPLICATE = "closed_duplicate"
+    MERGED_INTO_CASE = "merged_into_case"
+    MERGED_INTO_INCIDENT = "merged_into_incident"
+    ESCALATED_TO_INCIDENT = "escalated_to_incident"
+    MONITORING = "monitoring"
+
+
+class AnalysisFact(_SecurityBaseModel):
+    id: str = ""
+    fact_type: str
+    statement: str
+    strength: FactStrength = FactStrength.MEDIUM
+    source_references: list[dict[str, Any]] = Field(default_factory=list)
+    supports: list[str] = Field(default_factory=list)
+    contradicts: list[str] = Field(default_factory=list)
+    raw_data: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisCase(_SecurityBaseModel):
+    id: str = ""
+    title: str
+    status: AnalysisCaseStatus = AnalysisCaseStatus.NEW
+    disposition: AnalysisDisposition = AnalysisDisposition.OPEN
+    alert_ids: list[str] = Field(default_factory=list)
+    incident_ids: list[str] = Field(default_factory=list)
+    asset_ids: list[str] = Field(default_factory=list)
+    facts: list[AnalysisFact] = Field(default_factory=list)
+    summary: str = ""
+    owner: str | None = None
+    raw_data: dict[str, Any] = Field(default_factory=dict)
+    normalized_data: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
 class RiskScore(_SecurityBaseModel):
     score: int
     level: RiskLevel

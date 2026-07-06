@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 from flocks.security.models import (
     AlertSource,
     AlertStatus,
+    AnalysisCaseStatus,
+    AnalysisDisposition,
+    AnalysisFact,
     AssetImportance,
     AssetType,
     Confidence,
@@ -218,5 +221,33 @@ class HoneypotEventUpdate(BaseModel):
     geo: dict[str, Any] | None = None
     threat_label: str | None = None
     occurred_at: str | None = None
+    raw_data: dict[str, Any] | None = None
+    normalized_data: dict[str, Any] | None = None
+
+
+class AnalysisCaseCreate(BaseModel):
+    title: str
+    status: AnalysisCaseStatus = AnalysisCaseStatus.NEW
+    disposition: AnalysisDisposition = AnalysisDisposition.OPEN
+    alert_ids: list[str] = Field(default_factory=list)
+    incident_ids: list[str] = Field(default_factory=list)
+    asset_ids: list[str] = Field(default_factory=list)
+    facts: list[AnalysisFact] = Field(default_factory=list)
+    summary: str = ""
+    owner: str | None = None
+    raw_data: dict[str, Any] = Field(default_factory=dict)
+    normalized_data: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisCaseUpdate(BaseModel):
+    title: str | None = None
+    status: AnalysisCaseStatus | None = None
+    disposition: AnalysisDisposition | None = None
+    alert_ids: list[str] | None = None
+    incident_ids: list[str] | None = None
+    asset_ids: list[str] | None = None
+    facts: list[AnalysisFact] | None = None
+    summary: str | None = None
+    owner: str | None = None
     raw_data: dict[str, Any] | None = None
     normalized_data: dict[str, Any] | None = None
