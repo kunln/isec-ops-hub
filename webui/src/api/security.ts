@@ -175,6 +175,12 @@ export interface AnalysisCase {
   updated_at: string;
 }
 
+export interface AnalysisCaseEscalationResponse {
+  case: AnalysisCase;
+  incident: SecurityIncident;
+  created: boolean;
+}
+
 export interface SecurityHoneypotEvent {
   id: string;
   sensor_id?: string | null;
@@ -1309,6 +1315,8 @@ export const securityAPI = {
     client.patch<AnalysisCase>(`/api/security/analysis-cases/${id}`, data),
   deleteAnalysisCase: (id: string) => client.delete(`/api/security/analysis-cases/${id}`),
   createAnalysisCaseFromAlert: (id: string) => client.post<AnalysisCase>(`/api/security/analysis-cases/from-alert/${id}`),
+  escalateAnalysisCaseToIncident: (id: string) =>
+    client.post<AnalysisCaseEscalationResponse>(`/api/security/analysis-cases/${id}/escalate-to-incident`),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),

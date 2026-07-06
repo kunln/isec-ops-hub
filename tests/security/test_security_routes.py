@@ -724,3 +724,98 @@ async def test_analysis_case_from_alert_returns_201_and_complete_fact(client: As
     assert fact["confidence"] == "medium"
     assert fact["strength"] == "medium"
     assert fact["observed_at"] == alert_payload["occurred_at"]
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_filter_matches_related_asset_id(client: AsyncClient):
+    related_asset_id = "ast_related_only"
+    created = await client.post(
+        "/api/security/analysis-cases",
+        json={"title": "Related asset case", "related_asset_ids": [related_asset_id]},
+    )
+    assert created.status_code == 201, created.text
+    case = created.json()
+
+    filtered = await client.get("/api/security/analysis-cases", params={"asset_id": related_asset_id})
+    assert filtered.status_code == 200
+    assert any(item["id"] == case["id"] for item in filtered.json())
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_escalate_to_incident_creates_and_reuses_incident(client: AsyncClient):
+    created = await client.post(
+        "/api/security/analysis-cases",
+        json={
+            "title": "Confirmed lateral movement",
+            "severity": "high",
+            "confidence": "high",
+            "evidence_coverage": "ec3_cross_source",
+            "analysis_mode": "cross_source",
+            "verdict": "confirmed_incident",
+            "primary_asset_id": "ast_primary",
+            "related_asset_ids": ["ast_primary", "ast_peer"],
+            "related_alert_ids": ["alert-1"],
+            "summary": "Multiple correlated detections indicate lateral movement.",
+            "recommendations": ["Notify the incident commander", "Collect endpoint process evidence"],
+            "facts": [
+                {
+                    "fact_type": "edr_detection",
+                    "statement": "Suspicious remote execution was observed",
+                    "source_ref": "edr:event-1",
+                    "related_asset_id": "ast_primary",
+                    "related_alert_id": "alert-1",
+                    "confidence": "high",
+                    "strength": "strong",
+                    "observed_at": "2026-07-06T10:00:00+00:00",
+                }
+            ],
+            "evidence_items": [
+                {
+                    "title": "EDR event",
+                    "description": "Remote execution telemetry",
+                    "source_ref": "edr:event-1",
+                }
+            ],
+            "evidence_gaps": [
+                {
+                    "gap_type": "missing_network_flow",
+                    "description": "East-west network flow details are missing",
+                    "missing_source_type": "ndr",
+                    "impact": "Limits lateral movement path reconstruction",
+                }
+            ],
+        },
+    )
+    assert created.status_code == 201, created.text
+    case = created.json()
+
+    response = await client.post(f"/api/security/analysis-cases/{case['id']}/escalate-to-incident")
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["created"] is True
+    incident = payload["incident"]
+    updated_case = payload["case"]
+    assert incident["id"].startswith("inc_")
+    assert incident["title"] == case["title"]
+    assert incident["severity"] == "high"
+    assert incident["asset_ids"] == ["ast_primary", "ast_peer"]
+    assert incident["alert_ids"] == ["alert-1"]
+    assert incident["evidence"]
+    assert incident["timeline"]
+    assert updated_case["related_incident_id"] == incident["id"]
+    assert updated_case["incident_decision"] == "escalate_to_incident"
+    assert updated_case["disposition"] == "escalated_to_incident"
+    assert updated_case["case_status"] == "escalated"
+
+    fetched_incident = await client.get(f"/api/security/incidents/{incident['id']}")
+    assert fetched_incident.status_code == 200
+
+    second = await client.post(f"/api/security/analysis-cases/{case['id']}/escalate-to-incident")
+    assert second.status_code == 200, second.text
+    second_payload = second.json()
+    assert second_payload["created"] is False
+    assert second_payload["incident"]["id"] == incident["id"]
+
+    incidents = await client.get("/api/security/incidents", params={"keyword": "Confirmed lateral movement"})
+    assert incidents.status_code == 200
+    assert [item["id"] for item in incidents.json()].count(incident["id"]) == 1

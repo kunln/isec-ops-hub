@@ -37,6 +37,7 @@ import PageHeader from '@/components/common/PageHeader';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import {
   securityAPI,
+  type AnalysisCase,
   type SecurityAlert,
   type SecurityAssetRiskProfile,
   type SecurityAsset,
@@ -58,7 +59,7 @@ import {
   type SecurityVulnerability,
 } from '@/api/security';
 
-type Section = 'dashboard' | 'assets' | 'vulnerabilities' | 'alerts' | 'incidents' | 'honeypot-events' | 'connectors';
+type Section = 'dashboard' | 'assets' | 'vulnerabilities' | 'alerts' | 'analysis-cases' | 'incidents' | 'honeypot-events' | 'connectors';
 type DataSection = Exclude<Section, 'dashboard' | 'connectors'>;
 type Entity = Record<string, any> & { id: string };
 type SecurityMode = 'expert' | 'admin';
@@ -88,14 +89,16 @@ const navItems: Array<{ section: Section; icon: LucideIcon; adminOnly?: boolean 
   { section: 'assets', icon: Database },
   { section: 'vulnerabilities', icon: Bug },
   { section: 'alerts', icon: Bell },
+  { section: 'analysis-cases', icon: FileText },
   { section: 'incidents', icon: ShieldAlert },
   { section: 'honeypot-events', icon: Radar },
   { section: 'connectors', icon: Plug, adminOnly: true },
 ];
 
-const supportedSections: Section[] = ['assets', 'vulnerabilities', 'alerts', 'incidents', 'honeypot-events', 'connectors'];
+const supportedSections: Section[] = ['assets', 'vulnerabilities', 'alerts', 'analysis-cases', 'incidents', 'honeypot-events', 'connectors'];
 const severityOptions = ['info', 'low', 'medium', 'high', 'critical'];
 const incidentSeverityOptions = ['low', 'medium', 'high', 'critical'];
+const analysisCaseSeverityOptions = ['informational', 'low', 'medium', 'high', 'critical'];
 const importanceOptions = ['low', 'medium', 'high', 'critical'];
 const exposureOptions = ['internal', 'external', 'unknown'];
 const environmentOptions = ['production', 'staging', 'testing', 'development', 'unknown'];
@@ -173,6 +176,25 @@ const fields: Record<DataSection, FieldConfig[]> = {
     { name: 'description', labelKey: 'fields.description', type: 'textarea' },
     { name: 'raw_event', labelKey: 'fields.raw_event', type: 'json' },
   ],
+
+  'analysis-cases': [
+    { name: 'title', labelKey: 'fields.title', required: true },
+    { name: 'description', labelKey: 'fields.description', type: 'textarea' },
+    { name: 'case_status', labelKey: 'fields.case_status', type: 'select', options: ['new', 'collecting_evidence', 'analyzing', 'awaiting_confirmation', 'monitoring', 'resolved', 'escalated', 'merged', 'reopened'] },
+    { name: 'verdict', labelKey: 'fields.verdict', type: 'select', options: ['confirmed_incident', 'confirmed_attack_attempt_blocked', 'suspicious_true_positive', 'false_positive_rule_noise', 'benign_business_activity', 'insufficient_evidence'] },
+    { name: 'severity', labelKey: 'fields.severity', type: 'select', options: analysisCaseSeverityOptions },
+    { name: 'confidence', labelKey: 'fields.confidence', type: 'select', options: ['low', 'medium', 'high'] },
+    { name: 'evidence_coverage', labelKey: 'fields.evidence_coverage', type: 'select', options: ['ec0_signal', 'ec1_single_source', 'ec2_enriched_single_source', 'ec3_cross_source', 'ec4_full_investigation'] },
+    { name: 'analysis_mode', labelKey: 'fields.analysis_mode', type: 'select', options: ['single_source', 'enriched_single_source', 'cross_source', 'full_investigation'] },
+    { name: 'notification_decision', labelKey: 'fields.notification_decision', type: 'select', options: ['realtime_notify', 'confirmation_request', 'daily_digest', 'no_notify_store_only', 'escalation_reminder'] },
+    { name: 'incident_decision', labelKey: 'fields.incident_decision', type: 'select', options: ['escalate_to_incident', 'do_not_escalate', 'needs_human_confirmation', 'continue_monitoring'] },
+    { name: 'disposition', labelKey: 'fields.disposition', type: 'select', options: ['open', 'closed_blocked_attempt', 'closed_false_positive', 'closed_benign', 'closed_insufficient_evidence', 'closed_duplicate', 'merged_into_case', 'merged_into_incident', 'escalated_to_incident', 'monitoring'] },
+    { name: 'primary_asset_id', labelKey: 'fields.primary_asset_id' },
+    { name: 'related_asset_ids', labelKey: 'fields.related_asset_ids', type: 'array' },
+    { name: 'related_alert_ids', labelKey: 'fields.related_alert_ids', type: 'array' },
+    { name: 'summary', labelKey: 'fields.summary', type: 'textarea' },
+    { name: 'recommendations', labelKey: 'fields.recommendations', type: 'array' },
+  ],
   incidents: [
     { name: 'title', labelKey: 'fields.title', required: true },
     { name: 'severity', labelKey: 'fields.severity', type: 'select', options: incidentSeverityOptions },
@@ -225,6 +247,24 @@ const columns: Record<DataSection, TableColumn[]> = {
     { key: 'severity', labelKey: 'fields.severity' },
     { key: 'status', labelKey: 'fields.status' },
     { key: 'mitre_technique', labelKey: 'fields.mitre_technique' },
+  ],
+
+  'analysis-cases': [
+    { key: 'title', labelKey: 'fields.title' },
+    { key: 'case_status', labelKey: 'fields.case_status' },
+    { key: 'verdict', labelKey: 'fields.verdict' },
+    { key: 'severity', labelKey: 'fields.severity' },
+    { key: 'confidence', labelKey: 'fields.confidence' },
+    { key: 'evidence_coverage', labelKey: 'fields.evidence_coverage' },
+    { key: 'notification_decision', labelKey: 'fields.notification_decision' },
+    { key: 'incident_decision', labelKey: 'fields.incident_decision' },
+    { key: 'disposition', labelKey: 'fields.disposition' },
+    { key: 'primary_asset_id', labelKey: 'fields.primary_asset_id' },
+    { key: 'related_alert_ids', labelKey: 'fields.related_alert_ids' },
+    { key: 'facts', labelKey: 'fields.facts' },
+    { key: 'evidence_gaps', labelKey: 'fields.evidence_gaps' },
+    { key: 'created_at', labelKey: 'fields.created_at' },
+    { key: 'updated_at', labelKey: 'fields.updated_at' },
   ],
   incidents: [
     { key: 'title', labelKey: 'fields.title' },
@@ -603,12 +643,14 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   const [assets, setAssets] = useState<SecurityAsset[]>([]);
   const [vulnerabilities, setVulnerabilities] = useState<SecurityVulnerability[]>([]);
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
+  const [analysisCases, setAnalysisCases] = useState<AnalysisCase[]>([]);
   const [incidents, setIncidents] = useState<SecurityIncident[]>([]);
   const [honeypotEvents, setHoneypotEvents] = useState<SecurityHoneypotEvent[]>([]);
   const [connectors, setConnectors] = useState<SecurityConnectorManifest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
+  const [analysisCaseFilters, setAnalysisCaseFilters] = useState({ severity: '', status: '', asset_id: '', verdict: '' });
   const [selected, setSelected] = useState<Entity | null>(null);
   const [editing, setEditing] = useState<Entity | null>(null);
   const [form, setForm] = useState<Record<string, any>>({});
@@ -639,9 +681,10 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     assets: assets as Entity[],
     vulnerabilities: vulnerabilities as Entity[],
     alerts: alerts as Entity[],
+    'analysis-cases': analysisCases as Entity[],
     incidents: incidents as Entity[],
     'honeypot-events': honeypotEvents as Entity[],
-  }), [alerts, assets, honeypotEvents, incidents, vulnerabilities]);
+  }), [alerts, analysisCases, assets, honeypotEvents, incidents, vulnerabilities]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -649,16 +692,18 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     setConnectorRuntimeError(null);
     try {
       const params = { limit: 500 };
-      const [assetRes, vulnRes, alertRes, incidentRes, honeypotRes] = await Promise.all([
+      const [assetRes, vulnRes, alertRes, analysisCaseRes, incidentRes, honeypotRes] = await Promise.all([
         securityAPI.listAssets(params),
         securityAPI.listVulnerabilities(params),
         securityAPI.listAlerts(params),
+        securityAPI.listAnalysisCases(params),
         securityAPI.listIncidents(params),
         securityAPI.listHoneypotEvents(params),
       ]);
       setAssets(assetRes.data);
       setVulnerabilities(vulnRes.data);
       setAlerts(alertRes.data);
+      setAnalysisCases(analysisCaseRes.data);
       setIncidents(incidentRes.data);
       setHoneypotEvents(honeypotRes.data);
 
@@ -748,9 +793,19 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     if (!isDataSection(section)) return [];
     const items = listData[section];
     const q = keyword.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => JSON.stringify(item).toLowerCase().includes(q));
-  }, [keyword, listData, section]);
+    let nextItems = q ? items.filter((item) => JSON.stringify(item).toLowerCase().includes(q)) : items;
+    if (section === 'analysis-cases') {
+      nextItems = nextItems.filter((item) => {
+        const matchesSeverity = !analysisCaseFilters.severity || item.severity === analysisCaseFilters.severity;
+        const matchesStatus = !analysisCaseFilters.status || item.case_status === analysisCaseFilters.status;
+        const matchesVerdict = !analysisCaseFilters.verdict || item.verdict === analysisCaseFilters.verdict;
+        const assetId = analysisCaseFilters.asset_id;
+        const matchesAsset = !assetId || item.primary_asset_id === assetId || item.related_asset_ids?.includes(assetId);
+        return matchesSeverity && matchesStatus && matchesVerdict && matchesAsset;
+      });
+    }
+    return nextItems;
+  }, [analysisCaseFilters, keyword, listData, section]);
 
   const filteredConnectors = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -762,11 +817,13 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     assets: assets.length,
     vulnerabilities: vulnerabilities.length,
     alerts: alerts.length,
+    analysisCases: analysisCases.length,
     incidents: incidents.length,
     highAssets: assets.filter((item) => ['high', 'critical'].includes(item.importance)).length,
     highVulnerabilities: vulnerabilities.filter((item) => ['high', 'critical'].includes(item.severity)).length,
     highAlerts: alerts.filter((item) => ['high', 'critical'].includes(item.severity)).length,
-  }), [alerts, assets, incidents, vulnerabilities]);
+    highAnalysisCases: analysisCases.filter((item) => ['high', 'critical'].includes(item.severity)).length,
+  }), [alerts, analysisCases, assets, incidents, vulnerabilities]);
 
   const openCreate = () => {
     if (!isDataSection(section)) return;
@@ -809,12 +866,14 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
       if (section === 'assets') await securityAPI.updateAsset(editing.id, payload);
       if (section === 'vulnerabilities') await securityAPI.updateVulnerability(editing.id, payload);
       if (section === 'alerts') await securityAPI.updateAlert(editing.id, payload);
+      if (section === 'analysis-cases') await securityAPI.updateAnalysisCase(editing.id, payload);
       if (section === 'incidents') await securityAPI.updateIncident(editing.id, payload);
       if (section === 'honeypot-events') await securityAPI.updateHoneypotEvent(editing.id, payload);
     } else {
       if (section === 'assets') await securityAPI.createAsset(payload);
       if (section === 'vulnerabilities') await securityAPI.createVulnerability(payload);
       if (section === 'alerts') await securityAPI.createAlert(payload);
+      if (section === 'analysis-cases') await securityAPI.createAnalysisCase(payload);
       if (section === 'incidents') await securityAPI.createIncident(payload);
       if (section === 'honeypot-events') await securityAPI.createHoneypotEvent(payload);
     }
@@ -828,6 +887,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     if (section === 'assets') await securityAPI.deleteAsset(item.id);
     if (section === 'vulnerabilities') await securityAPI.deleteVulnerability(item.id);
     if (section === 'alerts') await securityAPI.deleteAlert(item.id);
+    if (section === 'analysis-cases') await securityAPI.deleteAnalysisCase(item.id);
     if (section === 'incidents') await securityAPI.deleteIncident(item.id);
     if (section === 'honeypot-events') await securityAPI.deleteHoneypotEvent(item.id);
     setSelected(null);
@@ -839,6 +899,21 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     setTriageResult(res.data);
     await loadAll();
     navigate(`${basePath}/alerts`);
+  };
+
+
+  const createAnalysisCaseFromAlert = async (alertId: string) => {
+    const res = await securityAPI.createAnalysisCaseFromAlert(alertId);
+    await loadAll();
+    setSelected(res.data as Entity);
+    navigate(`${basePath}/analysis-cases`);
+  };
+
+  const escalateAnalysisCase = async (caseId: string) => {
+    const res = await securityAPI.escalateAnalysisCaseToIncident(caseId);
+    await loadAll();
+    setSelected(res.data.case as Entity);
+    window.alert(t('analysisCases.escalated', { defaultValue: '已升级为 Incident' }));
   };
 
   const buildRiskProfile = async (assetId: string) => {
@@ -1404,10 +1479,46 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                 placeholder={t('search.placeholder')}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm md:max-w-sm"
               />
+
+              {section === 'analysis-cases' && (
+                <div className="grid w-full gap-2 md:grid-cols-4">
+                  <select value={analysisCaseFilters.severity} onChange={(event) => setAnalysisCaseFilters({ ...analysisCaseFilters, severity: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                    <option value="">Severity</option>
+                    {analysisCaseSeverityOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                  <select value={analysisCaseFilters.status} onChange={(event) => setAnalysisCaseFilters({ ...analysisCaseFilters, status: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                    <option value="">Status</option>
+                    {fields['analysis-cases'].find((field) => field.name === 'case_status')?.options?.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                  <input value={analysisCaseFilters.asset_id} onChange={(event) => setAnalysisCaseFilters({ ...analysisCaseFilters, asset_id: event.target.value })} placeholder="asset_id" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                  <select value={analysisCaseFilters.verdict} onChange={(event) => setAnalysisCaseFilters({ ...analysisCaseFilters, verdict: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                    <option value="">Verdict</option>
+                    {fields['analysis-cases'].find((field) => field.name === 'verdict')?.options?.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </div>
+              )}
               <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800">
                 <Plus className="h-4 w-4" /> {t('actions.new')}
               </button>
             </div>
+
+            {section === 'analysis-cases' && (
+              <div className="grid gap-3 border-b border-gray-100 p-4 text-xs md:grid-cols-3 xl:grid-cols-6">
+                {[
+                  ['总研判单', analysisCases.length],
+                  ['High/Critical', analysisCases.filter((item) => ['high', 'critical'].includes(item.severity)).length],
+                  ['待确认/监控/分析中', analysisCases.filter((item) => ['awaiting_confirmation', 'monitoring', 'analyzing'].includes(item.case_status)).length],
+                  ['Confirmed Incident', analysisCases.filter((item) => item.verdict === 'confirmed_incident').length],
+                  ['Suspicious TP', analysisCases.filter((item) => item.verdict === 'suspicious_true_positive').length],
+                  ['Insufficient Evidence', analysisCases.filter((item) => item.verdict === 'insufficient_evidence').length],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                    <div className="text-gray-500">{label}</div>
+                    <div className="text-lg font-semibold text-gray-900">{value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
@@ -1422,7 +1533,8 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       {columns[section].map((column) => {
-                        const value = item[column.key];
+                        const rawValue = item[column.key];
+                        const value = section === 'analysis-cases' && ['related_alert_ids', 'facts', 'evidence_gaps'].includes(column.key) && Array.isArray(rawValue) ? rawValue.length : rawValue;
                         const isBadge = ['severity', 'importance', 'confidence'].includes(column.key);
                         return (
                           <td key={column.key} onClick={() => setSelected(item)} className="cursor-pointer px-4 py-3 text-gray-700">
@@ -1439,10 +1551,18 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                               <button title={t('actions.aiTriage')} onClick={() => void runTriage(item.id)} className="rounded p-1.5 text-purple-600 hover:bg-purple-50">
                                 <Brain className="h-4 w-4" />
                               </button>
+                              <button title={t('actions.createAnalysisCase', { defaultValue: '生成研判单' })} onClick={() => void createAnalysisCaseFromAlert(item.id)} className="rounded p-1.5 text-indigo-600 hover:bg-indigo-50">
+                                <FileText className="h-4 w-4" />
+                              </button>
                               <button title={t('actions.createIncident')} onClick={() => void createIncidentFromAlert(item.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50">
                                 <ShieldAlert className="h-4 w-4" />
                               </button>
                             </>
+                          )}
+                          {section === 'analysis-cases' && (
+                            <button title={t('actions.escalateToIncident', { defaultValue: '升级为事件' })} onClick={() => void escalateAnalysisCase(item.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50">
+                              <ShieldAlert className="h-4 w-4" />
+                            </button>
                           )}
                           {section === 'incidents' && (
                             <button title={t('actions.generateReport')} onClick={() => void generateReport(item.id)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50">
@@ -1470,7 +1590,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           </div>
 
           <div className="space-y-4">
-            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} />
+            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} />
           </div>
         </div>
       )}
@@ -4244,21 +4364,46 @@ function DetailPanel({
   triageResult,
   riskProfile,
   report,
+  onEscalateAnalysisCase,
 }: {
   selected: Entity | null;
   triageResult: any;
   riskProfile: SecurityAssetRiskProfile | null;
   report: string;
+  onEscalateAnalysisCase: (caseId: string) => void;
 }) {
   const { t } = useTranslation('security');
+  const isAnalysisCase = Boolean(selected && 'case_status' in selected && 'facts' in selected && 'evidence_gaps' in selected);
   return (
     <>
-      <div className="rounded-lg border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3 font-semibold text-gray-900">{t('detail.title')}</div>
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 text-xs text-gray-700">
-          {selected ? JSON.stringify(selected, null, 2) : t('detail.empty')}
-        </pre>
-      </div>
+      {isAnalysisCase && selected ? (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-gray-200 bg-white">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <div className="font-semibold text-gray-900">{selected.title}</div>
+              <button onClick={() => onEscalateAnalysisCase(selected.id)} className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700">
+                <ShieldAlert className="h-4 w-4" /> {t('actions.escalateToIncident', { defaultValue: '升级为事件' })}
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-4 text-xs">
+              {['verdict', 'severity', 'confidence', 'evidence_coverage', 'analysis_mode', 'notification_decision', 'incident_decision', 'disposition'].map((key) => (
+                <div key={key} className="rounded border border-gray-200 px-3 py-2">
+                  <div className="text-gray-500">{t(`fields.${key}`, { defaultValue: key })}</div>
+                  <div className="font-medium text-gray-900">{renderValue(selected[key], (value) => t(`options.${value}`, { defaultValue: value }))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <AnalysisCaseDetail caseItem={selected as AnalysisCase} />
+        </div>
+      ) : (
+        <div className="rounded-lg border border-gray-200 bg-white">
+          <div className="border-b border-gray-200 px-4 py-3 font-semibold text-gray-900">{t('detail.title')}</div>
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 text-xs text-gray-700">
+            {selected ? JSON.stringify(selected, null, 2) : t('detail.empty')}
+          </pre>
+        </div>
+      )}
       {triageResult && (
         <div className="rounded-lg border border-purple-200 bg-purple-50">
           <div className="border-b border-purple-100 px-4 py-3 font-semibold text-purple-900">{t('detail.triageResult')}</div>
@@ -4284,6 +4429,57 @@ function DetailPanel({
         </div>
       )}
     </>
+  );
+}
+
+
+function AnalysisCaseDetail({ caseItem }: { caseItem: AnalysisCase }) {
+  const rows = [
+    ['primary_asset_id', caseItem.primary_asset_id],
+    ['related_asset_ids', caseItem.related_asset_ids],
+    ['related_alert_ids', caseItem.related_alert_ids],
+    ['related_vulnerability_ids', caseItem.related_vulnerability_ids],
+    ['related_incident_id', caseItem.related_incident_id],
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs">
+        <div className="mb-2 font-semibold text-gray-900">关联对象</div>
+        {rows.map(([key, value]) => <div key={key as string} className="mb-1"><span className="text-gray-500">{key as string}: </span>{renderValue(value)}</div>)}
+      </div>
+      <AnalysisCaseArray title="Fact Ledger" items={caseItem.facts} keys={['fact_type', 'statement', 'source_ref', 'related_asset_id', 'related_alert_id', 'confidence', 'strength', 'supports', 'contradicts', 'limitations', 'observed_at']} />
+      <AnalysisCaseArray title="Evidence Items" items={caseItem.evidence_items} keys={['title', 'description', 'source_ref', 'related_fact_ids']} />
+      <AnalysisCaseArray title="Evidence Gaps" items={caseItem.evidence_gaps} keys={['gap_type', 'description', 'missing_source_type', 'impact', 'suggested_connector_capability']} />
+      <AnalysisCaseArray title="Hypotheses" items={caseItem.hypotheses} keys={[]} />
+      <AnalysisCaseArray title="Timeline" items={caseItem.timeline} keys={[]} />
+      <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs">
+        <div className="mb-2 font-semibold text-gray-900">Recommendations</div>
+        {(caseItem.recommendations || []).map((item) => <div key={item} className="mb-1">- {item}</div>)}
+        {caseItem.recommendations.length === 0 && <div className="text-gray-400">-</div>}
+      </div>
+      <details className="rounded-lg border border-gray-200 bg-white p-4 text-xs" open>
+        <summary className="cursor-pointer font-semibold text-gray-900">Raw JSON</summary>
+        <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words text-gray-700">{JSON.stringify(caseItem, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+function AnalysisCaseArray({ title, items, keys }: { title: string; items: Record<string, any>[]; keys: string[] }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs">
+      <div className="mb-2 font-semibold text-gray-900">{title}</div>
+      <div className="space-y-2">
+        {items.map((item, index) => (
+          <div key={item.id || index} className="rounded border border-gray-100 p-2">
+            {(keys.length ? keys : Object.keys(item)).map((key) => (
+              <div key={key} className="mb-1"><span className="text-gray-500">{key}: </span>{renderValue(item[key])}</div>
+            ))}
+          </div>
+        ))}
+        {items.length === 0 && <div className="text-gray-400">-</div>}
+      </div>
+    </div>
   );
 }
 
