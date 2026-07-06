@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from flocks.security.models import (
     Alert,
+    AnalysisCase,
     Asset,
     HoneypotEvent,
     Incident,
@@ -19,6 +20,8 @@ from flocks.security.models import (
 from flocks.security.schemas import (
     AlertCreate,
     AlertUpdate,
+    AnalysisCaseCreate,
+    AnalysisCaseUpdate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -33,7 +36,7 @@ from flocks.storage.storage import Storage
 from flocks.utils.id import Identifier
 
 
-SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, HoneypotEvent)
+SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, AnalysisCase, HoneypotEvent)
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,7 @@ VULNERABILITIES = CollectionSpec(
 )
 ALERTS = CollectionSpec("alerts", "security/alerts/", Alert, "alert")
 INCIDENTS = CollectionSpec("incidents", "security/incidents/", Incident, "incident")
+ANALYSIS_CASES = CollectionSpec("analysis_cases", "security/analysis-cases/", AnalysisCase, "analysis_case")
 HONEYPOT_EVENTS = CollectionSpec(
     "honeypot_events",
     "security/honeypot-events/",
@@ -94,6 +98,22 @@ def _contains(value: Any, expected: str | None) -> bool:
 
 def _compact_dict(data: dict[str, Any], fields: list[str]) -> dict[str, Any]:
     return {field: data.get(field) for field in fields if data.get(field) not in (None, "", [], {})}
+
+
+def _ensure_analysis_case_children(data: dict[str, Any]) -> None:
+    now = utc_now()
+    for fact in data.get("facts") or []:
+        if not fact.get("id"):
+            fact["id"] = Identifier.create("analysis_fact")
+        fact["created_at"] = fact.get("created_at") or now
+    for evidence in data.get("evidence_items") or []:
+        if not evidence.get("id"):
+            evidence["id"] = Identifier.create("evidence")
+        evidence["created_at"] = evidence.get("created_at") or now
+    for gap in data.get("evidence_gaps") or []:
+        if not gap.get("id"):
+            gap["id"] = Identifier.create("evidence_gap")
+        gap["created_at"] = gap.get("created_at") or now
 
 
 def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict[str, Any]:
@@ -172,6 +192,28 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
                 "created_by",
             ],
         )
+    if spec is ANALYSIS_CASES:
+        return _compact_dict(
+            data,
+            [
+                "id",
+                "title",
+                "case_status",
+                "verdict",
+                "severity",
+                "confidence",
+                "evidence_coverage",
+                "analysis_mode",
+                "notification_decision",
+                "incident_decision",
+                "disposition",
+                "primary_asset_id",
+                "related_asset_ids",
+                "related_alert_ids",
+                "related_vulnerability_ids",
+                "related_incident_id",
+            ],
+        )
     if spec is HONEYPOT_EVENTS:
         return _compact_dict(
             data,
@@ -197,6 +239,8 @@ class SecurityStore:
             data["id"] = Identifier.create(spec.id_prefix)  # type: ignore[arg-type]
         data["created_at"] = data.get("created_at") or now
         data["updated_at"] = data.get("updated_at") or now
+        if spec is ANALYSIS_CASES:
+            _ensure_analysis_case_children(data)
         if spec is ALERTS and not data.get("raw_data") and data.get("raw_event"):
             data["raw_data"] = data["raw_event"]
         if not data.get("normalized_data"):
@@ -256,8 +300,8 @@ class SecurityStore:
     def _matches(self, item: SecurityObject, filters: SecurityListFilters) -> bool:
         if filters.asset_id and getattr(item, "asset_id", None) != filters.asset_id:
             if not (
-                isinstance(item, Incident)
-                and filters.asset_id in item.asset_ids
+                (isinstance(item, Incident) and filters.asset_id in item.asset_ids)
+                or (isinstance(item, AnalysisCase) and filters.asset_id in item.related_asset_ids)
             ):
                 return False
         if filters.severity and getattr(item, "severity", None) != filters.severity:
@@ -398,6 +442,25 @@ class SecurityStore:
 
     async def delete_incident(self, incident_id: str) -> bool:
         return await self._delete(INCIDENTS, incident_id)
+
+
+    async def list_analysis_cases(self, filters: SecurityListFilters | None = None) -> list[AnalysisCase]:
+        return await self._list(ANALYSIS_CASES, filters)
+
+    async def get_analysis_case(self, case_id: str) -> AnalysisCase | None:
+        return await self._get(ANALYSIS_CASES, case_id)
+
+    async def create_analysis_case(self, payload: AnalysisCaseCreate | dict[str, Any]) -> AnalysisCase:
+        return await self._create(ANALYSIS_CASES, payload)
+
+    async def upsert_analysis_case(self, payload: AnalysisCase | dict[str, Any]) -> AnalysisCase:
+        return await self._upsert(ANALYSIS_CASES, payload)
+
+    async def update_analysis_case(self, case_id: str, payload: AnalysisCaseUpdate | dict[str, Any]) -> AnalysisCase | None:
+        return await self._update(ANALYSIS_CASES, case_id, payload)
+
+    async def delete_analysis_case(self, case_id: str) -> bool:
+        return await self._delete(ANALYSIS_CASES, case_id)
 
     async def list_honeypot_events(self, filters: SecurityListFilters | None = None) -> list[HoneypotEvent]:
         return await self._list(HONEYPOT_EVENTS, filters)
