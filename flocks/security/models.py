@@ -7,10 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 class _SecurityBaseModel(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
-
 
 class AssetImportance(str, Enum):
     LOW = "low"
@@ -18,12 +16,10 @@ class AssetImportance(str, Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
-
 class ExposureLevel(str, Enum):
     INTERNAL = "internal"
     EXTERNAL = "external"
     UNKNOWN = "unknown"
-
 
 class AssetType(str, Enum):
     SERVER = "server"
@@ -36,14 +32,12 @@ class AssetType(str, Enum):
     CLOUD_RESOURCE = "cloud_resource"
     OTHER = "other"
 
-
 class Environment(str, Enum):
     PRODUCTION = "production"
     STAGING = "staging"
     TESTING = "testing"
     DEVELOPMENT = "development"
     UNKNOWN = "unknown"
-
 
 class SecuritySeverity(str, Enum):
     INFO = "info"
@@ -52,6 +46,63 @@ class SecuritySeverity(str, Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+class AnalysisCaseStatus(str, Enum):
+    OPEN = "open"
+    INVESTIGATING = "investigating"
+    PENDING_REVIEW = "pending_review"
+    CLOSED = "closed"
+
+class AnalysisCaseVerdict(str, Enum):
+    CONFIRMED_INCIDENT = "confirmed_incident"
+    CONFIRMED_ATTACK_ATTEMPT_BLOCKED = "confirmed_attack_attempt_blocked"
+    SUSPICIOUS_TRUE_POSITIVE = "suspicious_true_positive"
+    FALSE_POSITIVE_RULE_NOISE = "false_positive_rule_noise"
+    BENIGN_BUSINESS_ACTIVITY = "benign_business_activity"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+class AnalysisCaseSeverity(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFORMATIONAL = "informational"
+
+class EvidenceCoverage(str, Enum):
+    EC0_SIGNAL = "ec0_signal"
+    EC1_SINGLE_SOURCE = "ec1_single_source"
+    EC2_ENRICHED_SINGLE_SOURCE = "ec2_enriched_single_source"
+    EC3_CROSS_SOURCE = "ec3_cross_source"
+    EC4_FULL_INVESTIGATION = "ec4_full_investigation"
+
+class AnalysisMode(str, Enum):
+    SINGLE_SOURCE = "single_source"
+    ENRICHED_SINGLE_SOURCE = "enriched_single_source"
+    CROSS_SOURCE = "cross_source"
+    FULL_INVESTIGATION = "full_investigation"
+
+class NotificationDecision(str, Enum):
+    REALTIME_NOTIFY = "realtime_notify"
+    CONFIRMATION_REQUEST = "confirmation_request"
+    DAILY_DIGEST = "daily_digest"
+    NO_NOTIFY_STORE_ONLY = "no_notify_store_only"
+    ESCALATION_REMINDER = "escalation_reminder"
+
+class IncidentDecision(str, Enum):
+    ESCALATE_TO_INCIDENT = "escalate_to_incident"
+    DO_NOT_ESCALATE = "do_not_escalate"
+    NEEDS_HUMAN_CONFIRMATION = "needs_human_confirmation"
+    CONTINUE_MONITORING = "continue_monitoring"
+
+class AnalysisDisposition(str, Enum):
+    UNDECIDED = "undecided"
+    TRUE_POSITIVE = "true_positive"
+    FALSE_POSITIVE = "false_positive"
+    BENIGN = "benign"
+
+class FactStrength(str, Enum):
+    SUPPORTING = "supporting"
+    CONTRADICTING = "contradicting"
+    CONTEXT = "context"
 
 class VulnerabilityStatus(str, Enum):
     OPEN = "open"
@@ -60,7 +111,6 @@ class VulnerabilityStatus(str, Enum):
     FIXED = "fixed"
     ACCEPTED = "accepted"
     FALSE_POSITIVE = "false_positive"
-
 
 class AlertSource(str, Enum):
     XDR = "xdr"
@@ -73,7 +123,6 @@ class AlertSource(str, Enum):
     MANUAL = "manual"
     OTHER = "other"
 
-
 class AlertStatus(str, Enum):
     NEW = "new"
     TRIAGING = "triaging"
@@ -82,13 +131,11 @@ class AlertStatus(str, Enum):
     INCIDENT_CREATED = "incident_created"
     CLOSED = "closed"
 
-
 class IncidentSeverity(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
-
 
 class IncidentStatus(str, Enum):
     OPEN = "open"
@@ -99,19 +146,16 @@ class IncidentStatus(str, Enum):
     CLOSED = "closed"
     FALSE_POSITIVE = "false_positive"
 
-
 class Confidence(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-
 
 class RiskLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
-
 
 class Asset(_SecurityBaseModel):
     id: str = ""
@@ -136,7 +180,6 @@ class Asset(_SecurityBaseModel):
     created_at: str = ""
     updated_at: str = ""
 
-
 class Vulnerability(_SecurityBaseModel):
     id: str = ""
     asset_id: str
@@ -157,7 +200,6 @@ class Vulnerability(_SecurityBaseModel):
     created_at: str = ""
     updated_at: str = ""
 
-
 class Alert(_SecurityBaseModel):
     id: str = ""
     asset_id: str | None = None
@@ -175,7 +217,6 @@ class Alert(_SecurityBaseModel):
     normalized_data: dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
-
 
 class Incident(_SecurityBaseModel):
     id: str = ""
@@ -201,6 +242,69 @@ class Incident(_SecurityBaseModel):
     created_at: str = ""
     updated_at: str = ""
 
+class AnalysisFact(_SecurityBaseModel):
+    id: str = ""
+    fact_type: str
+    statement: str
+    source_ref: str | None = None
+    source_connector_id: str | None = None
+    source_device_type: str | None = None
+    raw_event_ref: str | None = None
+    related_asset_id: str | None = None
+    related_alert_id: str | None = None
+    related_ioc: str | None = None
+    confidence: Confidence = Confidence.MEDIUM
+    strength: FactStrength = FactStrength.CONTEXT
+    supports: list[str] = Field(default_factory=list)
+    contradicts: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    observed_at: str | None = None
+    created_at: str = ""
+
+class EvidenceItem(_SecurityBaseModel):
+    id: str = ""
+    title: str
+    description: str | None = None
+    source_ref: str | None = None
+    related_fact_ids: list[str] = Field(default_factory=list)
+    created_at: str = ""
+
+class EvidenceGap(_SecurityBaseModel):
+    id: str = ""
+    gap_type: str
+    description: str
+    missing_source_type: str | None = None
+    impact: str | None = None
+    suggested_connector_capability: str | None = None
+    created_at: str = ""
+
+class AnalysisCase(_SecurityBaseModel):
+    id: str = ""
+    title: str
+    description: str | None = None
+    case_status: AnalysisCaseStatus = AnalysisCaseStatus.OPEN
+    verdict: AnalysisCaseVerdict = AnalysisCaseVerdict.INSUFFICIENT_EVIDENCE
+    severity: AnalysisCaseSeverity = AnalysisCaseSeverity.MEDIUM
+    confidence: Confidence = Confidence.MEDIUM
+    evidence_coverage: EvidenceCoverage = EvidenceCoverage.EC0_SIGNAL
+    analysis_mode: AnalysisMode = AnalysisMode.SINGLE_SOURCE
+    notification_decision: NotificationDecision = NotificationDecision.NO_NOTIFY_STORE_ONLY
+    incident_decision: IncidentDecision = IncidentDecision.CONTINUE_MONITORING
+    disposition: AnalysisDisposition = AnalysisDisposition.UNDECIDED
+    primary_asset_id: str | None = None
+    related_asset_ids: list[str] = Field(default_factory=list)
+    related_alert_ids: list[str] = Field(default_factory=list)
+    related_vulnerability_ids: list[str] = Field(default_factory=list)
+    related_incident_id: str | None = None
+    facts: list[AnalysisFact] = Field(default_factory=list)
+    evidence_items: list[EvidenceItem] = Field(default_factory=list)
+    evidence_gaps: list[EvidenceGap] = Field(default_factory=list)
+    hypotheses: list[dict[str, Any]] = Field(default_factory=list)
+    timeline: list[dict[str, Any]] = Field(default_factory=list)
+    summary: str = ""
+    recommendations: list[str] = Field(default_factory=list)
+    created_at: str = ""
+    updated_at: str = ""
 
 class HoneypotEvent(_SecurityBaseModel):
     id: str = ""
@@ -219,13 +323,11 @@ class HoneypotEvent(_SecurityBaseModel):
     created_at: str = ""
     updated_at: str = ""
 
-
 class RiskScore(_SecurityBaseModel):
     score: int
     level: RiskLevel
     reasons: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
-
 
 class AlertCorrelation(_SecurityBaseModel):
     alert: Alert
@@ -237,7 +339,6 @@ class AlertCorrelation(_SecurityBaseModel):
     triage_summary: str
     recommended_actions: list[str] = Field(default_factory=list)
     confidence: Confidence = Confidence.MEDIUM
-
 
 class AlertTriageResult(_SecurityBaseModel):
     alert_id: str
@@ -253,7 +354,6 @@ class AlertTriageResult(_SecurityBaseModel):
     linked_alert_ids: list[str] = Field(default_factory=list)
     incident_id: str | None = None
 
-
 class AssetRiskProfile(_SecurityBaseModel):
     asset: Asset
     vulnerabilities: list[Vulnerability] = Field(default_factory=list)
@@ -267,7 +367,6 @@ class AssetRiskProfile(_SecurityBaseModel):
     uncertainties: list[str] = Field(default_factory=list)
     recommended_actions: list[str] = Field(default_factory=list)
     normalized_data: dict[str, Any] = Field(default_factory=dict)
-
 
 class VulnerabilityPriority(_SecurityBaseModel):
     vulnerability: Vulnerability

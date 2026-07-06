@@ -60,3 +60,55 @@ async def test_security_store_asset_crud_and_filters(store: SecurityStore):
 
     assert await store.delete_asset(asset.id) is True
     assert await store.delete_asset(asset.id) is False
+
+from flocks.security.models import AnalysisCase
+from flocks.security.schemas import AnalysisCaseCreate
+
+
+@pytest.mark.asyncio
+async def test_security_store_analysis_case_crud_and_filters(store: SecurityStore):
+    case = await store.create_analysis_case(
+        AnalysisCaseCreate(
+            title="Investigate suspicious login",
+            description="Initial signal from SIEM",
+            severity="high",
+            primary_asset_id="asset-1",
+            related_asset_ids=["asset-1"],
+            related_alert_ids=["alert-1"],
+            facts=[
+                {
+                    "fact_type": "alert_signal",
+                    "statement": "SIEM reported suspicious login for host asset-1.",
+                    "source_ref": "alert:alert-1",
+                    "related_asset_id": "asset-1",
+                    "related_alert_id": "alert-1",
+                }
+            ],
+            evidence_gaps=[{"gap_type": "missing_edr", "description": "No EDR telemetry queried yet."}],
+        )
+    )
+
+    assert isinstance(case, AnalysisCase)
+    assert case.id.startswith("case_")
+    assert case.facts[0].id.startswith("fact_")
+    assert case.facts[0].created_at
+    assert case.evidence_gaps[0].id.startswith("gap_")
+
+    fetched = await store.get_analysis_case(case.id)
+    assert fetched is not None
+    assert fetched.title == "Investigate suspicious login"
+
+    updated = await store.update_analysis_case(case.id, {"case_status": "investigating", "verdict": "suspicious_true_positive"})
+    assert updated is not None
+    assert updated.case_status == "investigating"
+    assert updated.verdict == "suspicious_true_positive"
+
+    by_asset = await store.list_analysis_cases(SecurityListFilters(asset_id="asset-1"))
+    by_status = await store.list_analysis_cases(SecurityListFilters(status="investigating"))
+    by_keyword = await store.list_analysis_cases(SecurityListFilters(keyword="EDR"))
+    assert [item.id for item in by_asset] == [case.id]
+    assert [item.id for item in by_status] == [case.id]
+    assert [item.id for item in by_keyword] == [case.id]
+
+    assert await store.delete_analysis_case(case.id) is True
+    assert await store.get_analysis_case(case.id) is None

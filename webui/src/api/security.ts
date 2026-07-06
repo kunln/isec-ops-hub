@@ -4,6 +4,34 @@ export type SecuritySeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type Confidence = 'low' | 'medium' | 'high';
 
+export type AnalysisCaseVerdict =
+  | 'confirmed_incident'
+  | 'confirmed_attack_attempt_blocked'
+  | 'suspicious_true_positive'
+  | 'false_positive_rule_noise'
+  | 'benign_business_activity'
+  | 'insufficient_evidence';
+export type AnalysisCaseSeverity = 'critical' | 'high' | 'medium' | 'low' | 'informational';
+export type EvidenceCoverage =
+  | 'ec0_signal'
+  | 'ec1_single_source'
+  | 'ec2_enriched_single_source'
+  | 'ec3_cross_source'
+  | 'ec4_full_investigation';
+export type AnalysisMode = 'single_source' | 'enriched_single_source' | 'cross_source' | 'full_investigation';
+export type NotificationDecision =
+  | 'realtime_notify'
+  | 'confirmation_request'
+  | 'daily_digest'
+  | 'no_notify_store_only'
+  | 'escalation_reminder';
+export type IncidentDecision =
+  | 'escalate_to_incident'
+  | 'do_not_escalate'
+  | 'needs_human_confirmation'
+  | 'continue_monitoring';
+
+
 export interface SecurityAsset {
   id: string;
   name: string;
@@ -89,6 +117,75 @@ export interface SecurityIncident {
   created_by: string;
   raw_data: Record<string, any>;
   normalized_data: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+
+export interface AnalysisFact {
+  id: string;
+  fact_type: string;
+  statement: string;
+  source_ref?: string | null;
+  source_connector_id?: string | null;
+  source_device_type?: string | null;
+  raw_event_ref?: string | null;
+  related_asset_id?: string | null;
+  related_alert_id?: string | null;
+  related_ioc?: string | null;
+  confidence: Confidence;
+  strength: string;
+  supports: string[];
+  contradicts: string[];
+  limitations: string[];
+  observed_at?: string | null;
+  created_at: string;
+}
+
+export interface AnalysisEvidenceItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  source_ref?: string | null;
+  related_fact_ids: string[];
+  created_at: string;
+}
+
+export interface AnalysisEvidenceGap {
+  id: string;
+  gap_type: string;
+  description: string;
+  missing_source_type?: string | null;
+  impact?: string | null;
+  suggested_connector_capability?: string | null;
+  created_at: string;
+}
+
+export interface AnalysisCase {
+  id: string;
+  title: string;
+  description?: string | null;
+  case_status: string;
+  verdict: AnalysisCaseVerdict;
+  severity: AnalysisCaseSeverity;
+  confidence: Confidence;
+  evidence_coverage: EvidenceCoverage;
+  analysis_mode: AnalysisMode;
+  notification_decision: NotificationDecision;
+  incident_decision: IncidentDecision;
+  disposition: string;
+  primary_asset_id?: string | null;
+  related_asset_ids: string[];
+  related_alert_ids: string[];
+  related_vulnerability_ids: string[];
+  related_incident_id?: string | null;
+  facts: AnalysisFact[];
+  evidence_items: AnalysisEvidenceItem[];
+  evidence_gaps: AnalysisEvidenceGap[];
+  hypotheses: Record<string, any>[];
+  timeline: Record<string, any>[];
+  summary: string;
+  recommendations: string[];
   created_at: string;
   updated_at: string;
 }
@@ -1218,6 +1315,16 @@ export const securityAPI = {
   triageAlert: (id: string, createIncident = true) =>
     client.post(`/api/security/triage/alert/${id}`, null, { params: { createIncident } }),
   createIncidentFromAlert: (id: string) => client.post(`/api/security/incidents/from-alert/${id}`),
+
+
+  listAnalysisCases: (params?: SecurityFilters) => client.get<AnalysisCase[]>('/api/security/analysis-cases', { params }),
+  createAnalysisCase: (data: Partial<AnalysisCase>) => client.post<AnalysisCase>('/api/security/analysis-cases', data),
+  getAnalysisCase: (id: string) => client.get<AnalysisCase>(`/api/security/analysis-cases/${id}`),
+  updateAnalysisCase: (id: string, data: Partial<AnalysisCase>) =>
+    client.patch<AnalysisCase>(`/api/security/analysis-cases/${id}`, data),
+  deleteAnalysisCase: (id: string) => client.delete(`/api/security/analysis-cases/${id}`),
+  createAnalysisCaseFromAlert: (id: string) =>
+    client.post<AnalysisCase>(`/api/security/analysis-cases/from-alert/${id}`),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),
