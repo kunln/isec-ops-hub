@@ -679,6 +679,23 @@ async def test_analysis_case_backend_closed_loop(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_analysis_case_filter_matches_primary_asset_id(client: AsyncClient):
+    primary_asset_id = "ast_primary_only"
+    created = await client.post(
+        "/api/security/analysis-cases",
+        json={"title": "Primary asset only case", "primary_asset_id": primary_asset_id},
+    )
+    assert created.status_code == 201, created.text
+    case = created.json()
+    assert case["primary_asset_id"] == primary_asset_id
+    assert case["related_asset_ids"] == []
+
+    filtered = await client.get("/api/security/analysis-cases", params={"asset_id": primary_asset_id})
+    assert filtered.status_code == 200
+    assert any(item["id"] == case["id"] for item in filtered.json())
+
+
+@pytest.mark.asyncio
 async def test_analysis_case_from_alert_returns_201_and_complete_fact(client: AsyncClient):
     alert_payload = {
         "asset_id": "ast_manual_asset",

@@ -301,7 +301,10 @@ class SecurityStore:
         if filters.asset_id and getattr(item, "asset_id", None) != filters.asset_id:
             if not (
                 (isinstance(item, Incident) and filters.asset_id in item.asset_ids)
-                or (isinstance(item, AnalysisCase) and filters.asset_id in item.related_asset_ids)
+                or (
+                    isinstance(item, AnalysisCase)
+                    and (filters.asset_id == item.primary_asset_id or filters.asset_id in item.related_asset_ids)
+                )
             ):
                 return False
         if filters.severity and getattr(item, "severity", None) != filters.severity:
