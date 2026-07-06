@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel
 
 from flocks.commercial.access_control import require_capability
@@ -14,7 +14,17 @@ from flocks.security.connectors import connector_registry
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
 from flocks.security.connectors.package_staging import MAX_UPLOAD_BYTES
 from flocks.security.connectors.scheduler import connector_sync_scheduler
-from flocks.security.models import Confidence, FactStrength, Incident
+from flocks.security.models import (
+    AnalysisCase,
+    AnalysisCaseSeverity,
+    AnalysisCaseStatus,
+    AnalysisDisposition,
+    Confidence,
+    FactStrength,
+    Incident,
+    IncidentDecision,
+    IncidentSeverity,
+)
 from flocks.security.prioritization import prioritize_vulnerabilities
 from flocks.security.profile import build_asset_risk_profile
 from flocks.security.report import generate_incident_report
@@ -37,6 +47,89 @@ from flocks.security.schemas import (
 from flocks.security.store import default_store
 from flocks.security.triage import triage_alert
 
+
+def _analysis_case_incident_severity(severity: str) -> IncidentSeverity:
+    mapping = {
+        AnalysisCaseSeverity.CRITICAL.value: IncidentSeverity.CRITICAL,
+        AnalysisCaseSeverity.HIGH.value: IncidentSeverity.HIGH,
+        AnalysisCaseSeverity.MEDIUM.value: IncidentSeverity.MEDIUM,
+        AnalysisCaseSeverity.LOW.value: IncidentSeverity.LOW,
+        AnalysisCaseSeverity.INFORMATIONAL.value: IncidentSeverity.LOW,
+    }
+    return mapping.get(str(severity), IncidentSeverity.MEDIUM)
+
+
+def _analysis_case_asset_ids(case: AnalysisCase) -> list[str]:
+    seen: set[str] = set()
+    asset_ids: list[str] = []
+    for asset_id in [case.primary_asset_id, *case.related_asset_ids]:
+        if asset_id and asset_id not in seen:
+            seen.add(asset_id)
+            asset_ids.append(asset_id)
+    return asset_ids
+
+
+def _analysis_case_evidence(case: AnalysisCase) -> list[str]:
+    evidence: list[str] = []
+    for fact in case.facts:
+        evidence.append(f"Fact[{fact.id or fact.fact_type}] {fact.statement} (source: {fact.source_ref})")
+    for item in case.evidence_items:
+        evidence.append(f"Evidence[{item.id or item.title}] {item.title}: {item.description} (source: {item.source_ref})")
+    for gap in case.evidence_gaps:
+        impact = f" impact: {gap.impact}" if gap.impact else ""
+        evidence.append(f"EvidenceGap[{gap.id or gap.gap_type}] {gap.description}{impact}")
+    return evidence
+
+
+def _analysis_case_timeline(case: AnalysisCase) -> list[dict[str, Any]]:
+    if case.timeline:
+        return case.timeline
+    return [
+        {
+            "timestamp": fact.observed_at,
+            "title": fact.fact_type,
+            "description": fact.statement,
+            "source_ref": fact.source_ref,
+        }
+        for fact in case.facts
+        if fact.observed_at
+    ]
+
+
+def _summarize_facts(facts: list[Any], limit: int = 5) -> list[str]:
+    return [getattr(fact, "statement", str(fact)) for fact in facts[:limit]]
+
+
+def _summarize_gaps(gaps: list[Any], limit: int = 5) -> list[str]:
+    return [getattr(gap, "description", str(gap)) for gap in gaps[:limit]]
+
+
+def _analysis_case_analysis(case: AnalysisCase) -> str:
+    lines = [
+        f"Verdict: {case.verdict}",
+        f"Confidence: {case.confidence}",
+        f"Evidence coverage: {case.evidence_coverage}",
+        f"Analysis mode: {case.analysis_mode}",
+    ]
+    facts = _summarize_facts(case.facts)
+    gaps = _summarize_gaps(case.evidence_gaps)
+    if facts:
+        lines.append("Key facts:")
+        lines.extend(f"- {fact}" for fact in facts)
+    if gaps:
+        lines.append("Evidence gaps:")
+        lines.extend(f"- {gap}" for gap in gaps)
+    return "\n".join(lines)
+
+
+def _analysis_case_summary(case: AnalysisCase) -> str:
+    if case.summary:
+        return case.summary
+    return f"Analysis case {case.id} was manually escalated to an incident for {case.title}."
+
+
+def _analysis_case_recommendation(case: AnalysisCase) -> str:
+    return "\n".join(f"- {item}" for item in case.recommendations)
 
 router = APIRouter(dependencies=[Depends(require_capability("security.ops.read"))])
 
@@ -1206,6 +1299,58 @@ async def create_analysis_case_from_alert(alert_id: str):
         )
     )
     return case
+
+
+@router.post(
+    "/analysis-cases/{case_id}/escalate-to-incident",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def escalate_analysis_case_to_incident(case_id: str, response: Response):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+
+    if case.related_incident_id:
+        incident = await default_store.get_incident(case.related_incident_id)
+        if incident is not None:
+            response.status_code = status.HTTP_200_OK
+            return {"case": case, "incident": incident, "created": False}
+
+    incident = await default_store.create_incident(
+        IncidentCreate(
+            title=case.title,
+            severity=_analysis_case_incident_severity(case.severity),
+            summary=_analysis_case_summary(case),
+            analysis=_analysis_case_analysis(case),
+            recommendation=_analysis_case_recommendation(case),
+            asset_ids=_analysis_case_asset_ids(case),
+            vulnerability_ids=case.related_vulnerability_ids,
+            alert_ids=case.related_alert_ids,
+            evidence=_analysis_case_evidence(case),
+            timeline=_analysis_case_timeline(case),
+            confidence=case.confidence,
+            created_by="analysis_case_manual_escalation",
+            raw_data={"analysis_case_id": case.id},
+            normalized_data={
+                "source": "analysis_case",
+                "analysis_case_id": case.id,
+                "verdict": case.verdict,
+                "evidence_coverage": case.evidence_coverage,
+                "analysis_mode": case.analysis_mode,
+            },
+        )
+    )
+    updated_case = await default_store.update_analysis_case(
+        case.id,
+        AnalysisCaseUpdate(
+            related_incident_id=incident.id,
+            incident_decision=IncidentDecision.ESCALATE_TO_INCIDENT,
+            disposition=AnalysisDisposition.ESCALATED_TO_INCIDENT,
+            case_status=AnalysisCaseStatus.ESCALATED,
+        ),
+    )
+    response.status_code = status.HTTP_201_CREATED
+    return {"case": updated_case or case, "incident": incident, "created": True}
 
 
 @router.get("/incidents")
