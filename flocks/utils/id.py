@@ -32,6 +32,8 @@ IdPrefix = Literal[
     "asset",      # ast  (security asset)
     "vulnerability", # vul (security vulnerability)
     "alert",      # alr  (security alert)
+    "analysis_case", # acase (security analysis case)
+    "analysis_fact", # afact (security analysis fact)
     "incident",   # inc  (security incident)
     "honeypot",   # hpt  (security honeypot event)
 ]
@@ -68,6 +70,8 @@ class Identifier:
         "asset": "ast",
         "vulnerability": "vul",
         "alert": "alr",
+        "analysis_case": "acase",
+        "analysis_fact": "afact",
         "incident": "inc",
         "honeypot": "hpt",
     }
