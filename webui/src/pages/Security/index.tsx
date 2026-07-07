@@ -916,6 +916,13 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     window.alert(t('analysisCases.escalated', { defaultValue: '已升级为 Incident' }));
   };
 
+  const runInitialAnalysis = async (caseId: string) => {
+    const res = await securityAPI.runInitialAnalysis(caseId);
+    await loadAll();
+    setSelected(res.data as Entity);
+    window.alert(t('analysisCases.initialAnalysisComplete', { defaultValue: '自动初判已完成' }));
+  };
+
   const buildRiskProfile = async (assetId: string) => {
     const res = await securityAPI.getAssetRiskProfile(assetId);
     setRiskProfile(res.data);
@@ -1560,9 +1567,14 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                             </>
                           )}
                           {section === 'analysis-cases' && (
-                            <button title={t('actions.escalateToIncident', { defaultValue: '升级为事件' })} onClick={() => void escalateAnalysisCase(item.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50">
-                              <ShieldAlert className="h-4 w-4" />
-                            </button>
+                            <>
+                              <button title={t('actions.runInitialAnalysis', { defaultValue: '运行初判 / Run Initial Analysis' })} onClick={() => void runInitialAnalysis(item.id)} className="rounded p-1.5 text-purple-600 hover:bg-purple-50">
+                                <Brain className="h-4 w-4" />
+                              </button>
+                              <button title={t('actions.escalateToIncident', { defaultValue: '升级为事件' })} onClick={() => void escalateAnalysisCase(item.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50">
+                                <ShieldAlert className="h-4 w-4" />
+                              </button>
+                            </>
                           )}
                           {section === 'incidents' && (
                             <button title={t('actions.generateReport')} onClick={() => void generateReport(item.id)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50">
@@ -1590,7 +1602,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           </div>
 
           <div className="space-y-4">
-            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} />
+            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} onRunInitialAnalysis={(caseId) => void runInitialAnalysis(caseId)} />
           </div>
         </div>
       )}
@@ -4365,12 +4377,14 @@ function DetailPanel({
   riskProfile,
   report,
   onEscalateAnalysisCase,
+  onRunInitialAnalysis,
 }: {
   selected: Entity | null;
   triageResult: any;
   riskProfile: SecurityAssetRiskProfile | null;
   report: string;
   onEscalateAnalysisCase: (caseId: string) => void;
+  onRunInitialAnalysis: (caseId: string) => void;
 }) {
   const { t } = useTranslation('security');
   const isAnalysisCase = Boolean(selected && 'case_status' in selected && 'facts' in selected && 'evidence_gaps' in selected);
@@ -4381,18 +4395,24 @@ function DetailPanel({
           <div className="rounded-lg border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div className="font-semibold text-gray-900">{selected.title}</div>
-              <button onClick={() => onEscalateAnalysisCase(selected.id)} className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700">
-                <ShieldAlert className="h-4 w-4" /> {t('actions.escalateToIncident', { defaultValue: '升级为事件' })}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => onRunInitialAnalysis(selected.id)} className="inline-flex items-center gap-2 rounded bg-purple-600 px-3 py-1.5 text-xs text-white hover:bg-purple-700">
+                  <Brain className="h-4 w-4" /> {t('actions.runInitialAnalysis', { defaultValue: '运行初判 / Run Initial Analysis' })}
+                </button>
+                <button onClick={() => onEscalateAnalysisCase(selected.id)} className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700">
+                  <ShieldAlert className="h-4 w-4" /> {t('actions.escalateToIncident', { defaultValue: '升级为事件' })}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 p-4 text-xs">
-              {['verdict', 'severity', 'confidence', 'evidence_coverage', 'analysis_mode', 'notification_decision', 'incident_decision', 'disposition'].map((key) => (
+              {['verdict', 'severity', 'confidence', 'notification_decision', 'incident_decision', 'evidence_coverage', 'disposition'].map((key) => (
                 <div key={key} className="rounded border border-gray-200 px-3 py-2">
                   <div className="text-gray-500">{t(`fields.${key}`, { defaultValue: key })}</div>
                   <div className="font-medium text-gray-900">{renderValue(selected[key], (value) => t(`options.${value}`, { defaultValue: value }))}</div>
                 </div>
               ))}
             </div>
+            <div className="px-4 pb-4 text-xs text-amber-700">自动初判是 rule-based initial analysis，仅供研判参考，不是最终人工确认；不会自动升级 Incident 或执行自动处置。Evidence gaps: {((selected as AnalysisCase).evidence_gaps || []).length}</div>
           </div>
           <AnalysisCaseDetail caseItem={selected as AnalysisCase} />
         </div>

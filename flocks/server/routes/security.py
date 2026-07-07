@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from flocks.commercial.access_control import require_capability
 from flocks.server.auth import get_optional_user
+from flocks.security.analysis import build_analysis_case_from_alert, run_initial_analysis
 from flocks.security.correlation import correlate_alert
 from flocks.security.connectors import connector_registry
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
@@ -1273,32 +1274,24 @@ async def create_analysis_case_from_alert(alert_id: str):
     alert = await default_store.get_alert(alert_id)
     if alert is None:
         raise _not_found("Alert", alert_id)
-    statement = f"Alert signal '{alert.title}' was observed"
-    if alert.description:
-        statement = f"{statement}: {alert.description}"
-    case = await default_store.create_analysis_case(
-        AnalysisCaseCreate(
-            title=f"Analysis case from alert: {alert.title}",
-            description=alert.description or "",
-            primary_asset_id=alert.asset_id,
-            related_asset_ids=[alert.asset_id] if alert.asset_id else [],
-            related_alert_ids=[alert.id],
-            facts=[
-                {
-                    "fact_type": "alert_signal",
-                    "statement": statement,
-                    "source_ref": f"alert:{alert.id}",
-                    "related_alert_id": alert.id,
-                    "related_asset_id": alert.asset_id,
-                    "confidence": Confidence.MEDIUM,
-                    "strength": FactStrength.MEDIUM,
-                    "observed_at": alert.occurred_at,
-                }
-            ],
-            summary=statement,
-        )
-    )
-    return case
+    return await default_store.create_analysis_case(build_analysis_case_from_alert(alert))
+
+
+@router.post(
+    "/analysis-cases/{case_id}/run-initial-analysis",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def run_analysis_case_initial_analysis(case_id: str):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    related_alerts = []
+    for alert_id in case.related_alert_ids:
+        alert = await default_store.get_alert(alert_id)
+        if alert is not None:
+            related_alerts.append(alert)
+    updated = await default_store.update_analysis_case(case.id, run_initial_analysis(case, related_alerts))
+    return updated or case
 
 
 @router.post(
