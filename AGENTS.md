@@ -171,4 +171,5 @@ Rex has a dedicated `flocks_skills` tool for managing agent skills.
 - 设备 API 能力逐步完善，不要求一次性支持所有厂商所有 API。
 - 新增代码必须补测试；但纯文档任务只改文档。
 - 不提交 secret、`.env`、运行态数据库、credential、日志或其他敏感/运行态文件。
+- Do not implement long-term raw log/event storage for Security Extension. Store evidence summaries and external references instead.
 

@@ -57,10 +57,12 @@ import {
   type SecurityHoneypotEvent,
   type SecurityIncident,
   type SecurityVulnerability,
+  type EvidenceIngestionContext,
+  type EvidenceIngestionResponse,
 } from '@/api/security';
 
-type Section = 'dashboard' | 'assets' | 'vulnerabilities' | 'alerts' | 'analysis-cases' | 'incidents' | 'honeypot-events' | 'connectors';
-type DataSection = Exclude<Section, 'dashboard' | 'connectors'>;
+type Section = 'dashboard' | 'assets' | 'vulnerabilities' | 'alerts' | 'analysis-cases' | 'evidence-ingestion' | 'incidents' | 'honeypot-events' | 'connectors';
+type DataSection = Exclude<Section, 'dashboard' | 'connectors' | 'evidence-ingestion'>;
 type Entity = Record<string, any> & { id: string };
 type SecurityMode = 'expert' | 'admin';
 type AssetRiskLevel = 'critical' | 'high' | 'medium' | 'low';
@@ -90,12 +92,13 @@ const navItems: Array<{ section: Section; icon: LucideIcon; adminOnly?: boolean 
   { section: 'vulnerabilities', icon: Bug },
   { section: 'alerts', icon: Bell },
   { section: 'analysis-cases', icon: FileText },
+  { section: 'evidence-ingestion', icon: UploadCloud },
   { section: 'incidents', icon: ShieldAlert },
   { section: 'honeypot-events', icon: Radar },
   { section: 'connectors', icon: Plug, adminOnly: true },
 ];
 
-const supportedSections: Section[] = ['assets', 'vulnerabilities', 'alerts', 'analysis-cases', 'incidents', 'honeypot-events', 'connectors'];
+const supportedSections: Section[] = ['assets', 'vulnerabilities', 'alerts', 'analysis-cases', 'evidence-ingestion', 'incidents', 'honeypot-events', 'connectors'];
 const severityOptions = ['info', 'low', 'medium', 'high', 'critical'];
 const incidentSeverityOptions = ['low', 'medium', 'high', 'critical'];
 const analysisCaseSeverityOptions = ['informational', 'low', 'medium', 'high', 'critical'];
@@ -671,6 +674,11 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   const [connectorRuntimeError, setConnectorRuntimeError] = useState<string | null>(null);
   const [report, setReport] = useState<string>('');
   const [analysisCaseBrief, setAnalysisCaseBrief] = useState<string>('');
+  const [ingestionContext, setIngestionContext] = useState<EvidenceIngestionContext>({ connector_id: 'demo-waf', connector_name: 'Demo WAF', vendor: 'Generic', product: 'WAF', source_type: 'waf', external_base_url: 'https://waf.example.local/events' });
+  const [ingestionEventsJson, setIngestionEventsJson] = useState('[\n  {\n    "id": "evt-001",\n    "title": "SQL injection blocked",\n    "severity": "high",\n    "action": "block",\n    "src_ip": "1.1.1.1",\n    "dst_ip": "10.0.0.10",\n    "url": "/login?id=1 union select",\n    "timestamp": "2026-07-07T10:00:00+00:00"\n  }\n]');
+  const [ingestionOptions, setIngestionOptions] = useState({ create_analysis_cases: true, run_initial_analysis: true, deduplicate: true });
+  const [ingestionResult, setIngestionResult] = useState<EvidenceIngestionResponse | null>(null);
+  const [ingestionLoading, setIngestionLoading] = useState(false);
   useEffect(() => {
     tRef.current = t;
   }, [t]);
@@ -906,6 +914,27 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     navigate(`${basePath}/alerts`);
   };
 
+
+
+  const ingestEvidenceEvents = async () => {
+    setIngestionLoading(true);
+    setError(null);
+    try {
+      const parsed = JSON.parse(ingestionEventsJson);
+      if (!Array.isArray(parsed)) throw new Error('Events JSON must be an array.');
+      const res = await securityAPI.ingestEvidenceEvents({
+        connector_context: ingestionContext,
+        events: parsed,
+        ...ingestionOptions,
+      });
+      setIngestionResult(res.data);
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.message || 'Evidence ingestion failed');
+    } finally {
+      setIngestionLoading(false);
+    }
+  };
 
   const createAnalysisCaseFromAlert = async (alertId: string) => {
     const res = await securityAPI.createAnalysisCaseFromAlert(alertId);
@@ -1508,6 +1537,18 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           onOperationEventNotify={notifyConnectorOperationEvent}
           onBulkRemediation={bulkRemediateConnectorCredentials}
           onEvidenceGraphRebuild={rebuildEvidenceGraph}
+        />
+      ) : section === 'evidence-ingestion' ? (
+        <EvidenceIngestionPanel
+          context={ingestionContext}
+          setContext={setIngestionContext}
+          eventsJson={ingestionEventsJson}
+          setEventsJson={setIngestionEventsJson}
+          options={ingestionOptions}
+          setOptions={setIngestionOptions}
+          result={ingestionResult}
+          loading={ingestionLoading}
+          onIngest={() => void ingestEvidenceEvents()}
         />
       ) : section === 'assets' ? (
         <AssetRiskModule
@@ -4428,6 +4469,88 @@ function Dashboard({
   );
 }
 
+function EvidenceIngestionPanel({
+  context,
+  setContext,
+  eventsJson,
+  setEventsJson,
+  options,
+  setOptions,
+  result,
+  loading,
+  onIngest,
+}: {
+  context: EvidenceIngestionContext;
+  setContext: (value: EvidenceIngestionContext) => void;
+  eventsJson: string;
+  setEventsJson: (value: string) => void;
+  options: { create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean };
+  setOptions: (value: { create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean }) => void;
+  result: EvidenceIngestionResponse | null;
+  loading: boolean;
+  onIngest: () => void;
+}) {
+  const contextFields: Array<keyof EvidenceIngestionContext> = ['connector_id', 'connector_name', 'vendor', 'product', 'source_type', 'external_base_url'];
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        仅用于轻量证据接入测试。系统只保存摘要、关键字段、hash 和外部引用，不保存完整原始日志。
+      </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="mb-3 text-lg font-semibold text-gray-900">证据接入 / Evidence Ingestion</h2>
+        <div className="grid gap-3 md:grid-cols-3">
+          {contextFields.map((field) => (
+            <label key={field} className="text-sm text-gray-600">
+              <span className="mb-1 block font-medium">{field}</span>
+              <input
+                value={context[field] || ''}
+                onChange={(event) => setContext({ ...context, [field]: event.target.value })}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <h3 className="mb-2 font-semibold text-gray-900">Events JSON array</h3>
+        <textarea value={eventsJson} onChange={(event) => setEventsJson(event.target.value)} className="h-72 w-full rounded-lg border border-gray-200 p-3 font-mono text-xs" />
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-700">
+          {(['create_analysis_cases', 'run_initial_analysis', 'deduplicate'] as const).map((key) => (
+            <label key={key} className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={options[key]} onChange={(event) => setOptions({ ...options, [key]: event.target.checked })} />
+              {key}
+            </label>
+          ))}
+          <button onClick={onIngest} disabled={loading} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50">
+            <UploadCloud className="h-4 w-4" /> {loading ? 'Ingesting…' : 'Ingest'}
+          </button>
+        </div>
+      </div>
+      {result && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="mb-3 grid gap-3 text-sm md:grid-cols-3">
+            <div className="rounded bg-gray-50 p-3"><div className="text-gray-500">created_alerts</div><div className="text-xl font-semibold">{result.created_alerts}</div></div>
+            <div className="rounded bg-gray-50 p-3"><div className="text-gray-500">skipped_duplicates</div><div className="text-xl font-semibold">{result.skipped_duplicates}</div></div>
+            <div className="rounded bg-gray-50 p-3"><div className="text-gray-500">created_analysis_cases</div><div className="text-xl font-semibold">{result.created_analysis_cases}</div></div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-xs">
+              <thead><tr>{['status', 'alert_id', 'analysis_case_id', 'external_event_id', 'payload_hash', 'title', 'source', 'severity', 'error'].map((header) => <th key={header} className="px-3 py-2 text-left font-semibold text-gray-600">{header}</th>)}</tr></thead>
+              <tbody className="divide-y divide-gray-100">
+                {result.items.map((item, index) => (
+                  <tr key={`${item.payload_hash || item.external_event_id || index}`}>
+                    <td className="px-3 py-2">{item.status}</td><td className="px-3 py-2">{item.alert_id || '-'}</td><td className="px-3 py-2">{item.analysis_case_id || '-'}</td><td className="px-3 py-2">{item.external_event_id || '-'}</td><td className="px-3 py-2 font-mono">{item.payload_hash || '-'}</td><td className="px-3 py-2">{item.title || '-'}</td><td className="px-3 py-2">{item.source || '-'}</td><td className="px-3 py-2">{item.severity || '-'}</td><td className="px-3 py-2 text-red-600">{item.error || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DetailPanel({
   selected,
   triageResult,
@@ -4560,7 +4683,7 @@ function AnalysisCaseDetail({ caseItem, onAckNotification }: { caseItem: Analysi
         {rows.map(([key, value]) => <div key={key as string} className="mb-1"><span className="text-gray-500">{key as string}: </span>{renderValue(value)}</div>)}
       </div>
       <AnalysisCaseArray title="Fact Ledger" items={caseItem.facts} keys={['fact_type', 'statement', 'source_ref', 'related_asset_id', 'related_alert_id', 'confidence', 'strength', 'supports', 'contradicts', 'limitations', 'observed_at']} />
-      <AnalysisCaseArray title="Evidence Items" items={caseItem.evidence_items} keys={['title', 'description', 'source_ref', 'related_fact_ids']} />
+      <AnalysisCaseArray title="Evidence Items" items={caseItem.evidence_items} keys={['title', 'description', 'source_ref', 'connector_id', 'external_event_id', 'external_url', 'query_hint', 'payload_hash', 'key_fields', 'related_fact_ids']} />
       <AnalysisCaseArray title="Evidence Gaps" items={caseItem.evidence_gaps} keys={['gap_type', 'description', 'missing_source_type', 'impact', 'suggested_connector_capability']} />
       <AnalysisCaseArray title="Notification Records" items={caseItem.notification_records || []} keys={['notification_type', 'channel', 'status', 'title', 'message', 'recipients', 'created_by', 'created_at', 'sent_at', 'acknowledged_at', 'related_fact_ids', 'related_evidence_gap_ids']} action={(item) => item.status !== 'acknowledged' ? <button onClick={() => onAckNotification(caseItem.id, item.id)} className="rounded border border-blue-200 px-2 py-1 text-blue-700 hover:bg-blue-50">Ack</button> : null} />
       <AnalysisCaseArray title="Confirmation Records" items={caseItem.confirmation_records || []} keys={['confirmation_type', 'decision', 'reviewer', 'reviewer_role', 'comment', 'related_notification_id', 'created_at']} />

@@ -14,6 +14,7 @@ from flocks.security.analysis_report import generate_analysis_case_brief
 from flocks.security.analysis_sample_data import clear_analysis_sample_data, load_analysis_sample_data
 from flocks.security.correlation import correlate_alert
 from flocks.security.connectors import connector_registry
+from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
 from flocks.security.connectors.package_staging import MAX_UPLOAD_BYTES
 from flocks.security.connectors.scheduler import connector_sync_scheduler
@@ -51,6 +52,15 @@ from flocks.security.schemas import (
 )
 from flocks.security.store import default_store, utc_now
 from flocks.security.triage import triage_alert
+
+
+
+class EvidenceIngestionRequest(BaseModel):
+    connector_context: dict[str, Any] | None = None
+    events: list[dict[str, Any]]
+    create_analysis_cases: bool = True
+    run_initial_analysis: bool = True
+    deduplicate: bool = True
 
 
 def _analysis_case_incident_severity(severity: str) -> IncidentSeverity:
@@ -1198,6 +1208,28 @@ async def update_vulnerability(vuln_id: str, payload: VulnerabilityUpdate):
 async def delete_vulnerability(vuln_id: str):
     return {"deleted": await default_store.delete_vulnerability(vuln_id)}
 
+
+
+@router.post(
+    "/evidence-ingestion/ingest",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def ingest_evidence_events(payload: EvidenceIngestionRequest):
+    return await ingest_external_events(
+        payload.events,
+        connector_context=payload.connector_context,
+        create_analysis_cases=payload.create_analysis_cases,
+        run_initial_analysis=payload.run_initial_analysis,
+        deduplicate=payload.deduplicate,
+    )
+
+
+@router.post(
+    "/evidence-ingestion/preview",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def preview_evidence_events(payload: EvidenceIngestionRequest):
+    return {"summaries": [summarize_external_event(event, connector_context=payload.connector_context) for event in payload.events]}
 
 @router.get("/alerts")
 async def list_alerts(filters: SecurityListFilters = Depends(_filters)):

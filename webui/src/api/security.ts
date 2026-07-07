@@ -136,8 +136,56 @@ export interface AnalysisEvidenceItem {
   description: string;
   source_ref: string;
   related_fact_ids: string[];
+  connector_id?: string | null;
+  connector_name?: string | null;
+  vendor?: string | null;
+  product?: string | null;
+  source_type?: string | null;
+  external_event_id?: string | null;
+  external_url?: string | null;
+  query_hint?: string | null;
+  time_range_start?: string | null;
+  time_range_end?: string | null;
+  payload_hash?: string | null;
+  key_fields: Record<string, any>;
   created_at: string;
   metadata: Record<string, any>;
+}
+
+export interface EvidenceIngestionContext {
+  connector_id?: string;
+  connector_name?: string;
+  vendor?: string;
+  product?: string;
+  source_type?: string;
+  external_base_url?: string;
+}
+
+export interface EvidenceIngestionRequest {
+  connector_context?: EvidenceIngestionContext;
+  events: Record<string, any>[];
+  create_analysis_cases: boolean;
+  run_initial_analysis: boolean;
+  deduplicate: boolean;
+}
+
+export interface EvidenceIngestionItem {
+  status: 'created' | 'skipped' | 'error';
+  alert_id?: string | null;
+  analysis_case_id?: string | null;
+  external_event_id?: string | null;
+  payload_hash?: string | null;
+  title?: string | null;
+  source?: string | null;
+  severity?: string | null;
+  error?: string | null;
+}
+
+export interface EvidenceIngestionResponse {
+  created_alerts: number;
+  skipped_duplicates: number;
+  created_analysis_cases: number;
+  items: EvidenceIngestionItem[];
 }
 
 export interface AnalysisEvidenceGap {
@@ -1388,6 +1436,8 @@ export const securityAPI = {
     client.get<AnalysisCaseBriefResponse>(`/api/security/analysis-cases/${id}/brief`),
   loadAnalysisCaseSampleData: () =>
     client.post<AnalysisCaseSampleDataLoadResponse>('/api/security/analysis-cases/sample-data/load'),
+  ingestEvidenceEvents: (data: EvidenceIngestionRequest) =>
+    client.post<EvidenceIngestionResponse>('/api/security/evidence-ingestion/ingest', data),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),
