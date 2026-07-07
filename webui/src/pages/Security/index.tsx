@@ -688,6 +688,11 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     limit: 20, max_pages: 1, verify_ssl: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
   });
   const [mingyuTestResult, setMingyuTestResult] = useState<Record<string, any> | null>(null);
+  const [tdaForm, setTdaForm] = useState({
+    base_url: '', api_key: '', secret: '', begin: '2026-07-01 00:00:00', end: '2026-07-07 23:59:59', time_type: 5, mode: 'alert' as 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext',
+    limit: 20, max_pages: 1, verify_ssl: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
+  });
+  const [tdaTestResult, setTdaTestResult] = useState<Record<string, any> | null>(null);
   useEffect(() => {
     tRef.current = t;
   }, [t]);
@@ -973,6 +978,33 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
       await loadAll();
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Mingyu APT ingestion failed');
+    } finally {
+      setIngestionLoading(false);
+    }
+  };
+
+  const testTda = async () => {
+    setIngestionLoading(true);
+    setError(null);
+    try {
+      const res = await securityAPI.testTda({ base_url: tdaForm.base_url, api_key: tdaForm.api_key, secret: tdaForm.secret, verify_ssl: tdaForm.verify_ssl });
+      setTdaTestResult(res.data);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'TDA connection test failed');
+    } finally {
+      setIngestionLoading(false);
+    }
+  };
+
+  const ingestTda = async () => {
+    setIngestionLoading(true);
+    setError(null);
+    try {
+      const res = await securityAPI.ingestTda(tdaForm);
+      setIngestionResult(res.data);
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'TDA ingestion failed');
     } finally {
       setIngestionLoading(false);
     }
@@ -1596,6 +1628,11 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           mingyuTestResult={mingyuTestResult}
           onMingyuTest={() => void testMingyuApt()}
           onMingyuIngest={() => void ingestMingyuApt()}
+          tdaForm={tdaForm}
+          setTdaForm={setTdaForm}
+          tdaTestResult={tdaTestResult}
+          onTdaTest={() => void testTda()}
+          onTdaIngest={() => void ingestTda()}
           connectorRuns={connectorRuns}
           selectedRun={selectedConnectorRun}
           onSelectRun={setSelectedConnectorRun}
@@ -4579,6 +4616,11 @@ function EvidenceIngestionPanel({
   mingyuTestResult,
   onMingyuTest,
   onMingyuIngest,
+  tdaForm,
+  setTdaForm,
+  tdaTestResult,
+  onTdaTest,
+  onTdaIngest,
   connectorRuns,
   selectedRun,
   onSelectRun,
@@ -4597,6 +4639,11 @@ function EvidenceIngestionPanel({
   mingyuTestResult: Record<string, any> | null;
   onMingyuTest: () => void;
   onMingyuIngest: () => void;
+  tdaForm: { base_url: string; api_key: string; secret: string; begin: string; end: string; time_type: number; mode: 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean };
+  setTdaForm: (value: { base_url: string; api_key: string; secret: string; begin: string; end: string; time_type: number; mode: 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean }) => void;
+  tdaTestResult: Record<string, any> | null;
+  onTdaTest: () => void;
+  onTdaIngest: () => void;
   connectorRuns: ConnectorSyncRun[];
   selectedRun: ConnectorSyncRun | null;
   onSelectRun: (run: ConnectorSyncRun) => void;
@@ -4629,6 +4676,32 @@ function EvidenceIngestionPanel({
           <button onClick={onMingyuIngest} disabled={loading} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50">拉取并生成研判单</button>
         </div>
         {mingyuTestResult && <pre className="mt-3 max-h-40 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(mingyuTestResult, null, 2)}</pre>}
+        {result?.run_id && <div className="mt-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">Run ID: <span className="font-mono">{result.run_id}</span></div>}
+      </div>
+      <div className="rounded-lg border border-indigo-200 bg-white p-4">
+        <h2 className="mb-2 text-lg font-semibold text-gray-900">信桅 TDA 接入测试</h2>
+        <p className="mb-3 text-sm text-indigo-700">api_key / secret 仅用于本次请求，不会保存。平台不保存完整原始日志或 API 响应；弱口令/明文口令接口不会保存 login_password 或 login_password_encrypted，只保存告警摘要、证据引用、hash、key_fields 和 Analysis Case。</p>
+        <div className="grid gap-3 md:grid-cols-4">
+          <input value={tdaForm.base_url} onChange={(event) => setTdaForm({ ...tdaForm, base_url: event.target.value })} placeholder="base_url" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="password" value={tdaForm.api_key} onChange={(event) => setTdaForm({ ...tdaForm, api_key: event.target.value })} placeholder="api_key" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="password" value={tdaForm.secret} onChange={(event) => setTdaForm({ ...tdaForm, secret: event.target.value })} placeholder="secret" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <select value={tdaForm.mode} onChange={(event) => setTdaForm({ ...tdaForm, mode: event.target.value as 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext' })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <option value="alert">alert</option><option value="event">event</option><option value="asset_risk">asset_risk</option><option value="weak_pwd">weak_pwd</option><option value="plaintext">plaintext</option>
+          </select>
+          <input value={tdaForm.begin} onChange={(event) => setTdaForm({ ...tdaForm, begin: event.target.value })} placeholder="begin" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={tdaForm.end} onChange={(event) => setTdaForm({ ...tdaForm, end: event.target.value })} placeholder="end" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="number" value={tdaForm.time_type} onChange={(event) => setTdaForm({ ...tdaForm, time_type: Number(event.target.value) })} placeholder="time_type" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="number" value={tdaForm.limit} onChange={(event) => setTdaForm({ ...tdaForm, limit: Number(event.target.value) })} placeholder="limit" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="number" value={tdaForm.max_pages} onChange={(event) => setTdaForm({ ...tdaForm, max_pages: Number(event.target.value) })} placeholder="max_pages" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-700">
+          {(['verify_ssl', 'create_analysis_cases', 'run_initial_analysis', 'deduplicate'] as const).map((key) => (
+            <label key={key} className="inline-flex items-center gap-2"><input type="checkbox" checked={tdaForm[key]} onChange={(event) => setTdaForm({ ...tdaForm, [key]: event.target.checked })} />{key}</label>
+          ))}
+          <button onClick={onTdaTest} disabled={loading} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 disabled:opacity-50">测试连接</button>
+          <button onClick={onTdaIngest} disabled={loading} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50">拉取并生成研判单</button>
+        </div>
+        {tdaTestResult && <pre className="mt-3 max-h-40 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(tdaTestResult, null, 2)}</pre>}
         {result?.run_id && <div className="mt-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">Run ID: <span className="font-mono">{result.run_id}</span></div>}
       </div>
       <ConnectorRunsPanel runs={connectorRuns} selectedRun={selectedRun} onSelectRun={onSelectRun} />
