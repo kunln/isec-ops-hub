@@ -203,6 +203,7 @@ export interface EvidenceIngestionItem {
 }
 
 export interface EvidenceIngestionResponse {
+  run_id?: string;
   created_alerts: number;
   skipped_duplicates: number;
   created_analysis_cases: number;
@@ -326,6 +327,34 @@ export interface SecurityHoneypotEvent {
   normalized_data: Record<string, any>;
   created_at: string;
   updated_at: string;
+}
+
+export interface ConnectorSyncRun {
+  id: string;
+  connector_id: string;
+  connector_name?: string | null;
+  vendor?: string | null;
+  product?: string | null;
+  mode: string;
+  status: string;
+  started_at: string;
+  finished_at?: string | null;
+  requested_by?: string | null;
+  request_summary: Record<string, any>;
+  result_summary: Record<string, any>;
+  error_message?: string | null;
+  item_refs: Record<string, any>[];
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, any>;
+}
+
+export interface ConnectorSyncRunFilters {
+  connector_id?: string;
+  status?: string;
+  mode?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface SecurityFilters {
@@ -1463,6 +1492,10 @@ export const securityAPI = {
     client.post<Record<string, any>>('/api/security/connectors/mingyu-apt/test', data),
   ingestMingyuApt: (data: MingyuAptIngestRequest) =>
     client.post<EvidenceIngestionResponse>('/api/security/connectors/mingyu-apt/ingest', data),
+  listConnectorRuns: (params?: ConnectorSyncRunFilters) =>
+    client.get<ConnectorSyncRun[]>('/api/security/connector-runs', { params }),
+  getConnectorRun: (runId: string) =>
+    client.get<ConnectorSyncRun>(`/api/security/connector-runs/${runId}`),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),

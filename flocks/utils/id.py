@@ -40,6 +40,7 @@ IdPrefix = Literal[
     "evidence_gap", # egap (security analysis evidence gap)
     "analysis_notification", # anot (security analysis notification record)
     "analysis_confirmation", # acon (security analysis confirmation record)
+    "connector_sync_run", # csrun (security connector sync run)
 ]
 
 
@@ -82,6 +83,7 @@ class Identifier:
         "evidence_gap": "egap",
         "analysis_notification": "anot",
         "analysis_confirmation": "acon",
+        "connector_sync_run": "csrun",
     }
     
     # Constants

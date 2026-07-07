@@ -417,6 +417,26 @@ class HoneypotEvent(_SecurityBaseModel):
     updated_at: str = ""
 
 
+class ConnectorSyncRun(_SecurityBaseModel):
+    id: str = ""
+    connector_id: str
+    connector_name: str | None = None
+    vendor: str | None = None
+    product: str | None = None
+    mode: str
+    status: str = "pending"
+    started_at: str = ""
+    finished_at: str | None = None
+    requested_by: str | None = None
+    request_summary: dict[str, Any] = Field(default_factory=dict)
+    result_summary: dict[str, Any] = Field(default_factory=dict)
+    error_message: str | None = None
+    item_refs: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: str = ""
+    updated_at: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class RiskScore(_SecurityBaseModel):
     score: int
     level: RiskLevel

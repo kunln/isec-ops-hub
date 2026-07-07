@@ -13,6 +13,10 @@ from flocks.security.analysis import apply_confirmation_to_case, build_analysis_
 from flocks.security.analysis_report import generate_analysis_case_brief
 from flocks.security.analysis_sample_data import clear_analysis_sample_data, load_analysis_sample_data
 from flocks.security.correlation import correlate_alert
+from flocks.security.connector_runs import (
+    record_connector_run,
+    sanitize_connector_request_summary,
+)
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
@@ -1118,20 +1122,63 @@ async def test_mingyu_apt_connector(payload: MingyuAptTestRequest):
     "/connectors/mingyu-apt/ingest",
     dependencies=[Depends(require_capability("security.ops.write"))],
 )
-async def ingest_mingyu_apt_connector(payload: MingyuAptIngestRequest):
-    return await ingest_mingyu_apt_risks(
-        base_url=payload.base_url,
-        apikey=payload.apikey,
-        begin=payload.begin,
-        end=payload.end,
-        mode=payload.mode,
-        limit=payload.limit,
-        max_pages=payload.max_pages,
-        create_analysis_cases=payload.create_analysis_cases,
-        run_initial_analysis=payload.run_initial_analysis,
-        deduplicate=payload.deduplicate,
-        verify_ssl=payload.verify_ssl,
+async def ingest_mingyu_apt_connector(payload: MingyuAptIngestRequest, request: Request):
+    actor = _actor_from_request(request)
+    run = await default_store.create_connector_sync_run({
+        "connector_id": "mingyu-apt",
+        "connector_name": "明御APT攻击预警平台",
+        "vendor": "DBAPPSecurity",
+        "product": "Mingyu APT",
+        "mode": payload.mode,
+        "status": "running",
+        "requested_by": actor.get("username") or actor.get("id"),
+        "request_summary": sanitize_connector_request_summary(payload.model_dump(mode="json")),
+        "started_at": utc_now(),
+    })
+    try:
+        result = await ingest_mingyu_apt_risks(
+            base_url=payload.base_url,
+            apikey=payload.apikey,
+            begin=payload.begin,
+            end=payload.end,
+            mode=payload.mode,
+            limit=payload.limit,
+            max_pages=payload.max_pages,
+            create_analysis_cases=payload.create_analysis_cases,
+            run_initial_analysis=payload.run_initial_analysis,
+            deduplicate=payload.deduplicate,
+            verify_ssl=payload.verify_ssl,
+        )
+    except Exception as exc:
+        await record_connector_run(default_store, run.id, error=exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mingyu APT ingestion failed") from exc
+    await record_connector_run(default_store, run.id, result=result)
+    return {"run_id": run.id, **result}
+
+
+@router.get("/connector-runs", dependencies=[Depends(require_capability("security.ops.read"))])
+async def list_connector_runs(
+    connector_id: str | None = None,
+    status_filter: str | None = Query(None, alias="status"),
+    mode: str | None = None,
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    return await default_store.list_connector_sync_runs(
+        connector_id=connector_id,
+        status=status_filter,
+        mode=mode,
+        limit=limit,
+        offset=offset,
     )
+
+
+@router.get("/connector-runs/{run_id}", dependencies=[Depends(require_capability("security.ops.read"))])
+async def get_connector_run(run_id: str):
+    run = await default_store.get_connector_sync_run(run_id)
+    if run is None:
+        raise _not_found("Connector sync run", run_id)
+    return run
 
 
 @router.post("/connectors/{connector_id}/test", dependencies=[Depends(require_capability("security.connectors.test"))])

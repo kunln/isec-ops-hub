@@ -59,10 +59,11 @@ import {
   type SecurityVulnerability,
   type EvidenceIngestionContext,
   type EvidenceIngestionResponse,
+  type ConnectorSyncRun,
 } from '@/api/security';
 
-type Section = 'dashboard' | 'assets' | 'vulnerabilities' | 'alerts' | 'analysis-cases' | 'evidence-ingestion' | 'incidents' | 'honeypot-events' | 'connectors';
-type DataSection = Exclude<Section, 'dashboard' | 'connectors' | 'evidence-ingestion'>;
+type Section = 'dashboard' | 'assets' | 'vulnerabilities' | 'alerts' | 'analysis-cases' | 'evidence-ingestion' | 'connector-runs' | 'incidents' | 'honeypot-events' | 'connectors';
+type DataSection = Exclude<Section, 'dashboard' | 'connectors' | 'evidence-ingestion' | 'connector-runs'>;
 type Entity = Record<string, any> & { id: string };
 type SecurityMode = 'expert' | 'admin';
 type AssetRiskLevel = 'critical' | 'high' | 'medium' | 'low';
@@ -93,12 +94,13 @@ const navItems: Array<{ section: Section; icon: LucideIcon; adminOnly?: boolean 
   { section: 'alerts', icon: Bell },
   { section: 'analysis-cases', icon: FileText },
   { section: 'evidence-ingestion', icon: UploadCloud },
+  { section: 'connector-runs', icon: Clock },
   { section: 'incidents', icon: ShieldAlert },
   { section: 'honeypot-events', icon: Radar },
   { section: 'connectors', icon: Plug, adminOnly: true },
 ];
 
-const supportedSections: Section[] = ['assets', 'vulnerabilities', 'alerts', 'analysis-cases', 'evidence-ingestion', 'incidents', 'honeypot-events', 'connectors'];
+const supportedSections: Section[] = ['assets', 'vulnerabilities', 'alerts', 'analysis-cases', 'evidence-ingestion', 'connector-runs', 'incidents', 'honeypot-events', 'connectors'];
 const severityOptions = ['info', 'low', 'medium', 'high', 'critical'];
 const incidentSeverityOptions = ['low', 'medium', 'high', 'critical'];
 const analysisCaseSeverityOptions = ['informational', 'low', 'medium', 'high', 'critical'];
@@ -654,6 +656,8 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   const [incidents, setIncidents] = useState<SecurityIncident[]>([]);
   const [honeypotEvents, setHoneypotEvents] = useState<SecurityHoneypotEvent[]>([]);
   const [connectors, setConnectors] = useState<SecurityConnectorManifest[]>([]);
+  const [connectorRuns, setConnectorRuns] = useState<ConnectorSyncRun[]>([]);
+  const [selectedConnectorRun, setSelectedConnectorRun] = useState<ConnectorSyncRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -724,6 +728,12 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
       setAnalysisCases(analysisCaseRes.data);
       setIncidents(incidentRes.data);
       setHoneypotEvents(honeypotRes.data);
+      try {
+        const runsRes = await securityAPI.listConnectorRuns({ limit: 50 });
+        setConnectorRuns(runsRes.data);
+      } catch {
+        setConnectorRuns([]);
+      }
 
       if (mode === 'admin') {
         const [connectorRes, packageDiagnosticsRes, evidenceGraphRes, operationEventsRes, operationSettingsRes, expiryStatusRes] = await Promise.allSettled([
@@ -1586,7 +1596,12 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           mingyuTestResult={mingyuTestResult}
           onMingyuTest={() => void testMingyuApt()}
           onMingyuIngest={() => void ingestMingyuApt()}
+          connectorRuns={connectorRuns}
+          selectedRun={selectedConnectorRun}
+          onSelectRun={setSelectedConnectorRun}
         />
+      ) : section === 'connector-runs' ? (
+        <ConnectorRunsPanel runs={connectorRuns} selectedRun={selectedConnectorRun} onSelectRun={setSelectedConnectorRun} />
       ) : section === 'assets' ? (
         <AssetRiskModule
           assets={assets}
@@ -4506,6 +4521,49 @@ function Dashboard({
   );
 }
 
+function ConnectorRunsPanel({ runs, selectedRun, onSelectRun }: { runs: ConnectorSyncRun[]; selectedRun: ConnectorSyncRun | null; onSelectRun: (run: ConnectorSyncRun) => void }) {
+  const activeRun = selectedRun || runs[0] || null;
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">同步记录 / Connector Runs</h2>
+        <span className="text-xs text-gray-500">轻量 run history，不保存 apikey/token/secret 或完整原始日志。</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+            <tr>{['started_at', 'finished_at', 'connector_name', 'mode', 'status', 'created_alerts', 'skipped_duplicates', 'created_analysis_cases', 'error_count', 'requested_by', 'run_id'].map((key) => <th key={key} className="px-3 py-2">{key}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {runs.map((run) => (
+              <tr key={run.id} onClick={() => onSelectRun(run)} className="cursor-pointer hover:bg-blue-50">
+                <td className="px-3 py-2 font-mono text-xs">{run.started_at}</td>
+                <td className="px-3 py-2 font-mono text-xs">{run.finished_at || '-'}</td>
+                <td className="px-3 py-2">{run.connector_name || run.connector_id}</td>
+                <td className="px-3 py-2">{run.mode}</td>
+                <td className="px-3 py-2"><span className="rounded-full bg-gray-100 px-2 py-1 text-xs">{run.status}</span></td>
+                <td className="px-3 py-2">{run.result_summary?.created_alerts ?? 0}</td>
+                <td className="px-3 py-2">{run.result_summary?.skipped_duplicates ?? 0}</td>
+                <td className="px-3 py-2">{run.result_summary?.created_analysis_cases ?? 0}</td>
+                <td className="px-3 py-2">{run.result_summary?.error_count ?? 0}</td>
+                <td className="px-3 py-2">{run.requested_by || '-'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{run.id}</td>
+              </tr>
+            ))}
+            {!runs.length && <tr><td colSpan={11} className="px-3 py-6 text-center text-gray-500">暂无同步记录 / No connector runs yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {activeRun && (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <pre className="max-h-72 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify({ request_summary: activeRun.request_summary, result_summary: activeRun.result_summary, error_message: activeRun.error_message }, null, 2)}</pre>
+          <pre className="max-h-72 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(activeRun.item_refs || [], null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EvidenceIngestionPanel({
   context,
   setContext,
@@ -4521,6 +4579,9 @@ function EvidenceIngestionPanel({
   mingyuTestResult,
   onMingyuTest,
   onMingyuIngest,
+  connectorRuns,
+  selectedRun,
+  onSelectRun,
 }: {
   context: EvidenceIngestionContext;
   setContext: (value: EvidenceIngestionContext) => void;
@@ -4536,6 +4597,9 @@ function EvidenceIngestionPanel({
   mingyuTestResult: Record<string, any> | null;
   onMingyuTest: () => void;
   onMingyuIngest: () => void;
+  connectorRuns: ConnectorSyncRun[];
+  selectedRun: ConnectorSyncRun | null;
+  onSelectRun: (run: ConnectorSyncRun) => void;
 }) {
   const contextFields: Array<keyof EvidenceIngestionContext> = ['connector_id', 'connector_name', 'vendor', 'product', 'source_type', 'external_base_url'];
   return (
@@ -4565,7 +4629,9 @@ function EvidenceIngestionPanel({
           <button onClick={onMingyuIngest} disabled={loading} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50">拉取并生成研判单</button>
         </div>
         {mingyuTestResult && <pre className="mt-3 max-h-40 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(mingyuTestResult, null, 2)}</pre>}
+        {result?.run_id && <div className="mt-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">Run ID: <span className="font-mono">{result.run_id}</span></div>}
       </div>
+      <ConnectorRunsPanel runs={connectorRuns} selectedRun={selectedRun} onSelectRun={onSelectRun} />
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold text-gray-900">证据接入 / Evidence Ingestion</h2>
         <div className="grid gap-3 md:grid-cols-3">
