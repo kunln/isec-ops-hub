@@ -228,6 +228,18 @@ class AnalysisEvidenceItemCreate(BaseModel):
     description: str = ""
     source_ref: str
     related_fact_ids: list[str] = Field(default_factory=list)
+    connector_id: str | None = None
+    connector_name: str | None = None
+    vendor: str | None = None
+    product: str | None = None
+    source_type: str | None = None
+    external_event_id: str | None = None
+    external_url: str | None = None
+    query_hint: str | None = None
+    time_range_start: str | None = None
+    time_range_end: str | None = None
+    payload_hash: str | None = None
+    key_fields: dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 

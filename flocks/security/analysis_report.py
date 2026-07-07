@@ -55,7 +55,7 @@ def generate_analysis_case_brief(case: AnalysisCase) -> str:
         "",
         "## Evidence Items",
         "",
-        _table(["title", "source_ref", "description"], [[e.title, e.source_ref, e.description] for e in case.evidence_items]),
+        _table(["title", "source_ref", "external_event_id", "connector_id", "payload_hash", "description"], [[e.title, e.source_ref, e.external_event_id, e.connector_id, e.payload_hash, e.description] for e in case.evidence_items]),
         "",
         "## Evidence Gaps",
         "",

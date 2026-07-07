@@ -10,13 +10,38 @@
     }
   },
   "sections": {
-    "dashboard": { "title": "安全概览", "nav": "概览" },
-    "assets": { "title": "资产中心", "nav": "资产" },
-    "vulnerabilities": { "title": "漏洞中心", "nav": "漏洞" },
-    "alerts": { "title": "告警中心", "nav": "告警" },
-    "incidents": { "title": "事件中心", "nav": "事件" },
-    "honeypot-events": { "title": "蜜罐事件", "nav": "蜜罐" },
-    "connectors": { "title": "连接器", "nav": "连接器" }
+    "dashboard": {
+      "title": "安全概览",
+      "nav": "概览"
+    },
+    "assets": {
+      "title": "资产中心",
+      "nav": "资产"
+    },
+    "vulnerabilities": {
+      "title": "漏洞中心",
+      "nav": "漏洞"
+    },
+    "alerts": {
+      "title": "告警中心",
+      "nav": "告警"
+    },
+    "incidents": {
+      "title": "事件中心",
+      "nav": "事件"
+    },
+    "honeypot-events": {
+      "title": "蜜罐事件",
+      "nav": "蜜罐"
+    },
+    "connectors": {
+      "title": "连接器",
+      "nav": "连接器"
+    },
+    "evidence-ingestion": {
+      "nav": "证据接入",
+      "title": "证据接入"
+    }
   },
   "actions": {
     "refresh": "刷新",
@@ -440,7 +465,7 @@
     "sync_blocked": "同步被阻断",
     "schedule_policy_paused": "调度已暂停",
     "credential_remediation_requested": "已请求处置",
-    "manual": "手动",
+    "manual": "人工录入",
     "scheduled": "调度",
     "busy": "忙碌",
     "canceled": "已取消",
@@ -466,7 +491,6 @@
     "critical": "严重",
     "internal": "内网",
     "external": "公网",
-    "unknown": "未知",
     "production": "生产",
     "staging": "预发",
     "testing": "测试",
@@ -500,7 +524,6 @@
     "siem": "SIEM",
     "honeypot": "蜜罐",
     "scanner": "扫描器",
-    "manual": "人工录入",
     "local_mock": "本地 Mock",
     "local_fixture": "本地 Fixture"
   }

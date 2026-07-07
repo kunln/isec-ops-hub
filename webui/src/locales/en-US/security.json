@@ -10,13 +10,38 @@
     }
   },
   "sections": {
-    "dashboard": { "title": "Security Dashboard", "nav": "Dashboard" },
-    "assets": { "title": "Asset Center", "nav": "Assets" },
-    "vulnerabilities": { "title": "Vulnerability Center", "nav": "Vulnerabilities" },
-    "alerts": { "title": "Alert Center", "nav": "Alerts" },
-    "incidents": { "title": "Incident Center", "nav": "Incidents" },
-    "honeypot-events": { "title": "Honeypot Events", "nav": "Honeypot" },
-    "connectors": { "title": "Connectors", "nav": "Connectors" }
+    "dashboard": {
+      "title": "Security Dashboard",
+      "nav": "Dashboard"
+    },
+    "assets": {
+      "title": "Asset Center",
+      "nav": "Assets"
+    },
+    "vulnerabilities": {
+      "title": "Vulnerability Center",
+      "nav": "Vulnerabilities"
+    },
+    "alerts": {
+      "title": "Alert Center",
+      "nav": "Alerts"
+    },
+    "incidents": {
+      "title": "Incident Center",
+      "nav": "Incidents"
+    },
+    "honeypot-events": {
+      "title": "Honeypot Events",
+      "nav": "Honeypot"
+    },
+    "connectors": {
+      "title": "Connectors",
+      "nav": "Connectors"
+    },
+    "evidence-ingestion": {
+      "nav": "Evidence Ingestion",
+      "title": "Evidence Ingestion"
+    }
   },
   "actions": {
     "refresh": "Refresh",
@@ -466,7 +491,6 @@
     "critical": "Critical",
     "internal": "Internal",
     "external": "External",
-    "unknown": "Unknown",
     "production": "Production",
     "staging": "Staging",
     "testing": "Testing",
@@ -500,7 +524,6 @@
     "siem": "SIEM",
     "honeypot": "Honeypot",
     "scanner": "Scanner",
-    "manual": "Manual",
     "local_mock": "Local Mock",
     "local_fixture": "Local Fixture"
   }
