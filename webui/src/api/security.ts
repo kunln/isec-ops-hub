@@ -64,6 +64,27 @@ export interface SecurityVulnerability {
   updated_at: string;
 }
 
+
+export interface MingyuAptIngestRequest {
+  base_url: string;
+  apikey: string;
+  begin: string;
+  end: string;
+  mode: 'risk' | 'important' | 'safe_event';
+  limit: number;
+  max_pages: number;
+  create_analysis_cases: boolean;
+  run_initial_analysis: boolean;
+  deduplicate: boolean;
+  verify_ssl: boolean;
+}
+
+export interface MingyuAptTestRequest {
+  base_url: string;
+  apikey: string;
+  verify_ssl: boolean;
+}
+
 export interface SecurityAlert {
   id: string;
   asset_id?: string | null;
@@ -1438,6 +1459,10 @@ export const securityAPI = {
     client.post<AnalysisCaseSampleDataLoadResponse>('/api/security/analysis-cases/sample-data/load'),
   ingestEvidenceEvents: (data: EvidenceIngestionRequest) =>
     client.post<EvidenceIngestionResponse>('/api/security/evidence-ingestion/ingest', data),
+  testMingyuApt: (data: MingyuAptTestRequest) =>
+    client.post<Record<string, any>>('/api/security/connectors/mingyu-apt/test', data),
+  ingestMingyuApt: (data: MingyuAptIngestRequest) =>
+    client.post<EvidenceIngestionResponse>('/api/security/connectors/mingyu-apt/ingest', data),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),
