@@ -20,6 +20,7 @@ from flocks.security.connector_runs import (
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
+from flocks.security.connectors.tda import TdaClient, ingest_tda_events
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
 from flocks.security.connectors.package_staging import MAX_UPLOAD_BYTES
 from flocks.security.connectors.scheduler import connector_sync_scheduler
@@ -78,6 +79,29 @@ class MingyuAptTestRequest(BaseModel):
     base_url: str
     apikey: str
     verify_ssl: bool = False
+
+class TdaIngestRequest(BaseModel):
+    base_url: str
+    api_key: str
+    secret: str
+    begin: str | None = None
+    end: str | None = None
+    time_type: int = 1
+    mode: str = "alert"
+    limit: int = 20
+    max_pages: int = 1
+    create_analysis_cases: bool = True
+    run_initial_analysis: bool = True
+    deduplicate: bool = True
+    verify_ssl: bool = False
+
+
+class TdaTestRequest(BaseModel):
+    base_url: str
+    api_key: str
+    secret: str
+    verify_ssl: bool = False
+
 
 class EvidenceIngestionRequest(BaseModel):
     connector_context: dict[str, Any] | None = None
@@ -1152,6 +1176,55 @@ async def ingest_mingyu_apt_connector(payload: MingyuAptIngestRequest, request: 
     except Exception as exc:
         await record_connector_run(default_store, run.id, error=exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mingyu APT ingestion failed") from exc
+    await record_connector_run(default_store, run.id, result=result)
+    return {"run_id": run.id, **result}
+
+
+@router.post(
+    "/connectors/tda/test",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def test_tda_connector(payload: TdaTestRequest):
+    client = TdaClient(base_url=payload.base_url, api_key=payload.api_key, secret=payload.secret, verify_ssl=payload.verify_ssl)
+    return {"connector_id": "tda", "result": client.test_connection()}
+
+
+@router.post(
+    "/connectors/tda/ingest",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def ingest_tda_connector(payload: TdaIngestRequest, request: Request):
+    actor = _actor_from_request(request)
+    run = await default_store.create_connector_sync_run({
+        "connector_id": "tda",
+        "connector_name": "信桅高级威胁监测系统 TDA",
+        "vendor": "Xinwei",
+        "product": "TDA",
+        "mode": payload.mode,
+        "status": "running",
+        "requested_by": actor.get("username") or actor.get("id"),
+        "request_summary": sanitize_connector_request_summary(payload.model_dump(mode="json")),
+        "started_at": utc_now(),
+    })
+    try:
+        result = await ingest_tda_events(
+            base_url=payload.base_url,
+            api_key=payload.api_key,
+            secret=payload.secret,
+            begin=payload.begin,
+            end=payload.end,
+            time_type=payload.time_type,
+            mode=payload.mode,
+            limit=payload.limit,
+            max_pages=payload.max_pages,
+            create_analysis_cases=payload.create_analysis_cases,
+            run_initial_analysis=payload.run_initial_analysis,
+            deduplicate=payload.deduplicate,
+            verify_ssl=payload.verify_ssl,
+        )
+    except Exception as exc:
+        await record_connector_run(default_store, run.id, error=exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="TDA ingestion failed") from exc
     await record_connector_run(default_store, run.id, result=result)
     return {"run_id": run.id, **result}
 

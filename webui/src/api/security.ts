@@ -85,6 +85,29 @@ export interface MingyuAptTestRequest {
   verify_ssl: boolean;
 }
 
+export interface TdaIngestRequest {
+  base_url: string;
+  api_key: string;
+  secret: string;
+  begin?: string;
+  end?: string;
+  time_type: number;
+  mode: 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext';
+  limit: number;
+  max_pages: number;
+  create_analysis_cases: boolean;
+  run_initial_analysis: boolean;
+  deduplicate: boolean;
+  verify_ssl: boolean;
+}
+
+export interface TdaTestRequest {
+  base_url: string;
+  api_key: string;
+  secret: string;
+  verify_ssl: boolean;
+}
+
 export interface SecurityAlert {
   id: string;
   asset_id?: string | null;
@@ -1492,6 +1515,10 @@ export const securityAPI = {
     client.post<Record<string, any>>('/api/security/connectors/mingyu-apt/test', data),
   ingestMingyuApt: (data: MingyuAptIngestRequest) =>
     client.post<EvidenceIngestionResponse>('/api/security/connectors/mingyu-apt/ingest', data),
+  testTda: (data: TdaTestRequest) =>
+    client.post<Record<string, any>>('/api/security/connectors/tda/test', data),
+  ingestTda: (data: TdaIngestRequest) =>
+    client.post<EvidenceIngestionResponse>('/api/security/connectors/tda/ingest', data),
   listConnectorRuns: (params?: ConnectorSyncRunFilters) =>
     client.get<ConnectorSyncRun[]>('/api/security/connector-runs', { params }),
   getConnectorRun: (runId: string) =>

@@ -8,14 +8,16 @@ from urllib.parse import urlsplit, urlunsplit
 
 from flocks.security.store import SecurityStore, utc_now
 
-SENSITIVE_KEYS = {"apikey", "api_key", "token", "password", "secret", "authorization", "auth", "credential"}
+SENSITIVE_KEYS = {"apikey", "api_key", "token", "password", "secret", "authorization", "auth", "credential", "sign", "auth_timestamp", "login_password", "login_password_encrypted"}
 REQUEST_SUMMARY_KEYS = {
     "begin", "end", "mode", "limit", "max_pages", "create_analysis_cases",
     "run_initial_analysis", "deduplicate", "verify_ssl",
 }
 ITEM_REF_KEYS = {"status", "alert_id", "analysis_case_id", "external_event_id", "payload_hash", "title", "source", "severity", "error"}
 _SECRET_PATTERNS = [
-    re.compile(r"(?i)(apikey|api_key|token|password|secret|authorization)\s*[:=]\s*[^\s,;]+"),
+    re.compile(r"(?i)(Authorization:\s*Bearer\s+)[^\s,;]+"),
+    re.compile(r'(?i)(\"(?:api_key|apikey|token|password|secret|authorization|sign|auth_timestamp|login_password|login_password_encrypted|credential)\"\s*:\s*)\"[^\"]*\"'),
+    re.compile(r"(?i)(apikey|api_key|token|password|secret|authorization|sign|auth_timestamp|login_password|login_password_encrypted|credential)\s*[:=]\s*[^\s,;]+"),
 ]
 
 
