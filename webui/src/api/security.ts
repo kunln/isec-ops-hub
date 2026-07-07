@@ -230,6 +230,17 @@ export interface AnalysisCaseEscalationResponse {
   created: boolean;
 }
 
+export interface AnalysisCaseBriefResponse {
+  case_id: string;
+  markdown: string;
+}
+
+export interface AnalysisCaseSampleDataLoadResponse {
+  loaded: number;
+  case_ids: string[];
+  total_demo_cases: number;
+}
+
 export interface SecurityHoneypotEvent {
   id: string;
   sensor_id?: string | null;
@@ -1373,6 +1384,10 @@ export const securityAPI = {
     client.post<AnalysisCase>(`/api/security/analysis-cases/${caseId}/confirmations`, data),
   ackAnalysisCaseNotification: (caseId: string, notificationId: string, data?: { reviewer?: string; comment?: string }) =>
     client.post<AnalysisCase>(`/api/security/analysis-cases/${caseId}/notifications/${notificationId}/ack`, data || {}),
+  getAnalysisCaseBrief: (id: string) =>
+    client.get<AnalysisCaseBriefResponse>(`/api/security/analysis-cases/${id}/brief`),
+  loadAnalysisCaseSampleData: () =>
+    client.post<AnalysisCaseSampleDataLoadResponse>('/api/security/analysis-cases/sample-data/load'),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),

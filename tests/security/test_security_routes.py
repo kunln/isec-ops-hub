@@ -1022,3 +1022,69 @@ async def test_analysis_case_confirmation_records_append_without_overwrite(clien
     records = second.json()["confirmation_records"]
     assert len(records) == 2
     assert [record["comment"] for record in records] == ["first", "second"]
+
+
+async def test_analysis_case_brief_and_demo_sample_data_are_idempotent(client: AsyncClient):
+    first = await client.post("/api/security/analysis-cases/sample-data/load")
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["total_demo_cases"] >= 8
+    assert body["loaded"] >= 8
+
+    second = await client.post("/api/security/analysis-cases/sample-data/load")
+    assert second.status_code == 200, second.text
+    assert second.json()["loaded"] == 0
+    assert second.json()["total_demo_cases"] == body["total_demo_cases"]
+
+    cases_response = await client.get("/api/security/analysis-cases", params={"limit": 500})
+    cases = cases_response.json()
+    demo_cases = [case for case in cases if case["title"].startswith("[Demo Closure]")]
+    assert len(demo_cases) == body["total_demo_cases"]
+    assert any(case["notification_records"] for case in demo_cases)
+    assert any(case["confirmation_records"] for case in demo_cases)
+
+    waf_blocked = next(case for case in demo_cases if "WAF SQL Injection blocked" in case["title"])
+    brief = await client.get(f"/api/security/analysis-cases/{waf_blocked['id']}/brief")
+    assert brief.status_code == 200, brief.text
+    markdown = brief.json()["markdown"]
+    assert "Analysis Case Brief" in markdown
+    assert "WAF SQL Injection blocked" in markdown
+    assert "confirmed_attack_attempt_blocked" in markdown
+    assert "## Key Facts" in markdown
+    assert "## Evidence Gaps" in markdown
+
+
+async def test_analysis_case_closure_smoke_flow(client: AsyncClient):
+    loaded = await client.post("/api/security/analysis-cases/sample-data/load")
+    assert loaded.status_code == 200, loaded.text
+    cases = (await client.get("/api/security/analysis-cases", params={"limit": 500})).json()
+    demo_cases = [case for case in cases if case["title"].startswith("[Demo Closure]")]
+
+    suspicious = next(case for case in demo_cases if "WAF RCE monitor allow" in case["title"])
+    notification = await client.post(
+        f"/api/security/analysis-cases/{suspicious['id']}/notifications",
+        json={"notification_type": "confirmation_request", "channel": "in_app", "recipients": ["secops-demo"]},
+    )
+    assert notification.status_code == 200, notification.text
+
+    confirmation = await client.post(
+        f"/api/security/analysis-cases/{suspicious['id']}/confirmations",
+        json={"confirmation_type": "request_more_evidence", "decision": "needs_more_evidence", "reviewer": "operator", "comment": "Need backend logs."},
+    )
+    assert confirmation.status_code == 200, confirmation.text
+
+    candidate = next(case for case in demo_cases if "EDR suspicious PowerShell" in case["title"])
+    escalated = await client.post(f"/api/security/analysis-cases/{candidate['id']}/escalate-to-incident")
+    assert escalated.status_code in {200, 201}, escalated.text
+    incident = escalated.json()["incident"]
+    fetched_incident = await client.get(f"/api/security/incidents/{incident['id']}")
+    assert fetched_incident.status_code == 200, fetched_incident.text
+
+    refreshed = (await client.get(f"/api/security/analysis-cases/{suspicious['id']}/brief")).json()["markdown"]
+    assert "WAF monitored an RCE-like request" in refreshed
+    assert "backend_access_log" in refreshed
+    assert "request_more_evidence" in refreshed
+
+    report = await client.post(f"/api/security/reports/incident/{incident['id']}")
+    assert report.status_code == 200, report.text
+    assert "Analysis Case Evidence" in report.json()["content"]

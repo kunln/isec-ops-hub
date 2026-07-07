@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from flocks.security.models import AnalysisCase
 from flocks.security.schemas import SecurityListFilters
 from flocks.security.store import SecurityStore, default_store
 
@@ -10,6 +11,57 @@ def _line_items(items: list[str], empty: str = "暂无") -> str:
     if not items:
         return f"- {empty}"
     return "\n".join(f"- {item}" for item in items)
+
+
+async def find_analysis_case_for_incident(incident_id: str, store: SecurityStore | None = None) -> AnalysisCase | None:
+    store = store or default_store
+    incident = await store.get_incident(incident_id)
+    if incident is None:
+        return None
+    for source in (incident.raw_data, incident.normalized_data):
+        case_id = source.get("analysis_case_id") if isinstance(source, dict) else None
+        if case_id:
+            case = await store.get_analysis_case(str(case_id))
+            if case is not None:
+                return case
+    for case in await store.list_analysis_cases(SecurityListFilters(limit=500)):
+        if case.related_incident_id == incident_id:
+            return case
+    return None
+
+
+def _analysis_case_evidence_section(case: AnalysisCase | None) -> list[str]:
+    if case is None:
+        return []
+    facts = [f"- {fact.fact_type}: {fact.statement} (source: {fact.source_ref})" for fact in case.facts[:5]]
+    gaps = [f"- {gap.gap_type}: {gap.description}" for gap in case.evidence_gaps[:5]]
+    confirmations = [f"- {record.confirmation_type}: {record.decision} by {record.reviewer or 'unknown'} - {record.comment}" for record in case.confirmation_records[:5]]
+    recommendations = [f"- {item}" for item in case.recommendations]
+    return [
+        "",
+        "## Analysis Case Evidence",
+        "",
+        f"- Analysis Case: {case.title} ({case.id})",
+        f"- verdict: {case.verdict}",
+        f"- confidence: {case.confidence}",
+        f"- evidence_coverage: {case.evidence_coverage}",
+        "",
+        "Top facts:",
+        "",
+        * (facts or ["- 暂无事实。"]),
+        "",
+        "Evidence gaps:",
+        "",
+        * (gaps or ["- 暂无证据缺口。"]),
+        "",
+        "Confirmation records:",
+        "",
+        * (confirmations or ["- 暂无人工确认记录。"]),
+        "",
+        "Recommendations:",
+        "",
+        * (recommendations or ["- 暂无建议。"]),
+    ]
 
 
 async def generate_incident_report(
@@ -36,6 +88,8 @@ async def generate_incident_report(
         for alert_id in incident.alert_ids
         if (alert := await store.get_alert(alert_id)) is not None
     ]
+
+    analysis_case = await find_analysis_case_for_incident(incident_id, store)
 
     honeypot_events = []
     for event_id in incident.honeypot_event_ids:
@@ -153,4 +207,5 @@ async def generate_incident_report(
         "- 验证关联漏洞是否真实可达、是否已修复或缓解。",
         "- 对 IOC、源 IP、MITRE 技术编号建立临时监控规则。",
         "- 形成复盘记录，更新资产风险画像和处置知识库。",
+        *_analysis_case_evidence_section(analysis_case),
     ])

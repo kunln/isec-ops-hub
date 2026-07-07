@@ -670,6 +670,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   const [evidenceGraph, setEvidenceGraph] = useState<SecurityEvidenceGraph | null>(null);
   const [connectorRuntimeError, setConnectorRuntimeError] = useState<string | null>(null);
   const [report, setReport] = useState<string>('');
+  const [analysisCaseBrief, setAnalysisCaseBrief] = useState<string>('');
   useEffect(() => {
     tRef.current = t;
   }, [t]);
@@ -951,6 +952,17 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     });
     await loadAll();
     setSelected(res.data as Entity);
+  };
+
+  const viewAnalysisCaseBrief = async (caseId: string) => {
+    const res = await securityAPI.getAnalysisCaseBrief(caseId);
+    setAnalysisCaseBrief(res.data.markdown);
+  };
+
+  const loadAnalysisDemoData = async () => {
+    const res = await securityAPI.loadAnalysisCaseSampleData();
+    await loadAll();
+    window.alert(`Loaded ${res.data.loaded} new demo cases (${res.data.total_demo_cases} demo cases available).`);
   };
 
   const ackAnalysisNotification = async (caseId: string, notificationId: string) => {
@@ -1541,6 +1553,11 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                   </select>
                 </div>
               )}
+              {section === 'analysis-cases' && (
+                <button onClick={() => void loadAnalysisDemoData()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
+                  <PlayCircle className="h-4 w-4" /> 加载演示数据
+                </button>
+              )}
               <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800">
                 <Plus className="h-4 w-4" /> {t('actions.new')}
               </button>
@@ -1555,6 +1572,9 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                   ['Confirmed Incident', analysisCases.filter((item) => item.verdict === 'confirmed_incident').length],
                   ['Suspicious TP', analysisCases.filter((item) => item.verdict === 'suspicious_true_positive').length],
                   ['Insufficient Evidence', analysisCases.filter((item) => item.verdict === 'insufficient_evidence').length],
+                  ['Notifications', analysisCases.reduce((sum, item) => sum + (item.notification_records || []).length, 0)],
+                  ['Confirmations', analysisCases.reduce((sum, item) => sum + (item.confirmation_records || []).length, 0)],
+                  ['Escalated', analysisCases.filter((item) => item.case_status === 'escalated').length],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                     <div className="text-gray-500">{label}</div>
@@ -1639,7 +1659,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           </div>
 
           <div className="space-y-4">
-            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} onRunInitialAnalysis={(caseId) => void runInitialAnalysis(caseId)} onCreateConfirmationRequest={(caseId) => void createConfirmationRequest(caseId)} onCreateAnalysisConfirmation={(caseId, confirmationType, decision) => void createAnalysisConfirmation(caseId, confirmationType, decision)} onAckAnalysisNotification={(caseId, notificationId) => void ackAnalysisNotification(caseId, notificationId)} />
+            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} analysisCaseBrief={analysisCaseBrief} onViewAnalysisCaseBrief={(caseId) => void viewAnalysisCaseBrief(caseId)} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} onRunInitialAnalysis={(caseId) => void runInitialAnalysis(caseId)} onCreateConfirmationRequest={(caseId) => void createConfirmationRequest(caseId)} onCreateAnalysisConfirmation={(caseId, confirmationType, decision) => void createAnalysisConfirmation(caseId, confirmationType, decision)} onAckAnalysisNotification={(caseId, notificationId) => void ackAnalysisNotification(caseId, notificationId)} />
           </div>
         </div>
       )}
@@ -4413,6 +4433,8 @@ function DetailPanel({
   triageResult,
   riskProfile,
   report,
+  analysisCaseBrief,
+  onViewAnalysisCaseBrief,
   onEscalateAnalysisCase,
   onRunInitialAnalysis,
   onCreateConfirmationRequest,
@@ -4423,6 +4445,8 @@ function DetailPanel({
   triageResult: any;
   riskProfile: SecurityAssetRiskProfile | null;
   report: string;
+  analysisCaseBrief: string;
+  onViewAnalysisCaseBrief: (caseId: string) => void;
   onEscalateAnalysisCase: (caseId: string) => void;
   onRunInitialAnalysis: (caseId: string) => void;
   onCreateConfirmationRequest: (caseId: string) => void;
@@ -4445,6 +4469,9 @@ function DetailPanel({
 
                 <button onClick={() => onCreateConfirmationRequest(selected.id)} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700">
                   <Bell className="h-4 w-4" /> Create Confirmation Request
+                </button>
+                <button onClick={() => onViewAnalysisCaseBrief(selected.id)} className="inline-flex items-center gap-2 rounded bg-slate-700 px-3 py-1.5 text-xs text-white hover:bg-slate-800">
+                  <FileText className="h-4 w-4" /> View Brief
                 </button>
                 <button onClick={() => onEscalateAnalysisCase(selected.id)} className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700">
                   <ShieldAlert className="h-4 w-4" /> {t('actions.escalateToIncident', { defaultValue: '升级为事件' })}
@@ -4470,6 +4497,15 @@ function DetailPanel({
             </div>
 
           </div>
+          {analysisCaseBrief && (
+            <div className="rounded-lg border border-blue-200 bg-white">
+              <div className="flex items-center justify-between border-b border-blue-100 px-4 py-3 font-semibold text-blue-900">
+                <span>Markdown Brief</span>
+                <button onClick={() => void navigator.clipboard?.writeText(analysisCaseBrief)} className="rounded border border-blue-200 px-2 py-1 text-xs text-blue-700 hover:bg-blue-50">Copy</button>
+              </div>
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 text-xs text-blue-950">{analysisCaseBrief}</pre>
+            </div>
+          )}
           <AnalysisCaseDetail caseItem={selected as AnalysisCase} onAckNotification={onAckAnalysisNotification} />
         </div>
       ) : (

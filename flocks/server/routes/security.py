@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from flocks.commercial.access_control import require_capability
 from flocks.server.auth import get_optional_user
 from flocks.security.analysis import apply_confirmation_to_case, build_analysis_case_from_alert, build_notification_for_case, run_initial_analysis
+from flocks.security.analysis_report import generate_analysis_case_brief
+from flocks.security.analysis_sample_data import clear_analysis_sample_data, load_analysis_sample_data
 from flocks.security.correlation import correlate_alert
 from flocks.security.connectors import connector_registry
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
@@ -1246,6 +1248,30 @@ async def create_analysis_case(payload: AnalysisCaseCreate):
     return await default_store.create_analysis_case(payload)
 
 
+@router.post(
+    "/analysis-cases/sample-data/load",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def load_analysis_case_sample_data_route():
+    return await load_analysis_sample_data()
+
+
+@router.delete(
+    "/analysis-cases/sample-data",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def clear_analysis_case_sample_data_route():
+    return await clear_analysis_sample_data()
+
+
+@router.get("/analysis-cases/{case_id}/brief")
+async def get_analysis_case_brief(case_id: str):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    return {"case_id": case.id, "markdown": generate_analysis_case_brief(case)}
+
+
 @router.get("/analysis-cases/{case_id}")
 async def get_analysis_case(case_id: str):
     case = await default_store.get_analysis_case(case_id)
@@ -1550,7 +1576,7 @@ async def create_incident_from_alert(alert_id: str):
 @router.post("/reports/incident/{incident_id}", dependencies=[Depends(require_capability("security.ops.write"))])
 async def incident_report(incident_id: str):
     try:
-        content = await generate_incident_report(incident_id)
+        content = await generate_incident_report(incident_id, default_store)
     except ValueError as exc:
         raise _not_found("Incident", incident_id) from exc
     return {"incident_id": incident_id, "format": "markdown", "content": content}
