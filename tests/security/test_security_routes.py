@@ -907,3 +907,118 @@ async def test_analysis_case_escalate_to_incident_creates_and_reuses_incident(cl
     incidents = await client.get("/api/security/incidents", params={"keyword": "Confirmed lateral movement"})
     assert incidents.status_code == 200
     assert [item["id"] for item in incidents.json()].count(incident["id"]) == 1
+
+
+async def _create_basic_analysis_case(client: AsyncClient) -> dict:
+    response = await client.post(
+        "/api/security/analysis-cases",
+        json={
+            "title": "Manual confirmation case",
+            "severity": "medium",
+            "facts": [{"fact_type": "alert_signal", "statement": "Signal observed", "source_ref": "alert:test"}],
+            "evidence_gaps": [{"gap_type": "missing_edr", "description": "Endpoint context is missing"}],
+            "recommendations": ["Review manually"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_create_notification_record(client: AsyncClient):
+    case = await _create_basic_analysis_case(client)
+    before_incidents = (await client.get("/api/security/incidents")).json()
+    response = await client.post(
+        f"/api/security/analysis-cases/{case['id']}/notifications",
+        json={"notification_type": "confirmation_request", "channel": "in_app", "recipients": ["security_team"], "created_by": "user"},
+    )
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert len(updated["notification_records"]) == 1
+    record = updated["notification_records"][0]
+    assert record["id"].startswith("anot_")
+    assert record["status"] == "sent"
+    assert record["channel"] == "in_app"
+    assert record["sent_at"]
+    assert updated["last_notified_at"]
+    assert (await client.get("/api/security/incidents")).json() == before_incidents
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_confirm_false_positive_updates_case_without_incident(client: AsyncClient):
+    case = await _create_basic_analysis_case(client)
+    before_incidents = (await client.get("/api/security/incidents")).json()
+    response = await client.post(
+        f"/api/security/analysis-cases/{case['id']}/confirmations",
+        json={"confirmation_type": "confirm_false_positive", "decision": "confirmed", "comment": "Authorized scanner", "reviewer": "analyst-name", "reviewer_role": "security_analyst"},
+    )
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated["verdict"] == "false_positive_rule_noise"
+    assert updated["incident_decision"] == "do_not_escalate"
+    assert updated["notification_decision"] == "no_notify_store_only"
+    assert updated["disposition"] == "closed_false_positive"
+    assert updated["case_status"] == "resolved"
+    assert len(updated["confirmation_records"]) == 1
+    assert updated["confirmation_records"][0]["id"].startswith("acon_")
+    assert updated["confirmation_records"][0]["comment"] == "Authorized scanner"
+    assert updated["last_confirmed_at"]
+    assert (await client.get("/api/security/incidents")).json() == before_incidents
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_confirmation_decision_variants_do_not_create_incidents(client: AsyncClient):
+    cases = [await _create_basic_analysis_case(client) for _ in range(3)]
+    before_incidents = (await client.get("/api/security/incidents")).json()
+
+    blocked = await client.post(f"/api/security/analysis-cases/{cases[0]['id']}/confirmations", json={"confirmation_type": "confirm_blocked_attempt", "decision": "confirmed"})
+    assert blocked.status_code == 200, blocked.text
+    blocked_case = blocked.json()
+    assert blocked_case["verdict"] == "confirmed_attack_attempt_blocked"
+    assert blocked_case["incident_decision"] == "do_not_escalate"
+    assert blocked_case["disposition"] == "closed_blocked_attempt"
+    assert blocked_case["case_status"] == "resolved"
+
+    monitoring = await client.post(f"/api/security/analysis-cases/{cases[1]['id']}/confirmations", json={"confirmation_type": "continue_monitoring", "decision": "monitoring"})
+    assert monitoring.status_code == 200, monitoring.text
+    monitoring_case = monitoring.json()
+    assert monitoring_case["incident_decision"] == "continue_monitoring"
+    assert monitoring_case["disposition"] == "monitoring"
+    assert monitoring_case["case_status"] == "monitoring"
+
+    escalate = await client.post(f"/api/security/analysis-cases/{cases[2]['id']}/confirmations", json={"confirmation_type": "escalate_to_incident", "decision": "escalated"})
+    assert escalate.status_code == 200, escalate.text
+    escalation_case = escalate.json()
+    assert escalation_case["incident_decision"] == "escalate_to_incident"
+    assert escalation_case["notification_decision"] == "realtime_notify"
+    assert not escalation_case["related_incident_id"]
+    assert (await client.get("/api/security/incidents")).json() == before_incidents
+
+    created = await client.post(f"/api/security/analysis-cases/{cases[2]['id']}/escalate-to-incident")
+    assert created.status_code == 201, created.text
+    assert created.json()["created"] is True
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_ack_notification(client: AsyncClient):
+    case = await _create_basic_analysis_case(client)
+    created = await client.post(f"/api/security/analysis-cases/{case['id']}/notifications", json={"notification_type": "confirmation_request", "channel": "in_app"})
+    assert created.status_code == 200, created.text
+    notification_id = created.json()["notification_records"][0]["id"]
+    response = await client.post(f"/api/security/analysis-cases/{case['id']}/notifications/{notification_id}/ack", json={"reviewer": "operator", "comment": "ack"})
+    assert response.status_code == 200, response.text
+    record = response.json()["notification_records"][0]
+    assert record["status"] == "acknowledged"
+    assert record["acknowledged_at"]
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_confirmation_records_append_without_overwrite(client: AsyncClient):
+    case = await _create_basic_analysis_case(client)
+    first = await client.post(f"/api/security/analysis-cases/{case['id']}/confirmations", json={"confirmation_type": "continue_monitoring", "decision": "monitoring", "comment": "first"})
+    assert first.status_code == 200, first.text
+    second = await client.post(f"/api/security/analysis-cases/{case['id']}/confirmations", json={"confirmation_type": "request_more_evidence", "decision": "needs_more_evidence", "comment": "second"})
+    assert second.status_code == 200, second.text
+    records = second.json()["confirmation_records"]
+    assert len(records) == 2
+    assert [record["comment"] for record in records] == ["first", "second"]

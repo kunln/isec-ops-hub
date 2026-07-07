@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from flocks.commercial.access_control import require_capability
 from flocks.server.auth import get_optional_user
-from flocks.security.analysis import build_analysis_case_from_alert, run_initial_analysis
+from flocks.security.analysis import apply_confirmation_to_case, build_analysis_case_from_alert, build_notification_for_case, run_initial_analysis
 from flocks.security.correlation import correlate_alert
 from flocks.security.connectors import connector_registry
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
@@ -35,6 +35,8 @@ from flocks.security.schemas import (
     AlertUpdate,
     AnalysisCaseCreate,
     AnalysisCaseUpdate,
+    AnalysisConfirmationCreate,
+    AnalysisNotificationCreate,
     AssetCreate,
     AssetUpdate,
     HoneypotEventCreate,
@@ -45,7 +47,7 @@ from flocks.security.schemas import (
     VulnerabilityCreate,
     VulnerabilityUpdate,
 )
-from flocks.security.store import default_store
+from flocks.security.store import default_store, utc_now
 from flocks.security.triage import triage_alert
 
 
@@ -1292,6 +1294,85 @@ async def run_analysis_case_initial_analysis(case_id: str):
             related_alerts.append(alert)
     updated = await default_store.update_analysis_case(case.id, run_initial_analysis(case, related_alerts))
     return updated or case
+
+
+
+
+@router.post(
+    "/analysis-cases/{case_id}/notifications",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def create_analysis_case_notification(case_id: str, payload: AnalysisNotificationCreate):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    now = utc_now()
+    generated = build_notification_for_case(case, payload.notification_type, payload.created_by)
+    data = generated.model_dump(mode="json")
+    provided = payload.model_dump(mode="json", exclude_unset=True)
+    for key, value in provided.items():
+        if value not in (None, "", [], {}):
+            data[key] = value
+    data["channel"] = data.get("channel") or "in_app"
+    if data["channel"] not in {"in_app", "manual"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only in_app and manual channels are supported")
+    data["status"] = "sent"
+    data["sent_at"] = now
+    records = [record.model_dump(mode="json") for record in case.notification_records]
+    records.append(data)
+    updated = await default_store.update_analysis_case(case.id, AnalysisCaseUpdate(notification_records=records, last_notified_at=now))
+    if updated is None:
+        raise _not_found("AnalysisCase", case_id)
+    return updated
+
+
+@router.post(
+    "/analysis-cases/{case_id}/confirmations",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def create_analysis_case_confirmation(case_id: str, payload: AnalysisConfirmationCreate):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    now = utc_now()
+    data = payload.model_dump(mode="json")
+    data["created_at"] = data.get("created_at") or now
+    records = [record.model_dump(mode="json") for record in case.confirmation_records]
+    records.append(data)
+    update = apply_confirmation_to_case(case, payload).model_dump(mode="json", exclude_unset=True)
+    update["confirmation_records"] = records
+    update["last_confirmed_at"] = now
+    updated = await default_store.update_analysis_case(case.id, AnalysisCaseUpdate(**update))
+    if updated is None:
+        raise _not_found("AnalysisCase", case_id)
+    return updated
+
+
+@router.post(
+    "/analysis-cases/{case_id}/notifications/{notification_id}/ack",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def acknowledge_analysis_case_notification(case_id: str, notification_id: str, payload: dict[str, Any] | None = None):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    now = utc_now()
+    records = [record.model_dump(mode="json") for record in case.notification_records]
+    found = False
+    for record in records:
+        if record.get("id") == notification_id:
+            record["status"] = "acknowledged"
+            record["acknowledged_at"] = now
+            if payload:
+                record.setdefault("metadata", {})["ack"] = payload
+            found = True
+            break
+    if not found:
+        raise _not_found("AnalysisNotification", notification_id)
+    updated = await default_store.update_analysis_case(case.id, AnalysisCaseUpdate(notification_records=records))
+    if updated is None:
+        raise _not_found("AnalysisCase", case_id)
+    return updated
 
 
 @router.post(

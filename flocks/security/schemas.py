@@ -243,6 +243,35 @@ class AnalysisEvidenceGapCreate(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AnalysisNotificationCreate(BaseModel):
+    id: str = ""
+    notification_type: str
+    channel: str = "in_app"
+    title: str = ""
+    message: str = ""
+    status: str = "pending"
+    recipients: list[str] = Field(default_factory=list)
+    related_fact_ids: list[str] = Field(default_factory=list)
+    related_evidence_gap_ids: list[str] = Field(default_factory=list)
+    created_by: str = "system"
+    created_at: str = ""
+    sent_at: str | None = None
+    acknowledged_at: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisConfirmationCreate(BaseModel):
+    id: str = ""
+    confirmation_type: str
+    decision: str
+    comment: str = ""
+    reviewer: str = ""
+    reviewer_role: str = ""
+    related_notification_id: str | None = None
+    created_at: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class AnalysisCaseCreate(BaseModel):
     title: str
     description: str = ""
@@ -263,6 +292,12 @@ class AnalysisCaseCreate(BaseModel):
     facts: list[AnalysisFactCreate] = Field(default_factory=list)
     evidence_items: list[AnalysisEvidenceItemCreate] = Field(default_factory=list)
     evidence_gaps: list[AnalysisEvidenceGapCreate] = Field(default_factory=list)
+    notification_records: list[AnalysisNotificationCreate] = Field(default_factory=list)
+    confirmation_records: list[AnalysisConfirmationCreate] = Field(default_factory=list)
+    owner: str | None = None
+    assignees: list[str] = Field(default_factory=list)
+    last_notified_at: str | None = None
+    last_confirmed_at: str | None = None
     hypotheses: list[dict[str, Any]] = Field(default_factory=list)
     timeline: list[dict[str, Any]] = Field(default_factory=list)
     summary: str = ""
@@ -289,6 +324,12 @@ class AnalysisCaseUpdate(BaseModel):
     facts: list[AnalysisFactCreate] | None = None
     evidence_items: list[AnalysisEvidenceItemCreate] | None = None
     evidence_gaps: list[AnalysisEvidenceGapCreate] | None = None
+    notification_records: list[AnalysisNotificationCreate] | None = None
+    confirmation_records: list[AnalysisConfirmationCreate] | None = None
+    owner: str | None = None
+    assignees: list[str] | None = None
+    last_notified_at: str | None = None
+    last_confirmed_at: str | None = None
     hypotheses: list[dict[str, Any]] | None = None
     timeline: list[dict[str, Any]] | None = None
     summary: str | None = None

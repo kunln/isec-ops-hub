@@ -41,6 +41,8 @@ class TestIdentifierCompatibility:
             "analysis_fact": "afact",
             "evidence": "evd",
             "evidence_gap": "egap",
+            "analysis_notification": "anot",
+            "analysis_confirmation": "acon",
         }
         
         assert Identifier._prefixes == expected_prefixes

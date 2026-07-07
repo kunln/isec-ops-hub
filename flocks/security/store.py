@@ -114,6 +114,14 @@ def _ensure_analysis_case_children(data: dict[str, Any]) -> None:
         if not gap.get("id"):
             gap["id"] = Identifier.create("evidence_gap")
         gap["created_at"] = gap.get("created_at") or now
+    for notification in data.get("notification_records") or []:
+        if not notification.get("id"):
+            notification["id"] = Identifier.create("analysis_notification")
+        notification["created_at"] = notification.get("created_at") or now
+    for confirmation in data.get("confirmation_records") or []:
+        if not confirmation.get("id"):
+            confirmation["id"] = Identifier.create("analysis_confirmation")
+        confirmation["created_at"] = confirmation.get("created_at") or now
 
 
 def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict[str, Any]:
@@ -212,6 +220,10 @@ def _default_normalized_data(spec: CollectionSpec, data: dict[str, Any]) -> dict
                 "related_alert_ids",
                 "related_vulnerability_ids",
                 "related_incident_id",
+                "owner",
+                "assignees",
+                "last_notified_at",
+                "last_confirmed_at",
             ],
         )
     if spec is HONEYPOT_EVENTS:
