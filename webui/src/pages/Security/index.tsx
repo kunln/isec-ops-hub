@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -263,6 +263,10 @@ const columns: Record<DataSection, TableColumn[]> = {
     { key: 'related_alert_ids', labelKey: 'fields.related_alert_ids' },
     { key: 'facts', labelKey: 'fields.facts' },
     { key: 'evidence_gaps', labelKey: 'fields.evidence_gaps' },
+    { key: 'notification_records', labelKey: 'fields.notification_records' },
+    { key: 'confirmation_records', labelKey: 'fields.confirmation_records' },
+    { key: 'last_notified_at', labelKey: 'fields.last_notified_at' },
+    { key: 'last_confirmed_at', labelKey: 'fields.last_confirmed_at' },
     { key: 'created_at', labelKey: 'fields.created_at' },
     { key: 'updated_at', labelKey: 'fields.updated_at' },
   ],
@@ -923,6 +927,39 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
     window.alert(t('analysisCases.initialAnalysisComplete', { defaultValue: '自动初判已完成' }));
   };
 
+
+
+  const createConfirmationRequest = async (caseId: string) => {
+    const res = await securityAPI.createAnalysisCaseNotification(caseId, {
+      notification_type: 'confirmation_request',
+      channel: 'in_app',
+      recipients: ['security_team'],
+      created_by: 'user',
+    });
+    await loadAll();
+    setSelected(res.data as Entity);
+  };
+
+  const createAnalysisConfirmation = async (caseId: string, confirmationType: any, decision: any) => {
+    const comment = window.prompt(t('analysisCases.confirmationComment', { defaultValue: 'Comment (optional)' })) || '';
+    const res = await securityAPI.createAnalysisCaseConfirmation(caseId, {
+      confirmation_type: confirmationType,
+      decision,
+      comment,
+      reviewer: 'operator',
+      reviewer_role: 'security_analyst',
+    });
+    await loadAll();
+    setSelected(res.data as Entity);
+  };
+
+  const ackAnalysisNotification = async (caseId: string, notificationId: string) => {
+    const comment = window.prompt(t('analysisCases.ackComment', { defaultValue: 'Acknowledgement comment (optional)' })) || '';
+    const res = await securityAPI.ackAnalysisCaseNotification(caseId, notificationId, { reviewer: 'operator', comment });
+    await loadAll();
+    setSelected(res.data as Entity);
+  };
+
   const buildRiskProfile = async (assetId: string) => {
     const res = await securityAPI.getAssetRiskProfile(assetId);
     setRiskProfile(res.data);
@@ -1541,7 +1578,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
                     <tr key={item.id} className="hover:bg-gray-50">
                       {columns[section].map((column) => {
                         const rawValue = item[column.key];
-                        const value = section === 'analysis-cases' && ['related_alert_ids', 'facts', 'evidence_gaps'].includes(column.key) && Array.isArray(rawValue) ? rawValue.length : rawValue;
+                        const value = section === 'analysis-cases' && ['related_alert_ids', 'facts', 'evidence_gaps', 'notification_records', 'confirmation_records'].includes(column.key) && Array.isArray(rawValue) ? rawValue.length : rawValue;
                         const isBadge = ['severity', 'importance', 'confidence'].includes(column.key);
                         return (
                           <td key={column.key} onClick={() => setSelected(item)} className="cursor-pointer px-4 py-3 text-gray-700">
@@ -1602,7 +1639,7 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           </div>
 
           <div className="space-y-4">
-            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} onRunInitialAnalysis={(caseId) => void runInitialAnalysis(caseId)} />
+            <DetailPanel selected={selected} triageResult={triageResult} riskProfile={riskProfile} report={report} onEscalateAnalysisCase={(caseId) => void escalateAnalysisCase(caseId)} onRunInitialAnalysis={(caseId) => void runInitialAnalysis(caseId)} onCreateConfirmationRequest={(caseId) => void createConfirmationRequest(caseId)} onCreateAnalysisConfirmation={(caseId, confirmationType, decision) => void createAnalysisConfirmation(caseId, confirmationType, decision)} onAckAnalysisNotification={(caseId, notificationId) => void ackAnalysisNotification(caseId, notificationId)} />
           </div>
         </div>
       )}
@@ -4378,6 +4415,9 @@ function DetailPanel({
   report,
   onEscalateAnalysisCase,
   onRunInitialAnalysis,
+  onCreateConfirmationRequest,
+  onCreateAnalysisConfirmation,
+  onAckAnalysisNotification,
 }: {
   selected: Entity | null;
   triageResult: any;
@@ -4385,6 +4425,9 @@ function DetailPanel({
   report: string;
   onEscalateAnalysisCase: (caseId: string) => void;
   onRunInitialAnalysis: (caseId: string) => void;
+  onCreateConfirmationRequest: (caseId: string) => void;
+  onCreateAnalysisConfirmation: (caseId: string, confirmationType: string, decision: string) => void;
+  onAckAnalysisNotification: (caseId: string, notificationId: string) => void;
 }) {
   const { t } = useTranslation('security');
   const isAnalysisCase = Boolean(selected && 'case_status' in selected && 'facts' in selected && 'evidence_gaps' in selected);
@@ -4398,6 +4441,10 @@ function DetailPanel({
               <div className="flex gap-2">
                 <button onClick={() => onRunInitialAnalysis(selected.id)} className="inline-flex items-center gap-2 rounded bg-purple-600 px-3 py-1.5 text-xs text-white hover:bg-purple-700">
                   <Brain className="h-4 w-4" /> {t('actions.runInitialAnalysis', { defaultValue: '运行初判 / Run Initial Analysis' })}
+                </button>
+
+                <button onClick={() => onCreateConfirmationRequest(selected.id)} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700">
+                  <Bell className="h-4 w-4" /> Create Confirmation Request
                 </button>
                 <button onClick={() => onEscalateAnalysisCase(selected.id)} className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700">
                   <ShieldAlert className="h-4 w-4" /> {t('actions.escalateToIncident', { defaultValue: '升级为事件' })}
@@ -4413,8 +4460,17 @@ function DetailPanel({
               ))}
             </div>
             <div className="px-4 pb-4 text-xs text-amber-700">自动初判是 rule-based initial analysis，仅供研判参考，不是最终人工确认；不会自动升级 Incident 或执行自动处置。Evidence gaps: {((selected as AnalysisCase).evidence_gaps || []).length}</div>
+            <div className="flex flex-wrap gap-2 px-4 pb-4 text-xs">
+              <button onClick={() => onCreateAnalysisConfirmation(selected.id, 'confirm_blocked_attempt', 'confirmed')} className="rounded border border-green-200 px-2 py-1 text-green-700 hover:bg-green-50">Confirm Blocked Attempt</button>
+              <button onClick={() => onCreateAnalysisConfirmation(selected.id, 'confirm_false_positive', 'confirmed')} className="rounded border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-50">Confirm False Positive</button>
+              <button onClick={() => onCreateAnalysisConfirmation(selected.id, 'confirm_benign', 'confirmed')} className="rounded border border-teal-200 px-2 py-1 text-teal-700 hover:bg-teal-50">Confirm Benign</button>
+              <button onClick={() => onCreateAnalysisConfirmation(selected.id, 'continue_monitoring', 'monitoring')} className="rounded border border-blue-200 px-2 py-1 text-blue-700 hover:bg-blue-50">Continue Monitoring</button>
+              <button onClick={() => onCreateAnalysisConfirmation(selected.id, 'request_more_evidence', 'needs_more_evidence')} className="rounded border border-amber-200 px-2 py-1 text-amber-700 hover:bg-amber-50">Request More Evidence</button>
+              <button onClick={() => onCreateAnalysisConfirmation(selected.id, 'escalate_to_incident', 'escalated')} className="rounded border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50">Mark for Incident Escalation</button>
+            </div>
+
           </div>
-          <AnalysisCaseDetail caseItem={selected as AnalysisCase} />
+          <AnalysisCaseDetail caseItem={selected as AnalysisCase} onAckNotification={onAckAnalysisNotification} />
         </div>
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white">
@@ -4453,7 +4509,7 @@ function DetailPanel({
 }
 
 
-function AnalysisCaseDetail({ caseItem }: { caseItem: AnalysisCase }) {
+function AnalysisCaseDetail({ caseItem, onAckNotification }: { caseItem: AnalysisCase; onAckNotification: (caseId: string, notificationId: string) => void }) {
   const rows = [
     ['primary_asset_id', caseItem.primary_asset_id],
     ['related_asset_ids', caseItem.related_asset_ids],
@@ -4470,6 +4526,8 @@ function AnalysisCaseDetail({ caseItem }: { caseItem: AnalysisCase }) {
       <AnalysisCaseArray title="Fact Ledger" items={caseItem.facts} keys={['fact_type', 'statement', 'source_ref', 'related_asset_id', 'related_alert_id', 'confidence', 'strength', 'supports', 'contradicts', 'limitations', 'observed_at']} />
       <AnalysisCaseArray title="Evidence Items" items={caseItem.evidence_items} keys={['title', 'description', 'source_ref', 'related_fact_ids']} />
       <AnalysisCaseArray title="Evidence Gaps" items={caseItem.evidence_gaps} keys={['gap_type', 'description', 'missing_source_type', 'impact', 'suggested_connector_capability']} />
+      <AnalysisCaseArray title="Notification Records" items={caseItem.notification_records || []} keys={['notification_type', 'channel', 'status', 'title', 'message', 'recipients', 'created_by', 'created_at', 'sent_at', 'acknowledged_at', 'related_fact_ids', 'related_evidence_gap_ids']} action={(item) => item.status !== 'acknowledged' ? <button onClick={() => onAckNotification(caseItem.id, item.id)} className="rounded border border-blue-200 px-2 py-1 text-blue-700 hover:bg-blue-50">Ack</button> : null} />
+      <AnalysisCaseArray title="Confirmation Records" items={caseItem.confirmation_records || []} keys={['confirmation_type', 'decision', 'reviewer', 'reviewer_role', 'comment', 'related_notification_id', 'created_at']} />
       <AnalysisCaseArray title="Hypotheses" items={caseItem.hypotheses} keys={[]} />
       <AnalysisCaseArray title="Timeline" items={caseItem.timeline} keys={[]} />
       <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs">
@@ -4485,13 +4543,14 @@ function AnalysisCaseDetail({ caseItem }: { caseItem: AnalysisCase }) {
   );
 }
 
-function AnalysisCaseArray({ title, items, keys }: { title: string; items: Record<string, any>[]; keys: string[] }) {
+function AnalysisCaseArray({ title, items, keys, action }: { title: string; items: Record<string, any>[]; keys: string[]; action?: (item: Record<string, any>) => ReactNode }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs">
       <div className="mb-2 font-semibold text-gray-900">{title}</div>
       <div className="space-y-2">
         {items.map((item, index) => (
           <div key={item.id || index} className="rounded border border-gray-100 p-2">
+            {action?.(item)}
             {(keys.length ? keys : Object.keys(item)).map((key) => (
               <div key={key} className="mb-1"><span className="text-gray-500">{key}: </span>{renderValue(item[key])}</div>
             ))}

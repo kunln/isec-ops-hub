@@ -10,6 +10,11 @@ export type AnalysisCaseSeverity = 'critical' | 'high' | 'medium' | 'low' | 'inf
 export type EvidenceCoverage = 'ec0_signal' | 'ec1_single_source' | 'ec2_enriched_single_source' | 'ec3_cross_source' | 'ec4_full_investigation';
 export type AnalysisMode = 'single_source' | 'enriched_single_source' | 'cross_source' | 'full_investigation';
 export type NotificationDecision = 'realtime_notify' | 'confirmation_request' | 'daily_digest' | 'no_notify_store_only' | 'escalation_reminder';
+export type AnalysisNotificationType = 'realtime_notify' | 'confirmation_request' | 'daily_digest' | 'escalation_reminder' | 'manual_note';
+export type AnalysisNotificationChannel = 'in_app' | 'manual';
+export type AnalysisNotificationStatus = 'pending' | 'sent' | 'acknowledged' | 'canceled';
+export type AnalysisConfirmationType = 'confirm_incident' | 'confirm_blocked_attempt' | 'confirm_false_positive' | 'confirm_benign' | 'request_more_evidence' | 'continue_monitoring' | 'escalate_to_incident' | 'close_case';
+export type AnalysisConfirmationDecision = 'confirmed' | 'rejected' | 'needs_more_evidence' | 'monitoring' | 'escalated' | 'closed';
 export type IncidentDecision = 'escalate_to_incident' | 'do_not_escalate' | 'needs_human_confirmation' | 'continue_monitoring';
 export type AnalysisDisposition = 'open' | 'closed_blocked_attempt' | 'closed_false_positive' | 'closed_benign' | 'closed_insufficient_evidence' | 'closed_duplicate' | 'merged_into_case' | 'merged_into_incident' | 'escalated_to_incident' | 'monitoring';
 export type FactStrength = 'weak' | 'medium' | 'strong' | 'critical';
@@ -146,6 +151,44 @@ export interface AnalysisEvidenceGap {
   metadata: Record<string, any>;
 }
 
+
+export interface AnalysisNotificationRecord {
+  id: string;
+  notification_type: AnalysisNotificationType;
+  channel: AnalysisNotificationChannel;
+  title: string;
+  message: string;
+  status: AnalysisNotificationStatus;
+  recipients: string[];
+  related_fact_ids: string[];
+  related_evidence_gap_ids: string[];
+  created_by: string;
+  created_at: string;
+  sent_at?: string | null;
+  acknowledged_at?: string | null;
+  metadata: Record<string, any>;
+}
+
+export interface AnalysisConfirmationRecord {
+  id: string;
+  confirmation_type: AnalysisConfirmationType;
+  decision: AnalysisConfirmationDecision;
+  comment: string;
+  reviewer: string;
+  reviewer_role: string;
+  related_notification_id?: string | null;
+  created_at: string;
+  metadata: Record<string, any>;
+}
+
+export type AnalysisNotificationCreate = Partial<Omit<AnalysisNotificationRecord, 'id' | 'created_at'>> & { id?: string; created_at?: string };
+export type AnalysisConfirmationCreate = Partial<Omit<AnalysisConfirmationRecord, 'id' | 'created_at'>> & {
+  confirmation_type: AnalysisConfirmationType;
+  decision: AnalysisConfirmationDecision;
+  id?: string;
+  created_at?: string;
+};
+
 export interface AnalysisCase {
   id: string;
   title: string;
@@ -167,6 +210,12 @@ export interface AnalysisCase {
   facts: AnalysisFact[];
   evidence_items: AnalysisEvidenceItem[];
   evidence_gaps: AnalysisEvidenceGap[];
+  notification_records: AnalysisNotificationRecord[];
+  confirmation_records: AnalysisConfirmationRecord[];
+  owner?: string | null;
+  assignees: string[];
+  last_notified_at?: string | null;
+  last_confirmed_at?: string | null;
   hypotheses: Record<string, any>[];
   timeline: Record<string, any>[];
   summary: string;
@@ -1318,6 +1367,12 @@ export const securityAPI = {
   runInitialAnalysis: (id: string) => client.post<AnalysisCase>(`/api/security/analysis-cases/${id}/run-initial-analysis`),
   escalateAnalysisCaseToIncident: (id: string) =>
     client.post<AnalysisCaseEscalationResponse>(`/api/security/analysis-cases/${id}/escalate-to-incident`),
+  createAnalysisCaseNotification: (caseId: string, data: AnalysisNotificationCreate) =>
+    client.post<AnalysisCase>(`/api/security/analysis-cases/${caseId}/notifications`, data),
+  createAnalysisCaseConfirmation: (caseId: string, data: AnalysisConfirmationCreate) =>
+    client.post<AnalysisCase>(`/api/security/analysis-cases/${caseId}/confirmations`, data),
+  ackAnalysisCaseNotification: (caseId: string, notificationId: string, data?: { reviewer?: string; comment?: string }) =>
+    client.post<AnalysisCase>(`/api/security/analysis-cases/${caseId}/notifications/${notificationId}/ack`, data || {}),
 
   listIncidents: (params?: SecurityFilters) => client.get<SecurityIncident[]>('/api/security/incidents', { params }),
   createIncident: (data: Partial<SecurityIncident>) => client.post<SecurityIncident>('/api/security/incidents', data),

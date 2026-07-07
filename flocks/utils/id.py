@@ -38,6 +38,8 @@ IdPrefix = Literal[
     "analysis_fact", # afact (security analysis fact)
     "evidence",   # evd (security analysis evidence)
     "evidence_gap", # egap (security analysis evidence gap)
+    "analysis_notification", # anot (security analysis notification record)
+    "analysis_confirmation", # acon (security analysis confirmation record)
 ]
 
 
@@ -78,6 +80,8 @@ class Identifier:
         "analysis_fact": "afact",
         "evidence": "evd",
         "evidence_gap": "egap",
+        "analysis_notification": "anot",
+        "analysis_confirmation": "acon",
     }
     
     # Constants

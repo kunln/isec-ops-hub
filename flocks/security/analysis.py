@@ -10,6 +10,7 @@ from flocks.security.models import (
     Alert,
     AnalysisCase,
     AnalysisCaseSeverity,
+    AnalysisCaseStatus,
     AnalysisCaseVerdict,
     AnalysisDisposition,
     AnalysisMode,
@@ -22,6 +23,8 @@ from flocks.security.models import (
 from flocks.security.schemas import (
     AnalysisCaseCreate,
     AnalysisCaseUpdate,
+    AnalysisConfirmationCreate,
+    AnalysisNotificationCreate,
     AnalysisEvidenceGapCreate,
     AnalysisEvidenceItemCreate,
     AnalysisFactCreate,
@@ -268,3 +271,109 @@ def run_initial_analysis(case: AnalysisCase, related_alerts: list[Alert] | None 
     alert_ids = list(dict.fromkeys([*case.related_alert_ids, *[a.id for a in alerts]]))
     asset_ids = list(dict.fromkeys([*case.related_asset_ids, *[a.asset_id for a in alerts if a.asset_id]]))
     return AnalysisCaseUpdate(facts=facts, evidence_items=items, evidence_gaps=gaps, hypotheses=_hypotheses(facts, gaps, alerts), timeline=_dedup_items([*case.timeline, *[{"timestamp": a.occurred_at, "title": "Alert observed", "description": a.title, "source_ref": _source_ref(a)} for a in alerts]]), summary=f"Rule-based initial analysis refreshed: {decision['verdict']} based on {len(facts)} facts and {len(gaps)} evidence gaps.", recommendations=["Review evidence gaps before final confirmation.", "Do not auto-escalate or auto-remediate from rule-based initial analysis."], primary_asset_id=case.primary_asset_id or (asset_ids[0] if asset_ids else None), related_asset_ids=asset_ids, related_alert_ids=alert_ids, related_incident_id=case.related_incident_id, **decision)
+
+
+def build_notification_for_case(case: AnalysisCase, notification_type: str | None = None, created_by: str = "system") -> AnalysisNotificationCreate:
+    effective_type = notification_type or str(case.notification_decision)
+    if effective_type == NotificationDecision.NO_NOTIFY_STORE_ONLY.value:
+        effective_type = "manual_note" if created_by == "user" else NotificationDecision.CONFIRMATION_REQUEST.value
+    key_facts = list(case.facts)[:5]
+    key_gaps = list(case.evidence_gaps)[:5]
+    recommendations = list(case.recommendations)[:5]
+    lines = [
+        f"Verdict: {case.verdict}",
+        f"Severity: {case.severity}",
+        f"Confidence: {case.confidence}",
+        f"Evidence coverage: {case.evidence_coverage}",
+        f"Notification decision: {case.notification_decision}",
+        f"Incident decision: {case.incident_decision}",
+    ]
+    if key_facts:
+        lines.append("Key facts:")
+        lines.extend(f"- {fact.statement} (source: {fact.source_ref})" for fact in key_facts)
+    if key_gaps:
+        lines.append("Evidence gaps:")
+        lines.extend(f"- {gap.description}" for gap in key_gaps)
+    if recommendations:
+        lines.append("Recommendations:")
+        lines.extend(f"- {item}" for item in recommendations)
+    return AnalysisNotificationCreate(
+        notification_type=effective_type,
+        channel="in_app",
+        title=f"[{case.severity}] {case.title}",
+        message="\n".join(lines),
+        status="sent",
+        recipients=[],
+        related_fact_ids=[fact.id for fact in key_facts if fact.id],
+        related_evidence_gap_ids=[gap.id for gap in key_gaps if gap.id],
+        created_by=created_by,
+    )
+
+
+def apply_confirmation_to_case(case: AnalysisCase, confirmation: AnalysisConfirmationCreate) -> AnalysisCaseUpdate:
+    updates: dict[str, Any] = {}
+    ctype = confirmation.confirmation_type
+    if ctype == "confirm_incident":
+        updates.update(
+            verdict=AnalysisCaseVerdict.CONFIRMED_INCIDENT,
+            incident_decision=IncidentDecision.NEEDS_HUMAN_CONFIRMATION,
+            notification_decision=NotificationDecision.REALTIME_NOTIFY,
+            disposition=AnalysisDisposition.OPEN,
+            case_status=AnalysisCaseStatus.MONITORING,
+        )
+    elif ctype == "confirm_blocked_attempt":
+        updates.update(
+            verdict=AnalysisCaseVerdict.CONFIRMED_ATTACK_ATTEMPT_BLOCKED,
+            incident_decision=IncidentDecision.DO_NOT_ESCALATE,
+            notification_decision=NotificationDecision.DAILY_DIGEST,
+            disposition=AnalysisDisposition.CLOSED_BLOCKED_ATTEMPT,
+            case_status=AnalysisCaseStatus.RESOLVED,
+        )
+    elif ctype == "confirm_false_positive":
+        updates.update(
+            verdict=AnalysisCaseVerdict.FALSE_POSITIVE_RULE_NOISE,
+            incident_decision=IncidentDecision.DO_NOT_ESCALATE,
+            notification_decision=NotificationDecision.NO_NOTIFY_STORE_ONLY,
+            disposition=AnalysisDisposition.CLOSED_FALSE_POSITIVE,
+            case_status=AnalysisCaseStatus.RESOLVED,
+        )
+    elif ctype == "confirm_benign":
+        updates.update(
+            verdict=AnalysisCaseVerdict.BENIGN_BUSINESS_ACTIVITY,
+            incident_decision=IncidentDecision.DO_NOT_ESCALATE,
+            notification_decision=NotificationDecision.NO_NOTIFY_STORE_ONLY,
+            disposition=AnalysisDisposition.CLOSED_BENIGN,
+            case_status=AnalysisCaseStatus.RESOLVED,
+        )
+    elif ctype == "request_more_evidence":
+        updates.update(
+            incident_decision=IncidentDecision.CONTINUE_MONITORING,
+            notification_decision=NotificationDecision.CONFIRMATION_REQUEST,
+            disposition=AnalysisDisposition.OPEN,
+            case_status=AnalysisCaseStatus.COLLECTING_EVIDENCE,
+        )
+    elif ctype == "continue_monitoring":
+        updates.update(
+            incident_decision=IncidentDecision.CONTINUE_MONITORING,
+            disposition=AnalysisDisposition.MONITORING,
+            case_status=AnalysisCaseStatus.MONITORING,
+        )
+    elif ctype == "escalate_to_incident":
+        updates.update(
+            incident_decision=IncidentDecision.ESCALATE_TO_INCIDENT,
+            notification_decision=NotificationDecision.REALTIME_NOTIFY,
+            disposition=AnalysisDisposition.OPEN,
+            case_status=AnalysisCaseStatus.AWAITING_CONFIRMATION,
+        )
+    elif ctype == "close_case":
+        disposition = AnalysisDisposition.MONITORING
+        if case.verdict == AnalysisCaseVerdict.FALSE_POSITIVE_RULE_NOISE:
+            disposition = AnalysisDisposition.CLOSED_FALSE_POSITIVE
+        elif case.verdict == AnalysisCaseVerdict.BENIGN_BUSINESS_ACTIVITY:
+            disposition = AnalysisDisposition.CLOSED_BENIGN
+        elif case.verdict == AnalysisCaseVerdict.CONFIRMED_ATTACK_ATTEMPT_BLOCKED:
+            disposition = AnalysisDisposition.CLOSED_BLOCKED_ATTEMPT
+        elif case.verdict == AnalysisCaseVerdict.INSUFFICIENT_EVIDENCE:
+            disposition = AnalysisDisposition.CLOSED_INSUFFICIENT_EVIDENCE
+        updates.update(case_status=AnalysisCaseStatus.RESOLVED, disposition=disposition)
+    return AnalysisCaseUpdate(**updates)

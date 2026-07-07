@@ -323,6 +323,35 @@ class EvidenceGap(_SecurityBaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AnalysisNotificationRecord(_SecurityBaseModel):
+    id: str = ""
+    notification_type: str
+    channel: str = "in_app"
+    title: str = ""
+    message: str = ""
+    status: str = "pending"
+    recipients: list[str] = Field(default_factory=list)
+    related_fact_ids: list[str] = Field(default_factory=list)
+    related_evidence_gap_ids: list[str] = Field(default_factory=list)
+    created_by: str = "system"
+    created_at: str = ""
+    sent_at: str | None = None
+    acknowledged_at: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisConfirmationRecord(_SecurityBaseModel):
+    id: str = ""
+    confirmation_type: str
+    decision: str
+    comment: str = ""
+    reviewer: str = ""
+    reviewer_role: str = ""
+    related_notification_id: str | None = None
+    created_at: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class AnalysisCase(_SecurityBaseModel):
     id: str = ""
     title: str
@@ -344,6 +373,12 @@ class AnalysisCase(_SecurityBaseModel):
     facts: list[AnalysisFact] = Field(default_factory=list)
     evidence_items: list[EvidenceItem] = Field(default_factory=list)
     evidence_gaps: list[EvidenceGap] = Field(default_factory=list)
+    notification_records: list[AnalysisNotificationRecord] = Field(default_factory=list)
+    confirmation_records: list[AnalysisConfirmationRecord] = Field(default_factory=list)
+    owner: str | None = None
+    assignees: list[str] = Field(default_factory=list)
+    last_notified_at: str | None = None
+    last_confirmed_at: str | None = None
     hypotheses: list[dict[str, Any]] = Field(default_factory=list)
     timeline: list[dict[str, Any]] = Field(default_factory=list)
     summary: str = ""
