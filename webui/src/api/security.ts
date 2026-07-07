@@ -1315,6 +1315,7 @@ export const securityAPI = {
     client.patch<AnalysisCase>(`/api/security/analysis-cases/${id}`, data),
   deleteAnalysisCase: (id: string) => client.delete(`/api/security/analysis-cases/${id}`),
   createAnalysisCaseFromAlert: (id: string) => client.post<AnalysisCase>(`/api/security/analysis-cases/from-alert/${id}`),
+  runInitialAnalysis: (id: string) => client.post<AnalysisCase>(`/api/security/analysis-cases/${id}/run-initial-analysis`),
   escalateAnalysisCaseToIncident: (id: string) =>
     client.post<AnalysisCaseEscalationResponse>(`/api/security/analysis-cases/${id}/escalate-to-incident`),
 

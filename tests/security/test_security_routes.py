@@ -696,34 +696,122 @@ async def test_analysis_case_filter_matches_primary_asset_id(client: AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_analysis_case_from_alert_returns_201_and_complete_fact(client: AsyncClient):
-    alert_payload = {
-        "asset_id": "ast_manual_asset",
-        "source": "siem",
-        "title": "Impossible travel",
+async def test_analysis_case_from_alert_waf_blocked_attack_initial_analysis(client: AsyncClient):
+    before = (await client.get("/api/security/incidents")).json()
+    alert_response = await client.post("/api/security/alerts", json={
+        "asset_id": "ast_waf_blocked",
+        "source": "waf",
+        "title": "SQL injection attempt blocked",
         "severity": "high",
-        "description": "User login from distant geographies",
+        "description": "WAF detected SQL injection and action block",
+        "raw_event": {"action": "block", "attack": "sqli", "uri": "/login?id=1 union select"},
+        "normalized_data": {"action": "block"},
         "occurred_at": "2026-07-06T10:00:00+00:00",
-    }
-    alert_response = await client.post("/api/security/alerts", json=alert_payload)
+    })
     assert alert_response.status_code == 201, alert_response.text
     alert = alert_response.json()
-
     response = await client.post(f"/api/security/analysis-cases/from-alert/{alert['id']}")
     assert response.status_code == 201, response.text
     case = response.json()
-    assert case["id"].startswith("acase_")
-    assert case["related_alert_ids"] == [alert["id"]]
-    assert case["primary_asset_id"] == alert_payload["asset_id"]
-    fact = case["facts"][0]
-    assert fact["fact_type"] == "alert_signal"
-    assert fact["statement"]
-    assert fact["source_ref"] == f"alert:{alert['id']}"
-    assert fact["related_alert_id"] == alert["id"]
-    assert fact["related_asset_id"] == alert_payload["asset_id"]
-    assert fact["confidence"] == "medium"
-    assert fact["strength"] == "medium"
-    assert fact["observed_at"] == alert_payload["occurred_at"]
+    fact_types = {fact["fact_type"] for fact in case["facts"]}
+    assert {"alert_signal", "attack_pattern_matched", "protection_action_observed"}.issubset(fact_types)
+    assert case["verdict"] == "confirmed_attack_attempt_blocked"
+    assert case["notification_decision"] == "daily_digest"
+    assert case["incident_decision"] == "do_not_escalate"
+    assert any(gap["missing_source_type"] in {"edr", "backend_access_log"} for gap in case["evidence_gaps"])
+    after = (await client.get("/api/security/incidents")).json()
+    assert len(after) == len(before)
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_from_alert_waf_monitor_attack_initial_analysis(client: AsyncClient):
+    alert_response = await client.post("/api/security/alerts", json={
+        "asset_id": "ast_waf_monitor",
+        "source": "waf",
+        "title": "RCE attempt monitored",
+        "severity": "medium",
+        "description": "RCE payload observed with action monitor",
+        "raw_event": {"action": "monitor", "attack": "remote code execution"},
+        "normalized_data": {"action": "monitor"},
+    })
+    assert alert_response.status_code == 201, alert_response.text
+    alert = alert_response.json()
+    response = await client.post(f"/api/security/analysis-cases/from-alert/{alert['id']}")
+    assert response.status_code == 201, response.text
+    case = response.json()
+    assert case["verdict"] == "suspicious_true_positive"
+    assert case["notification_decision"] == "confirmation_request"
+    assert case["incident_decision"] == "needs_human_confirmation"
+    gap_sources = {gap["missing_source_type"] for gap in case["evidence_gaps"]}
+    assert {"edr", "backend_access_log"}.issubset(gap_sources)
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_from_alert_edr_suspicious_process_initial_analysis(client: AsyncClient):
+    before = (await client.get("/api/security/incidents")).json()
+    alert_response = await client.post("/api/security/alerts", json={
+        "asset_id": "ast_edr_process",
+        "source": "edr",
+        "title": "Suspicious Powershell encoded command",
+        "severity": "high",
+        "description": "web service spawned shell with powershell encoded command",
+        "raw_event": {"process_name": "powershell.exe", "command_line": "powershell encoded command"},
+    })
+    assert alert_response.status_code == 201, alert_response.text
+    alert = alert_response.json()
+    response = await client.post(f"/api/security/analysis-cases/from-alert/{alert['id']}")
+    assert response.status_code == 201, response.text
+    case = response.json()
+    assert "process_execution_observed" in {fact["fact_type"] for fact in case["facts"]}
+    assert case["verdict"] in {"suspicious_true_positive", "confirmed_incident"}
+    assert case["severity"] in {"high", "critical"}
+    assert case["notification_decision"] == "realtime_notify"
+    assert case["incident_decision"] in {"escalate_to_incident", "needs_human_confirmation"}
+    after = (await client.get("/api/security/incidents")).json()
+    assert len(after) == len(before)
+
+
+@pytest.mark.asyncio
+async def test_analysis_case_from_alert_weak_generic_initial_analysis(client: AsyncClient):
+    alert_response = await client.post("/api/security/alerts", json={"source": "siem", "title": "Generic alert", "severity": "low"})
+    assert alert_response.status_code == 201, alert_response.text
+    alert = alert_response.json()
+    response = await client.post(f"/api/security/analysis-cases/from-alert/{alert['id']}")
+    assert response.status_code == 201, response.text
+    case = response.json()
+    assert case["verdict"] == "insufficient_evidence"
+    assert len(case["evidence_gaps"]) >= 1
+    assert case["incident_decision"] == "continue_monitoring"
+
+
+@pytest.mark.asyncio
+async def test_run_initial_analysis_endpoint_enriches_and_deduplicates(client: AsyncClient):
+    alert_response = await client.post("/api/security/alerts", json={
+        "asset_id": "ast_run_initial",
+        "source": "waf",
+        "title": "SQLi allowed",
+        "severity": "medium",
+        "description": "SQL injection action allow",
+        "raw_event": {"action": "allow", "attack": "sql injection"},
+    })
+    assert alert_response.status_code == 201, alert_response.text
+    alert = alert_response.json()
+    case_response = await client.post("/api/security/analysis-cases", json={"title": "Manual case", "related_alert_ids": [alert["id"]]})
+    assert case_response.status_code == 201, case_response.text
+    case = case_response.json()
+    first = await client.post(f"/api/security/analysis-cases/{case['id']}/run-initial-analysis")
+    assert first.status_code == 200, first.text
+    enriched = first.json()
+    assert enriched["facts"]
+    assert enriched["evidence_gaps"]
+    assert enriched["hypotheses"]
+    fact_count = len(enriched["facts"])
+    gap_count = len(enriched["evidence_gaps"])
+    second = await client.post(f"/api/security/analysis-cases/{case['id']}/run-initial-analysis")
+    assert second.status_code == 200, second.text
+    rerun = second.json()
+    assert len(rerun["facts"]) == fact_count
+    assert len(rerun["evidence_gaps"]) == gap_count
 
 
 @pytest.mark.asyncio
