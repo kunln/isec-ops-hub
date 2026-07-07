@@ -13,6 +13,7 @@ from flocks.security.models import (
     Alert,
     AnalysisCase,
     Asset,
+    ConnectorSyncRun,
     HoneypotEvent,
     Incident,
     Vulnerability,
@@ -36,7 +37,7 @@ from flocks.storage.storage import Storage
 from flocks.utils.id import Identifier
 
 
-SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, AnalysisCase, HoneypotEvent)
+SecurityObject = TypeVar("SecurityObject", Asset, Vulnerability, Alert, Incident, AnalysisCase, HoneypotEvent, ConnectorSyncRun)
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,12 @@ HONEYPOT_EVENTS = CollectionSpec(
     "security/honeypot-events/",
     HoneypotEvent,
     "honeypot",
+)
+CONNECTOR_SYNC_RUNS = CollectionSpec(
+    "connector_sync_runs",
+    "security/connector-sync-runs/",
+    ConnectorSyncRun,
+    "connector_sync_run",
 )
 
 
@@ -253,6 +260,8 @@ class SecurityStore:
         data["updated_at"] = data.get("updated_at") or now
         if spec is ANALYSIS_CASES:
             _ensure_analysis_case_children(data)
+        if spec is CONNECTOR_SYNC_RUNS:
+            data["started_at"] = data.get("started_at") or now
         if spec is ALERTS and not data.get("raw_data") and data.get("raw_event"):
             data["raw_data"] = data["raw_event"]
         if not data.get("normalized_data"):
@@ -498,6 +507,37 @@ class SecurityStore:
 
     async def delete_honeypot_event(self, event_id: str) -> bool:
         return await self._delete(HONEYPOT_EVENTS, event_id)
+
+    async def create_connector_sync_run(self, payload: dict[str, Any]) -> ConnectorSyncRun:
+        return await self._create(CONNECTOR_SYNC_RUNS, payload)
+
+    async def update_connector_sync_run(self, run_id: str, payload: dict[str, Any]) -> ConnectorSyncRun | None:
+        return await self._update(CONNECTOR_SYNC_RUNS, run_id, payload)
+
+    async def get_connector_sync_run(self, run_id: str) -> ConnectorSyncRun | None:
+        return await self._get(CONNECTOR_SYNC_RUNS, run_id)
+
+    async def list_connector_sync_runs(
+        self,
+        connector_id: str | None = None,
+        status: str | None = None,
+        mode: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[ConnectorSyncRun]:
+        entries = await Storage.list_entries(CONNECTOR_SYNC_RUNS.prefix, CONNECTOR_SYNC_RUNS.model)
+        runs = [value for _, value in entries]
+        if connector_id:
+            runs = [run for run in runs if run.connector_id == connector_id]
+        if status:
+            runs = [run for run in runs if run.status == status]
+        if mode:
+            runs = [run for run in runs if run.mode == mode]
+        runs.sort(key=lambda run: run.started_at or run.created_at or run.updated_at, reverse=True)
+        return runs[max(0, offset): max(0, offset) + max(1, limit)]
+
+    async def delete_connector_sync_run(self, run_id: str) -> bool:
+        return await self._delete(CONNECTOR_SYNC_RUNS, run_id)
 
 
 default_store = SecurityStore()

@@ -43,6 +43,7 @@ class TestIdentifierCompatibility:
             "evidence_gap": "egap",
             "analysis_notification": "anot",
             "analysis_confirmation": "acon",
+            "connector_sync_run": "csrun",
         }
         
         assert Identifier._prefixes == expected_prefixes
