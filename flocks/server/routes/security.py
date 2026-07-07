@@ -15,6 +15,7 @@ from flocks.security.analysis_sample_data import clear_analysis_sample_data, loa
 from flocks.security.correlation import correlate_alert
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
+from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
 from flocks.security.connectors.package_staging import MAX_UPLOAD_BYTES
 from flocks.security.connectors.scheduler import connector_sync_scheduler
@@ -54,6 +55,25 @@ from flocks.security.store import default_store, utc_now
 from flocks.security.triage import triage_alert
 
 
+
+class MingyuAptIngestRequest(BaseModel):
+    base_url: str
+    apikey: str
+    begin: str
+    end: str
+    mode: str = "risk"
+    limit: int = 20
+    max_pages: int = 1
+    create_analysis_cases: bool = True
+    run_initial_analysis: bool = True
+    deduplicate: bool = True
+    verify_ssl: bool = False
+
+
+class MingyuAptTestRequest(BaseModel):
+    base_url: str
+    apikey: str
+    verify_ssl: bool = False
 
 class EvidenceIngestionRequest(BaseModel):
     connector_context: dict[str, Any] | None = None
@@ -1083,6 +1103,35 @@ async def get_connector(connector_id: str):
     if connector is None:
         raise _not_found("Connector", connector_id)
     return connector
+
+
+@router.post(
+    "/connectors/mingyu-apt/test",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def test_mingyu_apt_connector(payload: MingyuAptTestRequest):
+    client = MingyuAptClient(base_url=payload.base_url, apikey=payload.apikey, verify_ssl=payload.verify_ssl)
+    return {"connector_id": "mingyu-apt", "version": client.get_version()}
+
+
+@router.post(
+    "/connectors/mingyu-apt/ingest",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def ingest_mingyu_apt_connector(payload: MingyuAptIngestRequest):
+    return await ingest_mingyu_apt_risks(
+        base_url=payload.base_url,
+        apikey=payload.apikey,
+        begin=payload.begin,
+        end=payload.end,
+        mode=payload.mode,
+        limit=payload.limit,
+        max_pages=payload.max_pages,
+        create_analysis_cases=payload.create_analysis_cases,
+        run_initial_analysis=payload.run_initial_analysis,
+        deduplicate=payload.deduplicate,
+        verify_ssl=payload.verify_ssl,
+    )
 
 
 @router.post("/connectors/{connector_id}/test", dependencies=[Depends(require_capability("security.connectors.test"))])

@@ -679,6 +679,11 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   const [ingestionOptions, setIngestionOptions] = useState({ create_analysis_cases: true, run_initial_analysis: true, deduplicate: true });
   const [ingestionResult, setIngestionResult] = useState<EvidenceIngestionResponse | null>(null);
   const [ingestionLoading, setIngestionLoading] = useState(false);
+  const [mingyuForm, setMingyuForm] = useState({
+    base_url: '', apikey: '', begin: '2026-07-01 00:00:00', end: '2026-07-07 23:59:59', mode: 'risk' as 'risk' | 'important' | 'safe_event',
+    limit: 20, max_pages: 1, verify_ssl: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
+  });
+  const [mingyuTestResult, setMingyuTestResult] = useState<Record<string, any> | null>(null);
   useEffect(() => {
     tRef.current = t;
   }, [t]);
@@ -931,6 +936,33 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
       await loadAll();
     } catch (err: any) {
       setError(err?.message || 'Evidence ingestion failed');
+    } finally {
+      setIngestionLoading(false);
+    }
+  };
+
+  const testMingyuApt = async () => {
+    setIngestionLoading(true);
+    setError(null);
+    try {
+      const res = await securityAPI.testMingyuApt({ base_url: mingyuForm.base_url, apikey: mingyuForm.apikey, verify_ssl: mingyuForm.verify_ssl });
+      setMingyuTestResult(res.data);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Mingyu APT connection test failed');
+    } finally {
+      setIngestionLoading(false);
+    }
+  };
+
+  const ingestMingyuApt = async () => {
+    setIngestionLoading(true);
+    setError(null);
+    try {
+      const res = await securityAPI.ingestMingyuApt(mingyuForm);
+      setIngestionResult(res.data);
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Mingyu APT ingestion failed');
     } finally {
       setIngestionLoading(false);
     }
@@ -1549,6 +1581,11 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
           result={ingestionResult}
           loading={ingestionLoading}
           onIngest={() => void ingestEvidenceEvents()}
+          mingyuForm={mingyuForm}
+          setMingyuForm={setMingyuForm}
+          mingyuTestResult={mingyuTestResult}
+          onMingyuTest={() => void testMingyuApt()}
+          onMingyuIngest={() => void ingestMingyuApt()}
         />
       ) : section === 'assets' ? (
         <AssetRiskModule
@@ -4479,6 +4516,11 @@ function EvidenceIngestionPanel({
   result,
   loading,
   onIngest,
+  mingyuForm,
+  setMingyuForm,
+  mingyuTestResult,
+  onMingyuTest,
+  onMingyuIngest,
 }: {
   context: EvidenceIngestionContext;
   setContext: (value: EvidenceIngestionContext) => void;
@@ -4489,12 +4531,40 @@ function EvidenceIngestionPanel({
   result: EvidenceIngestionResponse | null;
   loading: boolean;
   onIngest: () => void;
+  mingyuForm: { base_url: string; apikey: string; begin: string; end: string; mode: 'risk' | 'important' | 'safe_event'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean };
+  setMingyuForm: (value: { base_url: string; apikey: string; begin: string; end: string; mode: 'risk' | 'important' | 'safe_event'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean }) => void;
+  mingyuTestResult: Record<string, any> | null;
+  onMingyuTest: () => void;
+  onMingyuIngest: () => void;
 }) {
   const contextFields: Array<keyof EvidenceIngestionContext> = ['connector_id', 'connector_name', 'vendor', 'product', 'source_type', 'external_base_url'];
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
         仅用于轻量证据接入测试。系统只保存摘要、关键字段、hash 和外部引用，不保存完整原始日志。
+      </div>
+      <div className="rounded-lg border border-amber-200 bg-white p-4">
+        <h2 className="mb-2 text-lg font-semibold text-gray-900">明御 APT 接入测试</h2>
+        <p className="mb-3 text-sm text-amber-700">apikey 仅用于本次请求，不会保存；平台不保存完整原始日志，只保存告警摘要、证据引用、hash、key_fields 和 Analysis Case。</p>
+        <div className="grid gap-3 md:grid-cols-4">
+          <input value={mingyuForm.base_url} onChange={(event) => setMingyuForm({ ...mingyuForm, base_url: event.target.value })} placeholder="base_url" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="password" value={mingyuForm.apikey} onChange={(event) => setMingyuForm({ ...mingyuForm, apikey: event.target.value })} placeholder="apikey" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={mingyuForm.begin} onChange={(event) => setMingyuForm({ ...mingyuForm, begin: event.target.value })} placeholder="begin" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={mingyuForm.end} onChange={(event) => setMingyuForm({ ...mingyuForm, end: event.target.value })} placeholder="end" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <select value={mingyuForm.mode} onChange={(event) => setMingyuForm({ ...mingyuForm, mode: event.target.value as 'risk' | 'important' | 'safe_event' })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <option value="risk">risk</option><option value="important">important</option><option value="safe_event">safe_event</option>
+          </select>
+          <input type="number" value={mingyuForm.limit} onChange={(event) => setMingyuForm({ ...mingyuForm, limit: Number(event.target.value) })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="number" value={mingyuForm.max_pages} onChange={(event) => setMingyuForm({ ...mingyuForm, max_pages: Number(event.target.value) })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-700">
+          {(['verify_ssl', 'create_analysis_cases', 'run_initial_analysis', 'deduplicate'] as const).map((key) => (
+            <label key={key} className="inline-flex items-center gap-2"><input type="checkbox" checked={mingyuForm[key]} onChange={(event) => setMingyuForm({ ...mingyuForm, [key]: event.target.checked })} />{key}</label>
+          ))}
+          <button onClick={onMingyuTest} disabled={loading} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 disabled:opacity-50">测试连接</button>
+          <button onClick={onMingyuIngest} disabled={loading} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50">拉取并生成研判单</button>
+        </div>
+        {mingyuTestResult && <pre className="mt-3 max-h-40 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(mingyuTestResult, null, 2)}</pre>}
       </div>
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold text-gray-900">证据接入 / Evidence Ingestion</h2>
