@@ -8,9 +8,21 @@ from uuid import uuid4
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate
 from flocks.security.integrations.registry import IntegrationRegistry, create_default_integration_registry
 from flocks.security.integrations.runtime import SENSITIVE_PARAM_KEYWORDS
-
-_SECRET_VALUE_HINTS = ("api_key=", "apikey=", "secret=", "token=", "password=", "authorization:", "bearer ", "cookie:")
 from flocks.security.store import utc_now
+
+_SECRET_VALUE_HINTS = (
+    "api_key=",
+    "apikey=",
+    "secret=",
+    "token=",
+    "password=",
+    "authorization:",
+    "bearer ",
+    "cookie:",
+    "session=",
+    "x-api-key",
+    "x-flocks-api-token",
+)
 
 
 class IntegrationInstanceStore:

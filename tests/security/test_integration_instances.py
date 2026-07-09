@@ -254,16 +254,44 @@ def test_build_capability_run_request_from_instance_is_dry_run() -> None:
     assert request.params == {"limit": 10, "page": 1}
 
 
-def test_generated_request_params_do_not_include_secret_like_values() -> None:
+def test_generated_request_params_drop_secret_like_values_and_keep_safe_values() -> None:
     store = IntegrationInstanceStore()
     instance = store.create_instance(
         IntegrationInstanceCreate(package_id="asiainfo.tda", display_name="TDA", metadata={"region": "cn"})
     )
 
-    request = build_capability_run_request_from_instance(instance, "alert.search")
+    request = build_capability_run_request_from_instance(
+        instance,
+        "alert.search",
+        params={"note": "Bearer abc", "safe": "visible"},
+    )
 
-    serialized = str(request.params).lower()
-    assert "api_key" not in serialized
-    assert "secret" not in serialized
-    assert "token" not in serialized
-    assert "password" not in serialized
+    serialized = str(request.params)
+    assert "Bearer abc" not in serialized
+    assert request.params["safe"] == "visible"
+    assert request.params["region"] == "cn"
+
+
+def test_generated_request_params_drop_nested_secret_like_keys_and_values() -> None:
+    store = IntegrationInstanceStore()
+    instance = store.create_instance(IntegrationInstanceCreate(package_id="asiainfo.tda", display_name="TDA"))
+
+    request = build_capability_run_request_from_instance(
+        instance,
+        "alert.search",
+        params={"headers": {"Authorization": "Bearer abc", "Accept": "application/json"}},
+    )
+
+    serialized = str(request.params)
+    assert "Authorization" not in serialized
+    assert "Bearer abc" not in serialized
+    assert request.params == {"headers": {"Accept": "application/json"}}
+
+
+def test_instance_metadata_rejects_secret_like_values() -> None:
+    store = IntegrationInstanceStore()
+
+    with pytest.raises(ValueError):
+        store.create_instance(
+            IntegrationInstanceCreate(package_id="asiainfo.tda", display_name="TDA", metadata={"note": "Bearer abc"})
+        )

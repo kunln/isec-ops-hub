@@ -13,6 +13,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from flocks.security.integrations.runtime import IntegrationCapabilityRunRequest, SENSITIVE_PARAM_KEYWORDS
 
+SECRET_LIKE_VALUE_HINTS = (
+    "api_key=",
+    "apikey=",
+    "secret=",
+    "token=",
+    "password=",
+    "authorization:",
+    "bearer ",
+    "cookie:",
+    "session=",
+    "x-api-key",
+    "x-flocks-api-token",
+)
+
 
 class _InstanceBaseModel(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -91,15 +105,36 @@ def build_capability_run_request_from_instance(
     )
 
 
+_DROP_VALUE = object()
+
+
 def _drop_secret_like_params(params: dict[str, Any]) -> dict[str, Any]:
     safe: dict[str, Any] = {}
     for key, value in params.items():
         if any(keyword in str(key).lower() for keyword in SENSITIVE_PARAM_KEYWORDS):
             continue
-        if isinstance(value, dict):
-            safe[str(key)] = _drop_secret_like_params(value)
-        elif isinstance(value, list):
-            safe[str(key)] = [_drop_secret_like_params(item) if isinstance(item, dict) else item for item in value]
-        else:
-            safe[str(key)] = value
+        sanitized = _drop_secret_like_value(value)
+        if sanitized is _DROP_VALUE:
+            continue
+        safe[str(key)] = sanitized
     return safe
+
+
+def _drop_secret_like_value(value: Any) -> Any:
+    if isinstance(value, str) and _is_secret_like_value(value):
+        return _DROP_VALUE
+    if isinstance(value, dict):
+        return _drop_secret_like_params(value)
+    if isinstance(value, list):
+        safe_items = []
+        for item in value:
+            sanitized = _drop_secret_like_value(item)
+            if sanitized is not _DROP_VALUE:
+                safe_items.append(sanitized)
+        return safe_items
+    return value
+
+
+def _is_secret_like_value(value: str) -> bool:
+    lowered = value.lower()
+    return any(hint in lowered for hint in SECRET_LIKE_VALUE_HINTS)
