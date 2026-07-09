@@ -19,6 +19,7 @@ from flocks.security.connector_runs import (
 )
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
+from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
 from flocks.security.connectors.tda import TdaClient, ingest_tda_events
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
@@ -1471,6 +1472,14 @@ async def get_analysis_case_brief(case_id: str):
     if case is None:
         raise _not_found("AnalysisCase", case_id)
     return {"case_id": case.id, "markdown": generate_analysis_case_brief(case)}
+
+
+@router.get("/analysis-cases/{case_id}/fact-ledger-summary")
+async def get_analysis_case_fact_ledger_summary(case_id: str):
+    case = await default_store.get_analysis_case(case_id)
+    if case is None:
+        raise _not_found("AnalysisCase", case_id)
+    return summarize_fact_ledger(case)
 
 
 @router.get("/analysis-cases/{case_id}")

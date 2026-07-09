@@ -304,6 +304,7 @@ For detailed runtime design, see docs/integration-runtime-v2.md.
 - AI-generated facts must be distinguished from human/system/vendor facts.
 - False positive must cite contradiction/negative observations.
 - Missing evidence is an Evidence Gap, not proof of absence.
+- Fact Ledger discipline requires analysis conclusions to distinguish supported facts, unsupported facts, cited evidence, uncited evidence, and open evidence gaps.
 - High-risk conclusions require human review.
 - Current stage no automatic remediation.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.models import AnalysisCase
 
 
@@ -33,6 +34,8 @@ def generate_analysis_case_brief(case: AnalysisCase) -> str:
     """
 
     raw_json = json.dumps(case.model_dump(mode="json"), ensure_ascii=False, indent=2)
+    fact_ledger = summarize_fact_ledger(case)
+    coverage = fact_ledger.coverage
     return "\n".join([
         "# Analysis Case Brief",
         "",
@@ -60,6 +63,22 @@ def generate_analysis_case_brief(case: AnalysisCase) -> str:
         "## Evidence Gaps",
         "",
         _table(["gap_type", "missing_source_type", "description", "impact", "suggested_connector_capability"], [[g.gap_type, g.missing_source_type, g.description, g.impact, g.suggested_connector_capability] for g in case.evidence_gaps]),
+        "",
+        "## Fact / Evidence Discipline",
+        "",
+        _table(["metric", "value"], [
+            ["total facts", coverage.total_facts],
+            ["supported facts", coverage.supported_facts],
+            ["unsupported facts", coverage.unsupported_facts],
+            ["cited evidence", coverage.cited_evidence_items],
+            ["uncited evidence", coverage.uncited_evidence_items],
+            ["open evidence gaps", coverage.open_evidence_gaps],
+            ["discipline status", coverage.discipline_status],
+        ]),
+        "",
+        "### Top Warnings",
+        "",
+        "\n".join(f"- {warning}" for warning in coverage.warnings[:3]) if coverage.warnings else "_None._",
         "",
         "## Hypotheses",
         "",
