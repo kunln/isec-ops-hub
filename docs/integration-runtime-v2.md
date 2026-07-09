@@ -53,6 +53,8 @@ Typical package contents:
 
 An Integration Instance is a user-configured instance of a package, such as `TDA-测试环境`, `明御APT-某客户`, or `微步账号A`.
 
+The first Integration Instance skeleton stores only instance metadata and credential profile references. It does not store credential values, test connections, run sync, call connectors, or create security objects.
+
 Suggested fields:
 
 - `instance_id`

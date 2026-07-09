@@ -21,6 +21,8 @@ from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.integrations import create_default_integration_registry
+from flocks.security.integrations.instance_store import default_integration_instance_store
+from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
 from flocks.security.connectors.tda import TdaClient, ingest_tda_events
@@ -436,6 +438,67 @@ async def get_integration_package(package_id: str):
     """Return one built-in Integration Package manifest by id."""
 
     return _integration_package_manifest(package_id)
+
+
+
+
+def _instance_validation_error(exc: ValueError) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/integrations/instances", response_model=list[IntegrationInstance])
+async def list_integration_instances(package_id: str | None = None, enabled: bool | None = None):
+    """List Integration Instance metadata without connector side effects."""
+
+    return default_integration_instance_store.list_instances(package_id=package_id, enabled=enabled)
+
+
+@router.post(
+    "/integrations/instances",
+    response_model=IntegrationInstance,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def create_integration_instance(payload: IntegrationInstanceCreate):
+    """Create Integration Instance metadata only.
+
+    Credential values, connection tests, sync, connector calls, and Security
+    object creation are intentionally out of scope for this skeleton.
+    """
+
+    try:
+        return default_integration_instance_store.create_instance(payload)
+    except ValueError as exc:
+        raise _instance_validation_error(exc) from exc
+
+
+@router.get("/integrations/instances/{instance_id}", response_model=IntegrationInstance)
+async def get_integration_instance(instance_id: str):
+    instance = default_integration_instance_store.get_instance(instance_id)
+    if instance is None:
+        raise HTTPException(status_code=404, detail="Integration instance not found")
+    return instance
+
+
+@router.patch(
+    "/integrations/instances/{instance_id}",
+    response_model=IntegrationInstance,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def update_integration_instance(instance_id: str, payload: IntegrationInstanceUpdate):
+    try:
+        instance = default_integration_instance_store.update_instance(instance_id, payload)
+    except ValueError as exc:
+        raise _instance_validation_error(exc) from exc
+    if instance is None:
+        raise HTTPException(status_code=404, detail="Integration instance not found")
+    return instance
+
+
+@router.delete("/integrations/instances/{instance_id}", dependencies=[Depends(require_capability("security.ops.write"))])
+async def delete_integration_instance(instance_id: str):
+    if not default_integration_instance_store.delete_instance(instance_id):
+        raise HTTPException(status_code=404, detail="Integration instance not found")
+    return {"status": "deleted", "instance_id": instance_id}
 
 
 @router.get("/integrations/capabilities", response_model=list[IntegrationCapability])
