@@ -350,7 +350,7 @@ Supported authentication types:
 - Header injection
 - The rule that the secret is never persisted in run history
 
-Example TDA HMAC authentication spec:
+Example TDA HMAC authentication spec, based on the current understanding of TDA documentation. The final live connector behavior should still be verified against real devices during integration testing:
 
 ```yaml
 auth:
@@ -363,17 +363,19 @@ auth:
       source: secret_ref
       required: true
   timestamp:
+    name: auth_timestamp
     source: unix_seconds
-    header: X-Timestamp
   sign:
-    input_template: "{api_key}{timestamp}{body_hash}"
+    input_template: "{auth_timestamp}{api_key}"
     digest: sha256
-    output: base64
-    url_safe: false
-    padding: true
-    header: X-Sign
+    output: base64_urlsafe
+    header: sign
   headers:
-    X-API-Key: "{api_key}"
+    api_key: "{api_key}"
+    auth_timestamp: "{auth_timestamp}"
+    sign: "{sign}"
+  run_history:
+    persist_secret: false
 ```
 
 ## 9. Pagination and Time Window Design
