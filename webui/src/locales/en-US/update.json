@@ -1,5 +1,5 @@
 {
-  "title": "Flocks Version Info",
+  "title": "iSecOps Hub Version Info",
   "currentVersion": "Current Version",
   "latestVersion": "Latest Version",
   "hasUpdate": "Update Available",
@@ -23,7 +23,7 @@
   "restartTimeout": "Service restart timed out, please refresh manually",
   "dismissAction": "Don't remind me again",
   "dockerModeTitle": "Docker Deployment",
-  "dockerModeDesc": "You are running Flocks via Docker. In-place upgrade is not available. Please pull the latest image and restart the container to upgrade.",
+  "dockerModeDesc": "You are running iSecOps Hub via Docker. In-place upgrade is not available. Please pull the latest image and restart the container to upgrade.",
   "dockerUpgradeHint": "docker pull ghcr.io/agentflocks/flocks:latest",
   "stageLabels": {
     "fetching": "Downloading latest source archive",

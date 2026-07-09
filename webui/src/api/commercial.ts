@@ -170,13 +170,13 @@ export interface CommercialAccessControl {
 }
 
 export const defaultBranding: CommercialBranding = {
-  product_name: 'Flocks',
-  company_name: 'Flocks Team',
+  product_name: 'iSecOps Hub',
+  company_name: 'iSecOps Hub Team',
   logo_light: null,
   logo_dark: null,
   favicon: null,
   support_url: null,
-  copyright: 'Copyright Flocks Team',
+  copyright: 'Copyright iSecOps Hub Team',
   login_title: null,
   login_subtitle: null,
 };

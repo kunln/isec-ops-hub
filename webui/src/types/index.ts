@@ -1,4 +1,4 @@
-// Common types for the Flocks WebUI
+// Common types for the iSecOps Hub WebUI
 
 /**
  * Session 会话信息

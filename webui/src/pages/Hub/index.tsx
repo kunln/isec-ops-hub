@@ -78,7 +78,7 @@ function formatPluginTypeLabel(type: HubPluginType, language: string): string {
 
 const HUB_TEXT = {
   zh: {
-    description: '浏览随 Flocks 打包的本地插件广场，并安装到本机插件目录。',
+    description: '浏览随 iSecOps Hub 打包的本地插件广场，并安装到本机插件目录。',
     treeView: '目录视图',
     tableView: '表格视图',
     refresh: '刷新',
@@ -120,7 +120,7 @@ const HUB_TEXT = {
     },
   },
   en: {
-    description: 'Browse bundled Flocks Hub plugins and install them into the local plugin directory.',
+    description: 'Browse bundled iSecOps Hub plugins and install them into the local plugin directory.',
     treeView: 'Directory View',
     tableView: 'Table View',
     refresh: 'Refresh',
@@ -363,7 +363,7 @@ export default function HubPage() {
   return (
     <div className="h-full flex flex-col">
       <PageHeader
-        title="Flocks Hub"
+        title="iSecOps Hub"
         description={text.description}
         icon={<Archive className="w-8 h-8" />}
         action={

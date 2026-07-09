@@ -54,7 +54,7 @@
   "error": {
     "backendUnavailable": "Cannot connect to backend service",
     "backendError": "Backend service error",
-    "backendErrorHint": "Please ensure the Flocks backend is running",
+    "backendErrorHint": "Please ensure the iSecOps Hub backend is running",
     "processingFailed": "Processing failed",
     "deleteFailed": "Delete failed",
     "saveFailed": "Save failed"
@@ -176,8 +176,8 @@
       "providerThreatBookGlobal": "ThreatBook Global free model",
       "savePrimary": "Save & Verify Model",
       "saveOptionalThreatBook": "Save & Verify ThreatBook Services",
-      "primaryThreatBookCnHint": "After validation, Flocks will also configure the ThreatBook-China model, API, and MCP services.",
-      "primaryThreatBookGlobalHint": "After validation, Flocks will also configure the ThreatBook Global model and API service.",
+      "primaryThreatBookCnHint": "After validation, iSecOps Hub will also configure the ThreatBook-China model, API, and MCP services.",
+      "primaryThreatBookGlobalHint": "After validation, iSecOps Hub will also configure the ThreatBook Global model and API service.",
       "primaryThreatBookCnSuccess": "Model verification succeeded. ThreatBook-China API and MCP have also been configured.",
       "primaryThreatBookGlobalSuccess": "Model verification succeeded. ThreatBook Global API has also been configured.",
       "primaryThirdPartySuccess": "Default model verification succeeded. {{provider}} / {{model}} has been configured.",

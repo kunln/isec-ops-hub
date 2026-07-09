@@ -29,7 +29,7 @@ export function useToolFilters(tools: Tool[]) {
     tools.forEach((t) => {
       cats.add(t.category);
       sources.add(t.source);
-      sourceNames.add(t.source_name || 'Flocks');
+      sourceNames.add(t.source_name || 'iSecOps Hub');
     });
     return {
       category: Array.from(cats).sort(),
@@ -61,7 +61,7 @@ export function useToolFilters(tools: Tool[]) {
 
     if (filters.category.size > 0) result = result.filter((t) => filters.category.has(t.category));
     if (filters.source.size > 0) result = result.filter((t) => filters.source.has(t.source));
-    if (filters.source_name.size > 0) result = result.filter((t) => filters.source_name.has(t.source_name || 'Flocks'));
+    if (filters.source_name.size > 0) result = result.filter((t) => filters.source_name.has(t.source_name || 'iSecOps Hub'));
     if (filters.enabled.size > 0) result = result.filter((t) => filters.enabled.has(String(t.enabled)));
 
     result.sort((a, b) => {
@@ -77,7 +77,7 @@ export function useToolFilters(tools: Tool[]) {
           cmp = (SOURCE_SORT_ORDER[a.source] ?? 99) - (SOURCE_SORT_ORDER[b.source] ?? 99);
           break;
         case 'source_name':
-          cmp = (a.source_name || 'Flocks').localeCompare(b.source_name || 'Flocks', 'zh');
+          cmp = (a.source_name || 'iSecOps Hub').localeCompare(b.source_name || 'iSecOps Hub', 'zh');
           break;
         case 'enabled':
           cmp = a.enabled === b.enabled ? 0 : a.enabled ? -1 : 1;

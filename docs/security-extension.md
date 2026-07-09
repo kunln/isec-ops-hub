@@ -2,7 +2,7 @@
 
 ## 1. 产品定位
 
-Security Extension 将 Flocks 扩展为“AI 驻场安全专家平台”的 MVP 原型，面向资产风险分析、漏洞优先级、告警研判、安全事件生成和客户可读报告输出。
+Security Extension 将 iSecOps Hub 扩展为“AI 驻场安全专家平台”的 MVP 原型，面向资产风险分析、漏洞优先级、告警研判、安全事件生成和客户可读报告输出。
 
 第一阶段不是 SIEM、SOAR、漏洞扫描器或蜜罐内核，而是一个可演示的安全运营闭环：
 
@@ -18,7 +18,7 @@ Security Extension 将 Flocks 扩展为“AI 驻场安全专家平台”的 MVP 
 - WebUI：`webui/src/pages/Security/`
 - 项目级 Agent / Skill / Workflow：`.flocks/plugins/...`
 
-该扩展复用现有 Storage、ToolRegistry、Agent、Skill、Workflow 和 WebUI 路由机制，不替换 Flocks Core。
+该扩展复用现有 Storage、ToolRegistry、Agent、Skill、Workflow 和 WebUI 路由机制，不替换 flocks internal core。
 
 ## 3. 新增目录说明
 

@@ -181,7 +181,7 @@
       "updateChannel": "更新通道",
       "updateCheckEnabled": "允许更新检查",
       "updateApplyEnabled": "允许应用更新",
-      "legacySourcesEnabled": "允许 Flocks 原更新源",
+      "legacySourcesEnabled": "允许 iSecOps Hub 原更新源",
       "requireManualApproval": "需要人工审批",
       "offlinePackageImport": "允许离线包导入",
       "signatureRequired": "必须校验签名",
