@@ -14,9 +14,21 @@ import re
 from typing import Any, Optional
 
 from .secrets import SecretManager, get_secret_manager
+from .safe_export import (
+    SafeExportResult,
+    is_sensitive_export_field,
+    redact_for_safe_export,
+    safe_export_json,
+    safe_export_records,
+)
 
 __all__ = [
     "SecretManager",
+    "SafeExportResult",
+    "is_sensitive_export_field",
+    "redact_for_safe_export",
+    "safe_export_json",
+    "safe_export_records",
     "get_secret_manager",
     "resolve_secret_value",
     "resolve_secret_refs",

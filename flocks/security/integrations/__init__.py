@@ -2,6 +2,14 @@
 
 from flocks.security.integrations.builtin import get_builtin_integration_packages
 from flocks.security.integrations.builtin_mappings import MINGYU_RISK_MAPPING, TDA_ALERT_MAPPING
+from flocks.security.integrations.instances import (
+    IntegrationInstance,
+    IntegrationInstanceCreate,
+    IntegrationInstanceStore,
+    IntegrationInstanceUpdate,
+    build_capability_run_request_from_instance,
+    default_integration_instance_store,
+)
 from flocks.security.integrations.mapping import (
     EvidenceEventMappingResult,
     MappingRule,
@@ -30,6 +38,12 @@ from flocks.security.integrations.runtime import (
 )
 
 __all__ = [
+    "default_integration_instance_store",
+    "build_capability_run_request_from_instance",
+    "IntegrationInstanceStore",
+    "IntegrationInstanceUpdate",
+    "IntegrationInstanceCreate",
+    "IntegrationInstance",
     "EvidenceEventMappingResult",
     "MappingRule",
     "MINGYU_RISK_MAPPING",
