@@ -265,6 +265,8 @@ Capabilities examples:
 
 Vendor/product code should implement capabilities, not own the platform lifecycle.
 
+For detailed runtime design, see docs/integration-runtime-v2.md.
+
 ## 6. Data Retention and Raw Log Boundary
 
 - iSecOps Hub is not SIEM.

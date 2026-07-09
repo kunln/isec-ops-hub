@@ -14,6 +14,7 @@
 - No automatic remediation at current stage.
 - Every task must respect five-layer architecture.
 - If a requested implementation crosses layers, pause and explain the boundary issue.
+- Integration Runtime work must follow docs/integration-runtime-v2.md and prefer package/capability abstractions over product-specific platform logic.
 
 For future PR summaries, Codex should include:
 
