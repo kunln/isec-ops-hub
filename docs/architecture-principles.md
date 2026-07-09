@@ -284,6 +284,7 @@ For detailed runtime design, see docs/integration-runtime-v2.md.
   - bounded key_fields
   - Integration Run summaries
 - Raw vendor response may be used temporarily in memory for mapping and hashing, then discarded.
+- All customer-facing briefs, reports, and exports must pass through safe export/redaction utilities before including metadata, key_fields, raw_data, normalized_data, or evidence-derived details.
 - Sensitive fields must be excluded:
   - api_key
   - secret

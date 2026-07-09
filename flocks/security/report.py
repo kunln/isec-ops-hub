@@ -2,9 +2,41 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from flocks.security.models import AnalysisCase
+from flocks.security.safe_export import is_raw_payload_key, is_sensitive_key, safe_export_dict, safe_export_value
 from flocks.security.schemas import SecurityListFilters
 from flocks.security.store import SecurityStore, default_store
+
+
+def _strip_redacted_keys(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _strip_redacted_keys(item)
+            for key, item in value.items()
+            if not is_sensitive_key(str(key)) and not is_raw_payload_key(str(key))
+        }
+    if isinstance(value, list):
+        return [_strip_redacted_keys(item) for item in value]
+    return value
+
+
+def _stringify_safe(value: Any) -> str:
+    if isinstance(value, dict | list):
+        return str(_strip_redacted_keys(value))
+    return str(value)
+
+
+def safe_incident_report_data(incident) -> dict[str, Any]:
+    """Return redacted incident fields for customer-facing report generation."""
+
+    return {
+        "evidence": safe_export_value(incident.evidence),
+        "timeline": safe_export_value(incident.timeline),
+        "raw_data": safe_export_dict(incident.raw_data),
+        "normalized_data": safe_export_dict(incident.normalized_data),
+    }
 
 
 def _line_items(items: list[str], empty: str = "暂无") -> str:
@@ -131,12 +163,14 @@ async def generate_incident_report(
         )
         for event in honeypot_events
     ]
-    evidence_lines = incident.evidence or [
+    report_data = safe_incident_report_data(incident)
+    evidence_lines = [_stringify_safe(item) for item in report_data["evidence"]] if report_data["evidence"] else [
         f"{alert.source} / {alert.title} / {alert.severity}" for alert in alerts
     ]
     timeline_lines = [
-        f"{item.get('timestamp') or 'unknown'}：{item.get('description') or item.get('event') or item}"
-        for item in incident.timeline
+        f"{item.get('timestamp') or 'unknown'}：{_stringify_safe(item.get('description') or item.get('event') or item)}"
+        if isinstance(item, dict) else _stringify_safe(item)
+        for item in report_data["timeline"]
     ]
 
     evidence_notice = (

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from flocks.security.fact_ledger import summarize_fact_ledger
+from flocks.security.safe_export import safe_export_dict
 from flocks.security.models import AnalysisCase
 
 
@@ -25,11 +26,30 @@ def _table(headers: list[str], rows: list[list[Any]]) -> str:
     return "\n".join(lines)
 
 
+def safe_analysis_case_export_details(case: AnalysisCase) -> dict[str, Any]:
+    """Return safe helper output for optional Analysis Case export details.
+
+    This intentionally covers metadata and key_fields without adding full raw
+    object dumps to the default brief.
+    """
+
+    return {
+        "facts": [{"id": fact.id, "metadata": safe_export_dict(fact.metadata)} for fact in case.facts],
+        "evidence_items": [
+            {"id": evidence.id, "key_fields": safe_export_dict(evidence.key_fields), "metadata": safe_export_dict(evidence.metadata)}
+            for evidence in case.evidence_items
+        ],
+        "evidence_gaps": [{"id": gap.id, "metadata": safe_export_dict(gap.metadata)} for gap in case.evidence_gaps],
+    }
+
+
 def generate_analysis_case_brief(case: AnalysisCase) -> str:
     """Return a Markdown brief for a single Analysis Case.
 
-    The brief is intentionally evidence-led and avoids raw payloads, secrets, and
-    full object dumps. It does not call external LLMs or notification systems.
+    The brief is a safe export: it is intentionally evidence-led, uses redacted
+    helper output for metadata/key_fields-style fields, and avoids raw payloads,
+    secrets, and full object dumps. It does not call external LLMs or notification
+    systems.
     """
 
     fact_ledger = summarize_fact_ledger(case)
