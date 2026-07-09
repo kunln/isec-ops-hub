@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.models import AnalysisCase
 
 
@@ -28,11 +28,12 @@ def _table(headers: list[str], rows: list[list[Any]]) -> str:
 def generate_analysis_case_brief(case: AnalysisCase) -> str:
     """Return a Markdown brief for a single Analysis Case.
 
-    The brief is intentionally evidence-led and includes raw JSON for demo and
-    smoke-test debugging. It does not call external LLMs or notification systems.
+    The brief is intentionally evidence-led and avoids raw payloads, secrets, and
+    full object dumps. It does not call external LLMs or notification systems.
     """
 
-    raw_json = json.dumps(case.model_dump(mode="json"), ensure_ascii=False, indent=2)
+    fact_ledger = summarize_fact_ledger(case)
+    top_warnings = fact_ledger.warnings[:3]
     return "\n".join([
         "# Analysis Case Brief",
         "",
@@ -61,6 +62,14 @@ def generate_analysis_case_brief(case: AnalysisCase) -> str:
         "",
         _table(["gap_type", "missing_source_type", "description", "impact", "suggested_connector_capability"], [[g.gap_type, g.missing_source_type, g.description, g.impact, g.suggested_connector_capability] for g in case.evidence_gaps]),
         "",
+        "## Fact / Evidence Discipline",
+        "",
+        _table(["metric", "value"], [["total facts", fact_ledger.coverage.total_facts], ["supported facts", fact_ledger.coverage.supported_facts], ["unsupported facts", fact_ledger.coverage.unsupported_facts], ["cited evidence", fact_ledger.coverage.cited_evidence_items], ["uncited evidence", fact_ledger.coverage.uncited_evidence_items], ["open evidence gaps", fact_ledger.coverage.open_evidence_gaps], ["discipline status", fact_ledger.discipline_status]]),
+        "",
+        "### Top Warnings",
+        "",
+        "\n".join(f"- {warning}" for warning in top_warnings) if top_warnings else "_None._",
+        "",
         "## Hypotheses",
         "",
         _table(["name", "status", "reason"], [[h.get("name"), h.get("status"), h.get("reason")] for h in case.hypotheses]),
@@ -77,9 +86,4 @@ def generate_analysis_case_brief(case: AnalysisCase) -> str:
         "",
         "\n".join(f"- {item}" for item in case.recommendations) if case.recommendations else "_None._",
         "",
-        "## Raw Case JSON",
-        "",
-        "```json",
-        raw_json,
-        "```",
     ])
