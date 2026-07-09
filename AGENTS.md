@@ -1,5 +1,27 @@
 # Flocks Project Instructions
 
+## iSecOps Hub Architecture Guardrails
+
+- iSecOps Hub is the product; flocks is current internal package/core.
+- Do not rename flocks package unless task explicitly says migration plan.
+- Prefer iSecOps Hub in user-facing UI/docs.
+- Use Integration terminology for new architecture docs.
+- Device Integration / future Integration Center owns credentials, connection tests, sync, integration runs.
+- Security owns alerts, evidence, analysis cases, incidents, notifications, reports.
+- Security pages must not introduce vendor credential forms.
+- Do not store long-term full raw logs/API responses.
+- AI conclusions must cite Evidence/Facts.
+- No automatic remediation at current stage.
+- Every task must respect five-layer architecture.
+- If a requested implementation crosses layers, pause and explain the boundary issue.
+
+For future PR summaries, Codex should include:
+
+- Architecture Layer Impact
+- Raw Data / Credential Safety
+- Tests
+
+
 ## 文件输出约定（全局强制）
 
 **所有 Agent（Rex 及所有子 Agent）在写文件时，若无明确指定路径，必须遵守以下约定。**
