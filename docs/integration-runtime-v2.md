@@ -462,6 +462,8 @@ Add docs, introduce Integration terminology, and keep v1 APIs.
 
 ### Phase 2 Package Registry Skeleton
 
+The initial skeleton is implemented as a built-in Integration Package Registry with static TDA and Mingyu APT package metadata. It does not change v1 connector behavior.
+
 Add package registry data model, manifest parser, and static built-in packages for TDA/Mingyu with no behavior change.
 
 ### Phase 3 Capability Runtime
