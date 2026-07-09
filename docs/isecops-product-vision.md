@@ -92,3 +92,5 @@ Future stages may add:
 - Richer case correlation across assets, identities, vulnerabilities, business systems, and timelines.
 
 Those capabilities should remain compatible with the current evidence-first model and should not bypass Analysis Case, Fact Ledger, approval, or audit requirements.
+
+For target customer and positioning details, see docs/target-customer-positioning.md.
