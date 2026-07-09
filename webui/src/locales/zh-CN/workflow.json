@@ -240,7 +240,7 @@
       "syslogPort": "端口",
       "syslogFormat": "解析格式",
       "syslogInputKey": "Inputs 键名",
-      "syslogHint": "开启后 Flocks 在指定地址/端口接收 syslog，解析结果写入工作流 inputs（默认键名 syslog_message）。",
+      "syslogHint": "开启后 iSecOps Hub 在指定地址/端口接收 syslog，解析结果写入工作流 inputs（默认键名 syslog_message）。",
       "syslogPortError": "端口范围无效，请输入 1 ~ 65535 之间的整数",
       "syslogActive": "监听中",
       "historySection": "执行历史",
@@ -256,7 +256,7 @@
       "currentLabel": "当前",
       "inputPlaceholder": "描述你想对工作流做的修改... (Enter 发送)",
       "sessionTitle": "修改工作流「{{name}}」",
-      "contextMessage": "你是一个工作流专家助手，正在帮助用户修改 Flocks 工作流。请根据用户的需求修改工作流文件。\n\n工作流名称： {{name}}\n分类： {{category}}\n工作流目录： {{dir}}\n\n文件路径：\n- MD 描述文件：{{mdPath}}\n- JSON 定义文件：{{jsonPath}}\n\n请先加载 workflow-builder skill，完成工作流的修改。",
+      "contextMessage": "你是一个工作流专家助手，正在帮助用户修改 iSecOps Hub 工作流。请根据用户的需求修改工作流文件。\n\n工作流名称： {{name}}\n分类： {{category}}\n工作流目录： {{dir}}\n\n文件路径：\n- MD 描述文件：{{mdPath}}\n- JSON 定义文件：{{jsonPath}}\n\n请先加载 workflow-builder skill，完成工作流的修改。",
       "welcome": {
         "title": "工作流「{{name}}」",
         "descPart1": "描述你的修改需求，AI 将先更新 MD 描述文件，请对照左侧",
@@ -296,7 +296,7 @@
       "sessionTitle": "新建工作流",
       "preparing": "正在准备工作流助手...",
       "inputPlaceholder": "描述您想创建的工作流... (Enter 发送)",
-      "contextMessage": "用户希望创建一个 Flocks 工作流，请使用 workflow-builder skill 来完成。",
+      "contextMessage": "用户希望创建一个 iSecOps Hub 工作流，请使用 workflow-builder skill 来完成。",
       "welcomeMessage": "你好！我是工作流创建助手 🚀\n\n请描述您想要创建的工作流，例如：\n\n- **情报查询类**：IP / 域名 / 文件哈希 威胁情报查询\n- **数据处理类**：多源数据采集、清洗、关联分析\n- **自动化响应类**：安全告警处理、事件响应流程\n\n描述越详细，生成的工作流越准确。您也可以点击下方的示例问题快速开始！",
       "exampleQuestions": [
         "帮我创建一个 IP 威胁情报查询工作流，输入 IP 地址，查询多个情报源并汇总生成报告",

@@ -253,7 +253,7 @@ export default function ToolPage() {
     tools.forEach((tool) => {
       cats.add(tool.category);
       sources.add(tool.source);
-      sourceNames.add(tool.source_name || 'Flocks');
+      sourceNames.add(tool.source_name || 'iSecOps Hub');
     });
     return {
       category: Array.from(cats).sort(),
@@ -295,7 +295,7 @@ export default function ToolPage() {
       result = result.filter((tool) => filters.source.has(tool.source));
     }
     if (filters.source_name.size > 0) {
-      result = result.filter((tool) => filters.source_name.has(tool.source_name || 'Flocks'));
+      result = result.filter((tool) => filters.source_name.has(tool.source_name || 'iSecOps Hub'));
     }
     if (filters.enabled.size > 0) {
       result = result.filter((tool) => filters.enabled.has(String(tool.enabled)));
@@ -315,7 +315,7 @@ export default function ToolPage() {
           cmp = (SOURCE_SORT_ORDER[a.source] ?? 99) - (SOURCE_SORT_ORDER[b.source] ?? 99);
           break;
         case 'source_name':
-          cmp = (a.source_name || 'Flocks').localeCompare(b.source_name || 'Flocks', 'zh');
+          cmp = (a.source_name || 'iSecOps Hub').localeCompare(b.source_name || 'iSecOps Hub', 'zh');
           break;
         case 'enabled':
           cmp = (a.enabled === b.enabled ? 0 : a.enabled ? -1 : 1);
@@ -3280,7 +3280,7 @@ function ToolTable({
 
               {/* Provider column */}
               <div className="text-xs text-gray-600 truncate">
-                {tool.source_name || 'Flocks'}
+                {tool.source_name || 'iSecOps Hub'}
               </div>
 
               {/* Status column */}

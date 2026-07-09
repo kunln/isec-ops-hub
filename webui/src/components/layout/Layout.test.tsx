@@ -33,13 +33,13 @@ const {
     getUpdatePolicy: vi.fn(),
   },
   defaultBranding: {
-    product_name: 'Flocks',
-    company_name: 'Flocks Team',
+    product_name: 'iSecOps Hub',
+    company_name: 'iSecOps Hub Team',
     logo_light: null,
     logo_dark: null,
     favicon: null,
     support_url: null,
-    copyright: 'Copyright Flocks Team',
+    copyright: 'Copyright iSecOps Hub Team',
     login_title: null,
     login_subtitle: null,
   },
@@ -405,7 +405,7 @@ describe('Layout onboarding entry', () => {
 
     renderHomeWithLayout();
 
-    expect(await screen.findByText('Flocks v2026.04.28 更新内容')).toBeInTheDocument();
+    expect(await screen.findByText('iSecOps Hub v2026.04.28 更新内容')).toBeInTheDocument();
     expect(screen.getByText(/中文更新 1/)).toBeInTheDocument();
     expect(screen.queryByText(/English update 1/)).not.toBeInTheDocument();
     expect(getActiveNotifications).toHaveBeenCalledTimes(1);
@@ -434,7 +434,7 @@ describe('Layout onboarding entry', () => {
     await waitFor(() => {
       expect(getNotificationAckStatus).toHaveBeenCalledWith('whats-new-2026.04.28');
     });
-    expect(screen.queryByText('Flocks v2026.04.28 更新内容')).not.toBeInTheDocument();
+    expect(screen.queryByText('iSecOps Hub v2026.04.28 更新内容')).not.toBeInTheDocument();
   });
 
   it('closes the notification modal from the top-right close button', async () => {
@@ -509,7 +509,7 @@ describe('Layout onboarding entry', () => {
     });
 
     expect(await screen.findByText('Token 免费期已延长')).toBeInTheDocument();
-    expect(screen.getByText('Flocks v2026.04.28 更新内容')).toBeInTheDocument();
+    expect(screen.getByText('iSecOps Hub v2026.04.28 更新内容')).toBeInTheDocument();
   });
 
   it('does not call update check when commercial update policy disables checks', async () => {
@@ -572,6 +572,6 @@ describe('Layout onboarding entry', () => {
       expect(checkUpdate).toHaveBeenCalledTimes(1);
     });
     expect(getNotificationAckStatus).not.toHaveBeenCalledWith('whats-new-2026.04.28');
-    expect(screen.queryByText('Flocks v2026.04.28 更新内容')).not.toBeInTheDocument();
+    expect(screen.queryByText('iSecOps Hub v2026.04.28 更新内容')).not.toBeInTheDocument();
   });
 });

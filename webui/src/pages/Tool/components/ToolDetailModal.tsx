@@ -90,7 +90,7 @@ export default function ToolDetailModal({ tool, initialSection, onClose }: ToolD
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${sb.className}`}>
                     {sourceLabel}
                   </span>
-                  <span className="text-xs text-gray-500">{tool.source_name || 'Flocks'}</span>
+                  <span className="text-xs text-gray-500">{tool.source_name || 'iSecOps Hub'}</span>
                   <span className="text-xs text-gray-400">{t(CATEGORY_LABEL_KEY[tool.category] ?? 'category.custom')}</span>
                 </div>
               </div>

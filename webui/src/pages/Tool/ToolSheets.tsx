@@ -661,7 +661,7 @@ export function MCPSheet({ onClose, onSaved, onRefresh }: MCPSheetProps) {
 
 // ─── APISheet ─────────────────────────────────────────────────────────────────
 
-const API_REX_CONTEXT = `你是 API 工具接入助手。用户希望通过对话将外部 API 接入为 Flocks API工具。
+const API_REX_CONTEXT = `你是 API 工具接入助手。用户希望通过对话将外部 API 接入为 iSecOps Hub API工具。
 
 请使用 tool-builder skill 完成接入，所有产物写入 ~/.flocks/plugins/tools/api/ 目录。
 
@@ -719,7 +719,7 @@ export function APISheet({ onClose }: APISheetProps) {
 
 // ─── GenerateToolSheet ────────────────────────────────────────────────────────
 
-const GENERATE_REX_CONTEXT = `你是工具创建助手。用户希望通过对话创建一个新的 Flocks python工具。
+const GENERATE_REX_CONTEXT = `你是工具创建助手。用户希望通过对话创建一个新的 iSecOps Hub python工具。
 
 请使用 tool-builder skill 根据用户需求完成工具创建，所有产物写入 ~/.flocks/plugins/tools/python 目录。
 

@@ -1,14 +1,17 @@
-# Flocks
+# iSecOps Hub
 
 **English** | [简体中文](README_zh.md)
 
 AI-Native SecOps Platform
 
-![Flocks WebUI](assets/flocks.webp)
+> [!NOTE]
+> iSecOps Hub is built on the existing `flocks` internal package/core during migration. Do not rename the `flocks` Python package in normal feature work.
+
+![iSecOps Hub WebUI](assets/flocks.webp)
 
 ## 1. Project Overview
 
-Flocks is an AI-driven SecOps platform built with Python, featuring multi-agent collaboration, HTTP API server, and modern terminal user interface designed to help you with your SecOps tasks.
+iSecOps Hub is an AI-driven SecOps platform built with Python, featuring multi-agent collaboration, HTTP API server, and modern terminal user interface designed to help you with your SecOps tasks.
 
 ## 2. Features
 
@@ -24,7 +27,7 @@ Flocks is an AI-driven SecOps platform built with Python, featuring multi-agent 
 
 ## 3. Installation & Usage
 
-Flocks supports two deployment methods — **choose one**:
+iSecOps Hub supports two deployment methods — **choose one**:
 
 | Method | Description |
 |---|---|
@@ -91,7 +94,7 @@ powershell -ep Bypass -File .\scripts\install.ps1
 
 **Option C: Windows installer (EXE, BETA)**
 
-Flocks provides an **Inno Setup** wizard (`.exe`) for **Windows x64**. Download the installer for your version from the [GitHub Releases](https://github.com/AgentFlocks/flocks/releases) page.
+iSecOps Hub provides an **Inno Setup** wizard (`.exe`) for **Windows x64**. Download the installer for your version from the [GitHub Releases](https://github.com/AgentFlocks/flocks/releases) page.
 
 | Platform | Download |
 | --- | --- |
@@ -119,7 +122,7 @@ The default service URLs are:
 - WebUI: `http://127.0.0.1:5173` by default
 - Remote access configurable via `flocks start --server-host <ip> --webui-host <ip>`
 
-Flocks CLI usage: `flocks --help`
+iSecOps Hub CLI usage: `flocks --help`
 
 ### 3.2 Option 2: Docker Installation
 
@@ -200,7 +203,7 @@ sudo chown -R <uid>:<gid> ~/.flocks
 # example: sudo chown -R 1001:1001 ~/.flocks
 ```
 
-### 4.3 Remote Access to Flocks Service
+### 4.3 Remote Access to iSecOps Hub Service
 ```bash
 __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=<your_domain> \
 flocks start --server-host 127.0.0.1 --webui-host 0.0.0.0

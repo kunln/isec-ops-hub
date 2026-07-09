@@ -181,7 +181,7 @@
       "updateChannel": "Update Channel",
       "updateCheckEnabled": "Allow Update Checks",
       "updateApplyEnabled": "Allow Applying Updates",
-      "legacySourcesEnabled": "Allow Original Flocks Update Sources",
+      "legacySourcesEnabled": "Allow Original iSecOps Hub Update Sources",
       "requireManualApproval": "Require Manual Approval",
       "offlinePackageImport": "Allow Offline Package Import",
       "signatureRequired": "Require Signature Verification",

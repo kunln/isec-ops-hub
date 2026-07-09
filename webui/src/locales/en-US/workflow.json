@@ -240,7 +240,7 @@
       "syslogPort": "Port",
       "syslogFormat": "Parse format",
       "syslogInputKey": "Inputs key",
-      "syslogHint": "When enabled, Flocks listens for syslog on the given address/port and passes parsed payloads to workflow inputs (default key: syslog_message).",
+      "syslogHint": "When enabled, iSecOps Hub listens for syslog on the given address/port and passes parsed payloads to workflow inputs (default key: syslog_message).",
       "syslogPortError": "Invalid port: must be an integer between 1 and 65535",
       "syslogActive": "Listening",
       "historySection": "Execution History",
@@ -256,7 +256,7 @@
       "currentLabel": "Current",
       "inputPlaceholder": "Describe your workflow changes... (Enter to send)",
       "sessionTitle": "Edit Workflow \"{{name}}\"",
-      "contextMessage": "You are a workflow expert assistant helping users modify Flocks workflows. Please modify the workflow files based on the user's requirements.\n\nWorkflow Name: {{name}}\nCategory: {{category}}\nWorkflow Directory: {{dir}}\n\nFile Paths:\n- MD Description File: {{mdPath}}\n- JSON Definition File: {{jsonPath}}\n\nPlease load the workflow-builder skill first to complete the workflow modifications.",
+      "contextMessage": "You are a workflow expert assistant helping users modify iSecOps Hub workflows. Please modify the workflow files based on the user's requirements.\n\nWorkflow Name: {{name}}\nCategory: {{category}}\nWorkflow Directory: {{dir}}\n\nFile Paths:\n- MD Description File: {{mdPath}}\n- JSON Definition File: {{jsonPath}}\n\nPlease load the workflow-builder skill first to complete the workflow modifications.",
       "welcome": {
         "title": "Workflow \"{{name}}\"",
         "descPart1": "Describe your changes, AI will first update the MD description file. Review the left ",
@@ -296,7 +296,7 @@
       "sessionTitle": "New Workflow",
       "preparing": "Preparing workflow assistant...",
       "inputPlaceholder": "Describe the workflow you want to create... (Enter to send)",
-      "contextMessage": "The user wants to create a Flocks workflow, please use the workflow-builder skill to complete it.",
+      "contextMessage": "The user wants to create an iSecOps Hub workflow, please use the workflow-builder skill to complete it.",
       "welcomeMessage": "Hello! I'm your Workflow Creation Assistant 🚀\n\nPlease describe the workflow you'd like to create, for example:\n\n- **Threat Intelligence**: IP / Domain / File Hash lookups\n- **Data Processing**: Multi-source collection, cleaning, correlation\n- **Automated Response**: Security alert handling, incident response\n\nThe more detail you provide, the more accurate the generated workflow will be. You can also click the example questions below to get started quickly!",
       "exampleQuestions": [
         "Create an IP threat intelligence query workflow that takes an IP address, queries multiple intelligence sources, and generates a summary report",

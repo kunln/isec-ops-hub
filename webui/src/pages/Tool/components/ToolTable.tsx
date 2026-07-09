@@ -145,7 +145,7 @@ export default function ToolTable({
 
               {/* Provider column */}
               <div className="text-xs text-gray-600 truncate">
-                {tool.source_name || 'Flocks'}
+                {tool.source_name || 'iSecOps Hub'}
               </div>
 
               {/* Status column */}

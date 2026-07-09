@@ -1,5 +1,5 @@
 {
-  "title": "Flocks 版本信息",
+  "title": "iSecOps Hub 版本信息",
   "currentVersion": "当前版本",
   "latestVersion": "最新版本",
   "hasUpdate": "有新版本",
@@ -23,7 +23,7 @@
   "restartTimeout": "服务重启超时，请手动刷新页面",
   "dismissAction": "不再提醒",
   "dockerModeTitle": "Docker 部署",
-  "dockerModeDesc": "当前通过 Docker 运行 Flocks，暂不支持页面内原地升级。请拉取最新镜像并重启容器完成升级。",
+  "dockerModeDesc": "当前通过 Docker 运行 iSecOps Hub，暂不支持页面内原地升级。请拉取最新镜像并重启容器完成升级。",
   "dockerUpgradeHint": "docker pull ghcr.io/agentflocks/flocks:latest",
   "stageLabels": {
     "fetching": "下载最新源码包",

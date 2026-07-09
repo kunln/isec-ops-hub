@@ -1,6 +1,6 @@
 # Commercial Admin Split
 
-Flocks ships two WebUI access surfaces:
+iSecOps Hub ships two WebUI access surfaces:
 
 - Frontstage user WebUI: development and preview default to port `8080`.
   Production should expose this surface through reverse proxy or container
@@ -69,7 +69,7 @@ triggered during normal WebUI startup.
 The backend is the final enforcement layer:
 
 - `/api/update/check` returns a local disabled result when checks, outbound
-  access, or legacy Flocks sources are disabled.
+  access, or legacy iSecOps Hub sources are disabled.
 - `/api/update/apply` returns `403` before any download when update application
   or outbound access is disabled.
 - `flocks update` uses the same commercial update policy checks as the WebUI
@@ -111,7 +111,7 @@ The Admin Console writes the three primary policy groups through these APIs:
 - `/api/commercial/notification-policy` controls local, built-in, benefit,
   whats-new, vendor, and announcement notifications.
 - `/api/commercial/update-policy` controls update checks, update application,
-  legacy Flocks update sources, manual approval, offline package imports,
+  legacy iSecOps Hub update sources, manual approval, offline package imports,
   signatures, and rollback.
 
 The UI is localized through the existing WebUI i18n resources. User-facing
