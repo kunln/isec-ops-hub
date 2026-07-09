@@ -108,6 +108,34 @@ export interface TdaTestRequest {
   verify_ssl: boolean;
 }
 
+export interface IntegrationPackageSummary {
+  package_id: string;
+  name: string;
+  vendor: string;
+  product: string;
+  version: string;
+  category: string;
+  description?: string | null;
+  auth_type: string;
+  capabilities: string[];
+  sensitive_fields: string[];
+  raw_response_policy: string;
+  raw_log_storage: string;
+}
+
+export type IntegrationPackageManifest = IntegrationPackageSummary;
+
+export interface IntegrationCapability {
+  package_id: string;
+  capability: string;
+  display_name?: string | null;
+  description?: string | null;
+  method?: string | null;
+  path?: string | null;
+  pagination?: string | null;
+  mapping?: string | null;
+}
+
 export interface SecurityAlert {
   id: string;
   asset_id?: string | null;
@@ -1206,6 +1234,13 @@ export interface SecurityVulnerabilityPriority {
 }
 
 export const securityAPI = {
+  listIntegrationPackages: () =>
+    client.get<IntegrationPackageSummary[]>('/api/security/integrations/packages'),
+  getIntegrationPackage: (packageId: string) =>
+    client.get<IntegrationPackageManifest>(`/api/security/integrations/packages/${packageId}`),
+  listIntegrationCapabilities: () =>
+    client.get<IntegrationCapability[]>('/api/security/integrations/capabilities'),
+
   health: () => client.get('/api/security/health'),
   getEvidenceGraph: () => client.get<SecurityEvidenceGraph>('/api/security/evidence-graph'),
   rebuildEvidenceGraph: () => client.post<SecurityEvidenceGraph>('/api/security/evidence-graph/rebuild'),
