@@ -25,6 +25,24 @@ async def commercial_storage(tmp_path, monkeypatch):
     Storage._initialized = False
 
 
+async def _enable_connectivity_license() -> None:
+    await default_store.set_license({
+        "status": "active",
+        "edition": "enterprise",
+        "license_id": "test-connectivity-license",
+        "features": ["connectivity"],
+    })
+
+
+async def _enable_license_without_connectivity() -> None:
+    await default_store.set_license({
+        "status": "active",
+        "edition": "community",
+        "license_id": "test-non-connectivity-license",
+        "features": ["branding"],
+    })
+
+
 @pytest.mark.asyncio
 async def test_local_urls_are_not_treated_as_external_outbound(commercial_storage):
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
@@ -37,6 +55,7 @@ async def test_local_urls_are_not_treated_as_external_outbound(commercial_storag
 
 @pytest.mark.asyncio
 async def test_private_network_urls_require_explicit_device_allowance(commercial_storage):
+    await _enable_connectivity_license()
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
 
     with pytest.raises(commercial_policy.CommercialPolicyError, match="private test"):
@@ -54,6 +73,7 @@ async def test_private_network_urls_require_explicit_device_allowance(commercial
 
 @pytest.mark.asyncio
 async def test_allowed_hosts_requires_known_target_for_unknown_outbound(commercial_storage):
+    await _enable_connectivity_license()
     await default_store.update_connectivity(
         ConnectivityUpdate(outbound_enabled=True, allowed_hosts=["api.example.com"])
     )
@@ -67,6 +87,7 @@ async def test_allowed_hosts_requires_known_target_for_unknown_outbound(commerci
 
 @pytest.mark.asyncio
 async def test_allowed_hosts_rejects_unlisted_remote_host_and_records_audit(commercial_storage):
+    await _enable_connectivity_license()
     await default_store.update_connectivity(
         ConnectivityUpdate(outbound_enabled=True, allowed_hosts=["api.example.com"])
     )
@@ -88,6 +109,7 @@ async def test_allowed_hosts_rejects_unlisted_remote_host_and_records_audit(comm
 async def test_remote_mcp_connection_blocked_before_transport(commercial_storage, monkeypatch):
     from flocks.mcp.client import McpClient
 
+    await _enable_connectivity_license()
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
     client = McpClient(
         name="remote-demo",
@@ -112,6 +134,7 @@ async def test_remote_mcp_connection_blocked_before_transport(commercial_storage
 async def test_mcp_package_install_blocked_before_subprocess(commercial_storage, monkeypatch):
     from flocks.mcp import installer
 
+    await _enable_connectivity_license()
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
     monkeypatch.setattr(
         installer,
@@ -136,6 +159,7 @@ async def test_mcp_package_install_blocked_before_subprocess(commercial_storage,
 async def test_skill_url_download_blocked_before_http_client(commercial_storage):
     from flocks.skill.installer import SkillInstaller
 
+    await _enable_connectivity_license()
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
 
     result = await SkillInstaller.install_from_source("https://example.com/SKILL.md")
@@ -149,6 +173,7 @@ async def test_skill_url_download_blocked_before_http_client(commercial_storage)
 async def test_skill_registry_search_records_policy_denial(commercial_storage):
     from flocks.cli.commands import skill as skill_command
 
+    await _enable_connectivity_license()
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
 
     results = await skill_command._search_clawhub("demo")
@@ -164,6 +189,7 @@ async def test_skill_registry_search_records_policy_denial(commercial_storage):
 async def test_webfetch_blocked_before_permission_prompt(commercial_storage):
     from flocks.tool.web.webfetch import webfetch_tool
 
+    await _enable_connectivity_license()
     await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
 
     class DummyContext:
@@ -178,3 +204,57 @@ async def test_webfetch_blocked_before_permission_prompt(commercial_storage):
     assert result.success is False
     assert "webfetch tool request" in (result.error or "")
     assert ctx.asked is False
+
+
+@pytest.mark.asyncio
+async def test_community_unlicensed_provider_credential_policy_allows_when_connectivity_disabled(commercial_storage):
+    await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
+
+    decision = await commercial_policy.decide_outbound_allowed(
+        url="https://api.minimax.io/v1/models",
+        purpose="provider credential test: minimax",
+    )
+
+    assert decision.allowed is True
+    assert decision.reason is None
+
+
+@pytest.mark.asyncio
+async def test_licensed_connectivity_enabled_rejects_unlisted_provider_host(commercial_storage):
+    await _enable_connectivity_license()
+    await default_store.update_connectivity(
+        ConnectivityUpdate(outbound_enabled=True, allowed_hosts=["api.example.com"])
+    )
+
+    with pytest.raises(commercial_policy.CommercialPolicyError, match="allowed_hosts"):
+        await commercial_policy.ensure_outbound_allowed(
+            url="https://api.minimax.io/v1/models",
+            purpose="provider credential test: minimax",
+        )
+
+
+@pytest.mark.asyncio
+async def test_licensed_connectivity_disabled_feature_allows_outbound_policy(commercial_storage):
+    await _enable_license_without_connectivity()
+    await default_store.update_connectivity(
+        ConnectivityUpdate(outbound_enabled=False, allowed_hosts=["api.example.com"])
+    )
+
+    await commercial_policy.ensure_outbound_allowed(
+        url="https://api.minimax.io/v1/models",
+        purpose="provider credential test: minimax",
+    )
+
+
+@pytest.mark.asyncio
+async def test_community_security_connector_and_device_policy_purposes_allow(commercial_storage):
+    await default_store.update_connectivity(ConnectivityUpdate(outbound_enabled=False))
+
+    for purpose, url in (
+        ("security connector test: tda", "https://tda.example.com/ngtda/dashboard/system_resource_overview"),
+        ("security connector ingest: mingyu-apt", "https://apt.example.com/openapi/risk"),
+        ("device connectivity probe", "https://device.example.com/api/status"),
+    ):
+        decision = await commercial_policy.decide_outbound_allowed(url=url, purpose=purpose)
+        assert decision.allowed is True
+        assert decision.reason is None

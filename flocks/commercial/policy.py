@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import ipaddress
 from urllib.parse import urlparse
 
+from flocks.commercial import features as commercial_features
 from flocks.commercial.models import (
     ConnectivityConfig,
     NotificationPolicy,
@@ -111,6 +112,16 @@ def is_host_allowed(connectivity: ConnectivityConfig, url: str | None) -> bool:
     return any(_host_matches_rule(host, rule) for rule in connectivity.allowed_hosts)
 
 
+async def is_commercial_connectivity_enforced() -> bool:
+    """Return true only when licensed commercial connectivity policy should apply.
+
+    Community/unlicensed deployments keep development outbound access open.
+    The commercial outbound allowlist/deny policy is enforced only when the
+    current active license explicitly enables the connectivity feature.
+    """
+    return await commercial_features.is_feature_enabled(commercial_features.FEATURE_CONNECTIVITY)
+
+
 async def decide_outbound_allowed(
     *,
     url: str | None = None,
@@ -124,6 +135,8 @@ async def decide_outbound_allowed(
     if is_local_url(url):
         return PolicyDecision(True)
     if allow_private_network and is_private_network_url(url):
+        return PolicyDecision(True)
+    if not await is_commercial_connectivity_enforced():
         return PolicyDecision(True)
     connectivity = await get_connectivity_policy()
     if not connectivity.outbound_enabled:
