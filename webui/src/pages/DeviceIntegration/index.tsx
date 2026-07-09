@@ -19,6 +19,8 @@ import {
   type SecurityConnectorCustomerEvent,
   type SecurityConnectorCustomerSchedule,
   type SecurityConnectorCustomerSummary,
+  type ConnectorSyncRun,
+  type EvidenceIngestionResponse,
 } from '@/api/security';
 import type { APIServiceSummary, APIServiceCredentialField, Tool, MCPCatalogEntry } from '@/types';
 import { toolAPI } from '@/api/tool';
@@ -2466,6 +2468,140 @@ type PanelMode =
   | { kind: 'edit'; device: DeviceIntegration }
   | null;
 
+
+type MingyuSyncForm = {
+  base_url: string; apikey: string; begin: string; end: string; mode: 'risk' | 'important' | 'safe_event';
+  limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean;
+};
+
+type TdaSyncForm = {
+  base_url: string; api_key: string; secret: string; begin: string; end: string; time_type: number; mode: 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext';
+  limit: number; max_pages: number; verify_ssl: boolean; strip_sign_padding: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean;
+};
+
+function SyncResultSummary({ result }: { result: EvidenceIngestionResponse | null }) {
+  if (!result) return null;
+  return (
+    <div className="mt-3 grid gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 sm:grid-cols-3 lg:grid-cols-6">
+      <div><span className="block text-xs text-emerald-600">run_id</span><span className="font-mono text-xs">{result.run_id || '-'}</span></div>
+      <div><span className="block text-xs text-emerald-600">created_alerts</span>{result.created_alerts ?? 0}</div>
+      <div><span className="block text-xs text-emerald-600">skipped_duplicates</span>{result.skipped_duplicates ?? 0}</div>
+      <div><span className="block text-xs text-emerald-600">created_analysis_cases</span>{result.created_analysis_cases ?? 0}</div>
+      <div><span className="block text-xs text-emerald-600">item count</span>{result.items?.length ?? 0}</div>
+      <div><span className="block text-xs text-emerald-600">error count</span>{(result.items || []).filter((item) => item.status === 'error').length}</div>
+    </div>
+  );
+}
+
+function ConnectorRunsTable({ runs, selectedRun, onSelectRun }: { runs: ConnectorSyncRun[]; selectedRun: ConnectorSyncRun | null; onSelectRun: (run: ConnectorSyncRun) => void }) {
+  const activeRun = selectedRun || runs[0] || null;
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-900">Connector Runs / 同步记录</h3>
+          <p className="mt-1 text-xs text-zinc-500">同步记录仅展示请求摘要、结果摘要、错误信息和 item_refs，不展示 api_key / secret / token 或完整原始日志。</p>
+        </div>
+        <Clock className="h-4 w-4 text-zinc-400" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-zinc-200 text-sm">
+          <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500">
+            <tr>{['started_at', 'finished_at', 'connector_name', 'mode', 'status', 'created_alerts', 'skipped_duplicates', 'created_analysis_cases', 'error_count', 'run_id'].map((key) => <th key={key} className="px-3 py-2">{key}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {runs.map((run) => (
+              <tr key={run.id} onClick={() => onSelectRun(run)} className="cursor-pointer hover:bg-blue-50">
+                <td className="px-3 py-2 font-mono text-xs">{run.started_at}</td>
+                <td className="px-3 py-2 font-mono text-xs">{run.finished_at || '-'}</td>
+                <td className="px-3 py-2">{run.connector_name || run.connector_id}</td>
+                <td className="px-3 py-2">{run.mode}</td>
+                <td className="px-3 py-2"><span className="rounded-full bg-zinc-100 px-2 py-1 text-xs">{run.status}</span></td>
+                <td className="px-3 py-2">{run.result_summary?.created_alerts ?? 0}</td>
+                <td className="px-3 py-2">{run.result_summary?.skipped_duplicates ?? 0}</td>
+                <td className="px-3 py-2">{run.result_summary?.created_analysis_cases ?? 0}</td>
+                <td className="px-3 py-2">{run.result_summary?.error_count ?? 0}</td>
+                <td className="px-3 py-2 font-mono text-xs">{run.id}</td>
+              </tr>
+            ))}
+            {!runs.length && <tr><td colSpan={10} className="px-3 py-6 text-center text-zinc-500">暂无同步记录 / No connector runs yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {activeRun && (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <pre className="max-h-72 overflow-auto rounded-lg bg-zinc-50 p-3 text-xs">{JSON.stringify({ request_summary: activeRun.request_summary, result_summary: activeRun.result_summary, error_message: activeRun.error_message }, null, 2)}</pre>
+          <pre className="max-h-72 overflow-auto rounded-lg bg-zinc-50 p-3 text-xs">{JSON.stringify(activeRun.item_refs || [], null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function EvidenceSyncPanel({
+  mingyuForm, setMingyuForm, tdaForm, setTdaForm, mingyuTestResult, tdaTestResult,
+  syncResult, syncLoading, connectorRuns, selectedRun, onSelectRun,
+  onMingyuTest, onMingyuIngest, onTdaTest, onTdaIngest,
+}: {
+  mingyuForm: MingyuSyncForm; setMingyuForm: (value: MingyuSyncForm) => void;
+  tdaForm: TdaSyncForm; setTdaForm: (value: TdaSyncForm) => void;
+  mingyuTestResult: Record<string, any> | null; tdaTestResult: Record<string, any> | null;
+  syncResult: EvidenceIngestionResponse | null; syncLoading: string | null;
+  connectorRuns: ConnectorSyncRun[]; selectedRun: ConnectorSyncRun | null; onSelectRun: (run: ConnectorSyncRun) => void;
+  onMingyuTest: () => void; onMingyuIngest: () => void; onTdaTest: () => void; onTdaIngest: () => void;
+}) {
+  const disabled = !!syncLoading;
+  return (
+    <section className="mt-6 space-y-4">
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+        <h3 className="text-sm font-semibold text-blue-950">设备接入与证据同步 / Evidence Sync</h3>
+        <div className="mt-2 space-y-1 text-xs text-blue-800">
+          <p>API 地址和密钥仅用于本次测试/同步，不会保存到安全运营页面。</p>
+          <p>平台不保存完整原始日志或 API 响应，仅保存告警摘要、证据引用、hash、key_fields 和 Analysis Case。</p>
+          <p>弱口令/明文口令接口不会保存 login_password 或 login_password_encrypted。</p>
+        </div>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-zinc-900">信桅 TDA</h3>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <input value={tdaForm.base_url} onChange={(e) => setTdaForm({ ...tdaForm, base_url: e.target.value })} placeholder="base_url" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="password" value={tdaForm.api_key} onChange={(e) => setTdaForm({ ...tdaForm, api_key: e.target.value })} placeholder="api_key" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="password" value={tdaForm.secret} onChange={(e) => setTdaForm({ ...tdaForm, secret: e.target.value })} placeholder="secret" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input value={tdaForm.begin} onChange={(e) => setTdaForm({ ...tdaForm, begin: e.target.value })} placeholder="begin" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input value={tdaForm.end} onChange={(e) => setTdaForm({ ...tdaForm, end: e.target.value })} placeholder="end" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <select value={tdaForm.mode} onChange={(e) => setTdaForm({ ...tdaForm, mode: e.target.value as TdaSyncForm['mode'] })} className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"><option value="alert">alert</option><option value="event">event</option><option value="asset_risk">asset_risk</option><option value="weak_pwd">weak_pwd</option><option value="plaintext">plaintext</option></select>
+            <input type="number" value={tdaForm.time_type} onChange={(e) => setTdaForm({ ...tdaForm, time_type: Number(e.target.value) })} placeholder="time_type" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="number" value={tdaForm.limit} onChange={(e) => setTdaForm({ ...tdaForm, limit: Number(e.target.value) })} placeholder="limit" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="number" value={tdaForm.max_pages} onChange={(e) => setTdaForm({ ...tdaForm, max_pages: Number(e.target.value) })} placeholder="max_pages" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-700">{(['verify_ssl','strip_sign_padding','create_analysis_cases','run_initial_analysis','deduplicate'] as const).map((key) => <label key={key} className="inline-flex items-center gap-1"><input type="checkbox" checked={tdaForm[key]} onChange={(e) => setTdaForm({ ...tdaForm, [key]: e.target.checked })} />{key}</label>)}</div>
+          <div className="mt-4 flex gap-2"><button onClick={onTdaTest} disabled={disabled} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50">测试连接</button><button onClick={onTdaIngest} disabled={disabled} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50">拉取并生成研判单</button></div>
+          {tdaTestResult && <pre className="mt-3 max-h-32 overflow-auto rounded bg-zinc-50 p-3 text-xs">{JSON.stringify(tdaTestResult, null, 2)}</pre>}
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-zinc-900">明御 APT</h3>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <input value={mingyuForm.base_url} onChange={(e) => setMingyuForm({ ...mingyuForm, base_url: e.target.value })} placeholder="base_url" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="password" value={mingyuForm.apikey} onChange={(e) => setMingyuForm({ ...mingyuForm, apikey: e.target.value })} placeholder="apikey" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <select value={mingyuForm.mode} onChange={(e) => setMingyuForm({ ...mingyuForm, mode: e.target.value as MingyuSyncForm['mode'] })} className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"><option value="risk">risk</option><option value="important">important</option><option value="safe_event">safe_event</option></select>
+            <input value={mingyuForm.begin} onChange={(e) => setMingyuForm({ ...mingyuForm, begin: e.target.value })} placeholder="begin" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input value={mingyuForm.end} onChange={(e) => setMingyuForm({ ...mingyuForm, end: e.target.value })} placeholder="end" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="number" value={mingyuForm.limit} onChange={(e) => setMingyuForm({ ...mingyuForm, limit: Number(e.target.value) })} placeholder="limit" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <input type="number" value={mingyuForm.max_pages} onChange={(e) => setMingyuForm({ ...mingyuForm, max_pages: Number(e.target.value) })} placeholder="max_pages" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-700">{(['verify_ssl','create_analysis_cases','run_initial_analysis','deduplicate'] as const).map((key) => <label key={key} className="inline-flex items-center gap-1"><input type="checkbox" checked={mingyuForm[key]} onChange={(e) => setMingyuForm({ ...mingyuForm, [key]: e.target.checked })} />{key}</label>)}</div>
+          <div className="mt-4 flex gap-2"><button onClick={onMingyuTest} disabled={disabled} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50">测试连接</button><button onClick={onMingyuIngest} disabled={disabled} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50">拉取并生成研判单</button></div>
+          {mingyuTestResult && <pre className="mt-3 max-h-32 overflow-auto rounded bg-zinc-50 p-3 text-xs">{JSON.stringify(mingyuTestResult, null, 2)}</pre>}
+        </div>
+      </div>
+      <SyncResultSummary result={syncResult} />
+      <ConnectorRunsTable runs={connectorRuns} selectedRun={selectedRun} onSelectRun={onSelectRun} />
+    </section>
+  );
+}
+
 export default function DeviceIntegrationPage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -2481,6 +2617,20 @@ export default function DeviceIntegrationPage() {
   const [credentialSource, setCredentialSource] = useState<SecurityConnectorCustomerDataSource | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [credentialSaving, setCredentialSaving] = useState(false);
+  const [connectorRuns, setConnectorRuns] = useState<ConnectorSyncRun[]>([]);
+  const [selectedConnectorRun, setSelectedConnectorRun] = useState<ConnectorSyncRun | null>(null);
+  const [syncLoading, setSyncLoading] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<EvidenceIngestionResponse | null>(null);
+  const [mingyuForm, setMingyuForm] = useState<MingyuSyncForm>({
+    base_url: '', apikey: '', begin: '2026-07-01 00:00:00', end: '2026-07-07 23:59:59', mode: 'risk',
+    limit: 20, max_pages: 1, verify_ssl: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
+  });
+  const [tdaForm, setTdaForm] = useState<TdaSyncForm>({
+    base_url: '', api_key: '', secret: '', begin: '2026-07-01 00:00:00', end: '2026-07-07 23:59:59', time_type: 5, mode: 'alert',
+    limit: 20, max_pages: 1, verify_ssl: false, strip_sign_padding: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
+  });
+  const [mingyuTestResult, setMingyuTestResult] = useState<Record<string, any> | null>(null);
+  const [tdaTestResult, setTdaTestResult] = useState<Record<string, any> | null>(null);
 
   const currentGroup: DeviceGroup | undefined = groups[0];
 
@@ -2488,7 +2638,7 @@ export default function DeviceIntegrationPage() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes] = await Promise.allSettled([
+      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes, connectorRunsRes] = await Promise.allSettled([
         deviceAPI.list(),
         providerAPI.listApiServices(),
         deviceAPI.listGroups(),
@@ -2496,6 +2646,7 @@ export default function DeviceIntegrationPage() {
         mcpAPI.catalogList(),
         mcpAPI.catalogConfigured(),
         mcpAPI.list(),
+        securityAPI.listConnectorRuns({ limit: 50 }),
       ]);
       if (devRes.status !== 'fulfilled' || tplRes.status !== 'fulfilled' || grpRes.status !== 'fulfilled') {
         throw new Error('device integration load failed');
@@ -2514,6 +2665,7 @@ export default function DeviceIntegrationPage() {
       setMcpStatuses(mcpStatusRes.status === 'fulfilled' ? (mcpStatusRes.value.data || {}) : {});
       setGroups(grpRes.value.data || []);
       setConnectorSummary(diagnosticsRes.status === 'fulfilled' ? diagnosticsRes.value.data : null);
+      setConnectorRuns(connectorRunsRes.status === 'fulfilled' ? connectorRunsRes.value.data : []);
     } catch {
       toast.error('加载失败');
     } finally {
@@ -2846,6 +2998,72 @@ export default function DeviceIntegrationPage() {
     }
   };
 
+
+
+  const refreshConnectorRuns = useCallback(async () => {
+    try {
+      const res = await securityAPI.listConnectorRuns({ limit: 50 });
+      setConnectorRuns(res.data);
+    } catch {
+      setConnectorRuns([]);
+    }
+  }, []);
+
+  const handleTestMingyuApt = async () => {
+    setSyncLoading('mingyu:test');
+    try {
+      const res = await securityAPI.testMingyuApt({ base_url: mingyuForm.base_url, apikey: mingyuForm.apikey, verify_ssl: mingyuForm.verify_ssl });
+      setMingyuTestResult(res.data);
+      toast.success('明御 APT 连接测试完成');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || '明御 APT 连接测试失败');
+    } finally {
+      setSyncLoading(null);
+    }
+  };
+
+  const handleIngestMingyuApt = async () => {
+    setSyncLoading('mingyu:ingest');
+    try {
+      const res = await securityAPI.ingestMingyuApt(mingyuForm);
+      setSyncResult(res.data);
+      toast.success('明御 APT 同步完成');
+      await refreshConnectorRuns();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || '明御 APT 同步失败');
+    } finally {
+      setSyncLoading(null);
+    }
+  };
+
+  const handleTestTda = async () => {
+    setSyncLoading('tda:test');
+    try {
+      const res = await securityAPI.testTda({ base_url: tdaForm.base_url, api_key: tdaForm.api_key, secret: tdaForm.secret, verify_ssl: tdaForm.verify_ssl });
+      setTdaTestResult(res.data);
+      toast.success('信桅 TDA 连接测试完成');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || '信桅 TDA 连接测试失败');
+    } finally {
+      setSyncLoading(null);
+    }
+  };
+
+  const handleIngestTda = async () => {
+    setSyncLoading('tda:ingest');
+    try {
+      const { strip_sign_padding: _stripSignPadding, ...payload } = tdaForm;
+      const res = await securityAPI.ingestTda(payload);
+      setSyncResult(res.data);
+      toast.success('信桅 TDA 同步完成');
+      await refreshConnectorRuns();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || '信桅 TDA 同步失败');
+    } finally {
+      setSyncLoading(null);
+    }
+  };
+
   const handleCredentialSubmit = async (payload: {
     values: Record<string, string>;
     secretKeys: string[];
@@ -2915,6 +3133,24 @@ export default function DeviceIntegrationPage() {
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <IntegrationHealthPanel integrations={customerIntegrations} connectorSummary={connectorSummary} />
+
+          <EvidenceSyncPanel
+            mingyuForm={mingyuForm}
+            setMingyuForm={setMingyuForm}
+            tdaForm={tdaForm}
+            setTdaForm={setTdaForm}
+            mingyuTestResult={mingyuTestResult}
+            tdaTestResult={tdaTestResult}
+            syncResult={syncResult}
+            syncLoading={syncLoading}
+            connectorRuns={connectorRuns}
+            selectedRun={selectedConnectorRun}
+            onSelectRun={setSelectedConnectorRun}
+            onMingyuTest={() => void handleTestMingyuApt()}
+            onMingyuIngest={() => void handleIngestMingyuApt()}
+            onTdaTest={() => void handleTestTda()}
+            onTdaIngest={() => void handleIngestTda()}
+          />
 
           {activeProductCount === 0 ? (
             /* Empty state */

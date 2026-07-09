@@ -57,8 +57,6 @@ import {
   type SecurityHoneypotEvent,
   type SecurityIncident,
   type SecurityVulnerability,
-  type EvidenceIngestionContext,
-  type EvidenceIngestionResponse,
   type ConnectorSyncRun,
 } from '@/api/security';
 
@@ -678,21 +676,6 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   const [connectorRuntimeError, setConnectorRuntimeError] = useState<string | null>(null);
   const [report, setReport] = useState<string>('');
   const [analysisCaseBrief, setAnalysisCaseBrief] = useState<string>('');
-  const [ingestionContext, setIngestionContext] = useState<EvidenceIngestionContext>({ connector_id: 'demo-waf', connector_name: 'Demo WAF', vendor: 'Generic', product: 'WAF', source_type: 'waf', external_base_url: 'https://waf.example.local/events' });
-  const [ingestionEventsJson, setIngestionEventsJson] = useState('[\n  {\n    "id": "evt-001",\n    "title": "SQL injection blocked",\n    "severity": "high",\n    "action": "block",\n    "src_ip": "1.1.1.1",\n    "dst_ip": "10.0.0.10",\n    "url": "/login?id=1 union select",\n    "timestamp": "2026-07-07T10:00:00+00:00"\n  }\n]');
-  const [ingestionOptions, setIngestionOptions] = useState({ create_analysis_cases: true, run_initial_analysis: true, deduplicate: true });
-  const [ingestionResult, setIngestionResult] = useState<EvidenceIngestionResponse | null>(null);
-  const [ingestionLoading, setIngestionLoading] = useState(false);
-  const [mingyuForm, setMingyuForm] = useState({
-    base_url: '', apikey: '', begin: '2026-07-01 00:00:00', end: '2026-07-07 23:59:59', mode: 'risk' as 'risk' | 'important' | 'safe_event',
-    limit: 20, max_pages: 1, verify_ssl: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
-  });
-  const [mingyuTestResult, setMingyuTestResult] = useState<Record<string, any> | null>(null);
-  const [tdaForm, setTdaForm] = useState({
-    base_url: '', api_key: '', secret: '', begin: '2026-07-01 00:00:00', end: '2026-07-07 23:59:59', time_type: 5, mode: 'alert' as 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext',
-    limit: 20, max_pages: 1, verify_ssl: false, create_analysis_cases: true, run_initial_analysis: true, deduplicate: true,
-  });
-  const [tdaTestResult, setTdaTestResult] = useState<Record<string, any> | null>(null);
   useEffect(() => {
     tRef.current = t;
   }, [t]);
@@ -935,80 +918,6 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
   };
 
 
-
-  const ingestEvidenceEvents = async () => {
-    setIngestionLoading(true);
-    setError(null);
-    try {
-      const parsed = JSON.parse(ingestionEventsJson);
-      if (!Array.isArray(parsed)) throw new Error('Events JSON must be an array.');
-      const res = await securityAPI.ingestEvidenceEvents({
-        connector_context: ingestionContext,
-        events: parsed,
-        ...ingestionOptions,
-      });
-      setIngestionResult(res.data);
-      await loadAll();
-    } catch (err: any) {
-      setError(err?.message || 'Evidence ingestion failed');
-    } finally {
-      setIngestionLoading(false);
-    }
-  };
-
-  const testMingyuApt = async () => {
-    setIngestionLoading(true);
-    setError(null);
-    try {
-      const res = await securityAPI.testMingyuApt({ base_url: mingyuForm.base_url, apikey: mingyuForm.apikey, verify_ssl: mingyuForm.verify_ssl });
-      setMingyuTestResult(res.data);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Mingyu APT connection test failed');
-    } finally {
-      setIngestionLoading(false);
-    }
-  };
-
-  const ingestMingyuApt = async () => {
-    setIngestionLoading(true);
-    setError(null);
-    try {
-      const res = await securityAPI.ingestMingyuApt(mingyuForm);
-      setIngestionResult(res.data);
-      await loadAll();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Mingyu APT ingestion failed');
-    } finally {
-      setIngestionLoading(false);
-    }
-  };
-
-  const testTda = async () => {
-    setIngestionLoading(true);
-    setError(null);
-    try {
-      const res = await securityAPI.testTda({ base_url: tdaForm.base_url, api_key: tdaForm.api_key, secret: tdaForm.secret, verify_ssl: tdaForm.verify_ssl });
-      setTdaTestResult(res.data);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'TDA connection test failed');
-    } finally {
-      setIngestionLoading(false);
-    }
-  };
-
-  const ingestTda = async () => {
-    setIngestionLoading(true);
-    setError(null);
-    try {
-      const res = await securityAPI.ingestTda(tdaForm);
-      setIngestionResult(res.data);
-      await loadAll();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'TDA ingestion failed');
-    } finally {
-      setIngestionLoading(false);
-    }
-  };
 
   const createAnalysisCaseFromAlert = async (alertId: string) => {
     const res = await securityAPI.createAnalysisCaseFromAlert(alertId);
@@ -1614,25 +1523,6 @@ export default function SecurityPage({ basePath = '/security', mode = 'expert' }
         />
       ) : section === 'evidence-ingestion' ? (
         <EvidenceIngestionPanel
-          context={ingestionContext}
-          setContext={setIngestionContext}
-          eventsJson={ingestionEventsJson}
-          setEventsJson={setIngestionEventsJson}
-          options={ingestionOptions}
-          setOptions={setIngestionOptions}
-          result={ingestionResult}
-          loading={ingestionLoading}
-          onIngest={() => void ingestEvidenceEvents()}
-          mingyuForm={mingyuForm}
-          setMingyuForm={setMingyuForm}
-          mingyuTestResult={mingyuTestResult}
-          onMingyuTest={() => void testMingyuApt()}
-          onMingyuIngest={() => void ingestMingyuApt()}
-          tdaForm={tdaForm}
-          setTdaForm={setTdaForm}
-          tdaTestResult={tdaTestResult}
-          onTdaTest={() => void testTda()}
-          onTdaIngest={() => void ingestTda()}
           connectorRuns={connectorRuns}
           selectedRun={selectedConnectorRun}
           onSelectRun={setSelectedConnectorRun}
@@ -4564,7 +4454,7 @@ function ConnectorRunsPanel({ runs, selectedRun, onSelectRun }: { runs: Connecto
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">同步记录 / Connector Runs</h2>
-        <span className="text-xs text-gray-500">轻量 run history，不保存 apikey/token/secret 或完整原始日志。</span>
+        <span className="text-xs text-gray-500">轻量 run history，不保存设备凭据或完整原始日志。</span>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -4602,160 +4492,68 @@ function ConnectorRunsPanel({ runs, selectedRun, onSelectRun }: { runs: Connecto
 }
 
 function EvidenceIngestionPanel({
-  context,
-  setContext,
-  eventsJson,
-  setEventsJson,
-  options,
-  setOptions,
-  result,
-  loading,
-  onIngest,
-  mingyuForm,
-  setMingyuForm,
-  mingyuTestResult,
-  onMingyuTest,
-  onMingyuIngest,
-  tdaForm,
-  setTdaForm,
-  tdaTestResult,
-  onTdaTest,
-  onTdaIngest,
   connectorRuns,
   selectedRun,
   onSelectRun,
 }: {
-  context: EvidenceIngestionContext;
-  setContext: (value: EvidenceIngestionContext) => void;
-  eventsJson: string;
-  setEventsJson: (value: string) => void;
-  options: { create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean };
-  setOptions: (value: { create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean }) => void;
-  result: EvidenceIngestionResponse | null;
-  loading: boolean;
-  onIngest: () => void;
-  mingyuForm: { base_url: string; apikey: string; begin: string; end: string; mode: 'risk' | 'important' | 'safe_event'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean };
-  setMingyuForm: (value: { base_url: string; apikey: string; begin: string; end: string; mode: 'risk' | 'important' | 'safe_event'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean }) => void;
-  mingyuTestResult: Record<string, any> | null;
-  onMingyuTest: () => void;
-  onMingyuIngest: () => void;
-  tdaForm: { base_url: string; api_key: string; secret: string; begin: string; end: string; time_type: number; mode: 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean };
-  setTdaForm: (value: { base_url: string; api_key: string; secret: string; begin: string; end: string; time_type: number; mode: 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext'; limit: number; max_pages: number; verify_ssl: boolean; create_analysis_cases: boolean; run_initial_analysis: boolean; deduplicate: boolean }) => void;
-  tdaTestResult: Record<string, any> | null;
-  onTdaTest: () => void;
-  onTdaIngest: () => void;
   connectorRuns: ConnectorSyncRun[];
   selectedRun: ConnectorSyncRun | null;
   onSelectRun: (run: ConnectorSyncRun) => void;
 }) {
-  const contextFields: Array<keyof EvidenceIngestionContext> = ['connector_id', 'connector_name', 'vendor', 'product', 'source_type', 'external_base_url'];
+  const recentRuns = connectorRuns.slice(0, 10);
+  const successfulRuns = connectorRuns.filter((run) => run.status === 'success');
+  const failedRuns = connectorRuns.filter((run) => run.status === 'failed');
+  const latestSuccess = successfulRuns[0] || null;
+  const latestFailure = failedRuns[0] || null;
+  const totals = connectorRuns.reduce(
+    (acc, run) => ({
+      createdAlerts: acc.createdAlerts + Number(run.result_summary?.created_alerts || 0),
+      createdAnalysisCases: acc.createdAnalysisCases + Number(run.result_summary?.created_analysis_cases || 0),
+      errors: acc.errors + Number(run.result_summary?.error_count || 0),
+    }),
+    { createdAlerts: 0, createdAnalysisCases: 0, errors: 0 },
+  );
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        仅用于轻量证据接入测试。系统只保存摘要、关键字段、hash 和外部引用，不保存完整原始日志。
+        <p className="font-semibold">设备 API 配置已统一迁移到设备接入中心。</p>
+        <p className="mt-1">安全运营页面只展示已接入数据源产生的告警、证据和研判结果。如需配置 TDA / 明御 APT 或执行同步，请前往 Device Integration。</p>
+        <button onClick={() => { window.location.href = '/devices'; }} className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">前往设备接入配置</button>
       </div>
-      <div className="rounded-lg border border-amber-200 bg-white p-4">
-        <h2 className="mb-2 text-lg font-semibold text-gray-900">明御 APT 接入测试</h2>
-        <p className="mb-3 text-sm text-amber-700">apikey 仅用于本次请求，不会保存；平台不保存完整原始日志，只保存告警摘要、证据引用、hash、key_fields 和 Analysis Case。</p>
-        <div className="grid gap-3 md:grid-cols-4">
-          <input value={mingyuForm.base_url} onChange={(event) => setMingyuForm({ ...mingyuForm, base_url: event.target.value })} placeholder="base_url" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="password" value={mingyuForm.apikey} onChange={(event) => setMingyuForm({ ...mingyuForm, apikey: event.target.value })} placeholder="apikey" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={mingyuForm.begin} onChange={(event) => setMingyuForm({ ...mingyuForm, begin: event.target.value })} placeholder="begin" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={mingyuForm.end} onChange={(event) => setMingyuForm({ ...mingyuForm, end: event.target.value })} placeholder="end" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <select value={mingyuForm.mode} onChange={(event) => setMingyuForm({ ...mingyuForm, mode: event.target.value as 'risk' | 'important' | 'safe_event' })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="risk">risk</option><option value="important">important</option><option value="safe_event">safe_event</option>
-          </select>
-          <input type="number" value={mingyuForm.limit} onChange={(event) => setMingyuForm({ ...mingyuForm, limit: Number(event.target.value) })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="number" value={mingyuForm.max_pages} onChange={(event) => setMingyuForm({ ...mingyuForm, max_pages: Number(event.target.value) })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-700">
-          {(['verify_ssl', 'create_analysis_cases', 'run_initial_analysis', 'deduplicate'] as const).map((key) => (
-            <label key={key} className="inline-flex items-center gap-2"><input type="checkbox" checked={mingyuForm[key]} onChange={(event) => setMingyuForm({ ...mingyuForm, [key]: event.target.checked })} />{key}</label>
-          ))}
-          <button onClick={onMingyuTest} disabled={loading} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 disabled:opacity-50">测试连接</button>
-          <button onClick={onMingyuIngest} disabled={loading} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50">拉取并生成研判单</button>
-        </div>
-        {mingyuTestResult && <pre className="mt-3 max-h-40 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(mingyuTestResult, null, 2)}</pre>}
-        {result?.run_id && <div className="mt-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">Run ID: <span className="font-mono">{result.run_id}</span></div>}
-      </div>
-      <div className="rounded-lg border border-indigo-200 bg-white p-4">
-        <h2 className="mb-2 text-lg font-semibold text-gray-900">信桅 TDA 接入测试</h2>
-        <p className="mb-3 text-sm text-indigo-700">api_key / secret 仅用于本次请求，不会保存。平台不保存完整原始日志或 API 响应；弱口令/明文口令接口不会保存 login_password 或 login_password_encrypted，只保存告警摘要、证据引用、hash、key_fields 和 Analysis Case。</p>
-        <div className="grid gap-3 md:grid-cols-4">
-          <input value={tdaForm.base_url} onChange={(event) => setTdaForm({ ...tdaForm, base_url: event.target.value })} placeholder="base_url" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="password" value={tdaForm.api_key} onChange={(event) => setTdaForm({ ...tdaForm, api_key: event.target.value })} placeholder="api_key" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="password" value={tdaForm.secret} onChange={(event) => setTdaForm({ ...tdaForm, secret: event.target.value })} placeholder="secret" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <select value={tdaForm.mode} onChange={(event) => setTdaForm({ ...tdaForm, mode: event.target.value as 'alert' | 'event' | 'asset_risk' | 'weak_pwd' | 'plaintext' })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="alert">alert</option><option value="event">event</option><option value="asset_risk">asset_risk</option><option value="weak_pwd">weak_pwd</option><option value="plaintext">plaintext</option>
-          </select>
-          <input value={tdaForm.begin} onChange={(event) => setTdaForm({ ...tdaForm, begin: event.target.value })} placeholder="begin" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={tdaForm.end} onChange={(event) => setTdaForm({ ...tdaForm, end: event.target.value })} placeholder="end" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="number" value={tdaForm.time_type} onChange={(event) => setTdaForm({ ...tdaForm, time_type: Number(event.target.value) })} placeholder="time_type" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="number" value={tdaForm.limit} onChange={(event) => setTdaForm({ ...tdaForm, limit: Number(event.target.value) })} placeholder="limit" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="number" value={tdaForm.max_pages} onChange={(event) => setTdaForm({ ...tdaForm, max_pages: Number(event.target.value) })} placeholder="max_pages" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-700">
-          {(['verify_ssl', 'create_analysis_cases', 'run_initial_analysis', 'deduplicate'] as const).map((key) => (
-            <label key={key} className="inline-flex items-center gap-2"><input type="checkbox" checked={tdaForm[key]} onChange={(event) => setTdaForm({ ...tdaForm, [key]: event.target.checked })} />{key}</label>
-          ))}
-          <button onClick={onTdaTest} disabled={loading} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 disabled:opacity-50">测试连接</button>
-          <button onClick={onTdaIngest} disabled={loading} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50">拉取并生成研判单</button>
-        </div>
-        {tdaTestResult && <pre className="mt-3 max-h-40 overflow-auto rounded bg-gray-50 p-3 text-xs">{JSON.stringify(tdaTestResult, null, 2)}</pre>}
-        {result?.run_id && <div className="mt-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">Run ID: <span className="font-mono">{result.run_id}</span></div>}
-      </div>
-      <ConnectorRunsPanel runs={connectorRuns} selectedRun={selectedRun} onSelectRun={onSelectRun} />
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">证据接入 / Evidence Ingestion</h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          {contextFields.map((field) => (
-            <label key={field} className="text-sm text-gray-600">
-              <span className="mb-1 block font-medium">{field}</span>
-              <input
-                value={context[field] || ''}
-                onChange={(event) => setContext({ ...context, [field]: event.target.value })}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </label>
-          ))}
-        </div>
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4"><p className="text-xs text-gray-500">最近成功同步时间</p><p className="mt-1 font-mono text-sm">{latestSuccess?.finished_at || latestSuccess?.started_at || '-'}</p></div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4"><p className="text-xs text-gray-500">最近失败同步</p><p className="mt-1 font-mono text-sm">{latestFailure?.finished_at || latestFailure?.started_at || '-'}</p></div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4"><p className="text-xs text-gray-500">created_alerts</p><p className="mt-1 text-xl font-semibold">{totals.createdAlerts}</p></div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4"><p className="text-xs text-gray-500">created_analysis_cases / errors</p><p className="mt-1 text-xl font-semibold">{totals.createdAnalysisCases} / {totals.errors}</p></div>
       </div>
       <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="mb-2 font-semibold text-gray-900">Events JSON array</h3>
-        <textarea value={eventsJson} onChange={(event) => setEventsJson(event.target.value)} className="h-72 w-full rounded-lg border border-gray-200 p-3 font-mono text-xs" />
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-700">
-          {(['create_analysis_cases', 'run_initial_analysis', 'deduplicate'] as const).map((key) => (
-            <label key={key} className="inline-flex items-center gap-2">
-              <input type="checkbox" checked={options[key]} onChange={(event) => setOptions({ ...options, [key]: event.target.checked })} />
-              {key}
-            </label>
-          ))}
-          <button onClick={onIngest} disabled={loading} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50">
-            <UploadCloud className="h-4 w-4" /> {loading ? 'Ingesting…' : 'Ingest'}
-          </button>
+        <h2 className="mb-3 text-lg font-semibold text-gray-900">已接入数据源 / 同步摘要</h2>
+        <div className="mb-3 flex flex-wrap gap-2 text-xs text-gray-500">
+          <span className="rounded-full bg-gray-100 px-2 py-1">connector_id/status/mode 过滤请在 Connector Runs 页面使用</span>
+          <span className="rounded-full bg-gray-100 px-2 py-1">本页不展示、不采集设备凭据</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr>{['started_at', 'connector_name', 'mode', 'status', 'created_alerts', 'created_analysis_cases', 'error_count', 'run_id'].map((key) => <th key={key} className="px-3 py-2">{key}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {recentRuns.map((run) => (
+                <tr key={run.id} onClick={() => onSelectRun(run)} className="cursor-pointer hover:bg-blue-50">
+                  <td className="px-3 py-2 font-mono text-xs">{run.started_at}</td>
+                  <td className="px-3 py-2">{run.connector_name || run.connector_id}</td>
+                  <td className="px-3 py-2">{run.mode}</td>
+                  <td className="px-3 py-2"><span className="rounded-full bg-gray-100 px-2 py-1 text-xs">{run.status}</span></td>
+                  <td className="px-3 py-2">{run.result_summary?.created_alerts ?? 0}</td>
+                  <td className="px-3 py-2">{run.result_summary?.created_analysis_cases ?? 0}</td>
+                  <td className="px-3 py-2">{run.result_summary?.error_count ?? 0}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{run.id}</td>
+                </tr>
+              ))}
+              {!recentRuns.length && <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-500">暂无同步摘要</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
-      {result && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <div className="mb-3 grid gap-3 text-sm md:grid-cols-3">
-            <div className="rounded bg-gray-50 p-3"><div className="text-gray-500">created_alerts</div><div className="text-xl font-semibold">{result.created_alerts}</div></div>
-            <div className="rounded bg-gray-50 p-3"><div className="text-gray-500">skipped_duplicates</div><div className="text-xl font-semibold">{result.skipped_duplicates}</div></div>
-            <div className="rounded bg-gray-50 p-3"><div className="text-gray-500">created_analysis_cases</div><div className="text-xl font-semibold">{result.created_analysis_cases}</div></div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-xs">
-              <thead><tr>{['status', 'alert_id', 'analysis_case_id', 'external_event_id', 'payload_hash', 'title', 'source', 'severity', 'error'].map((header) => <th key={header} className="px-3 py-2 text-left font-semibold text-gray-600">{header}</th>)}</tr></thead>
-              <tbody className="divide-y divide-gray-100">
-                {result.items.map((item, index) => (
-                  <tr key={`${item.payload_hash || item.external_event_id || index}`}>
-                    <td className="px-3 py-2">{item.status}</td><td className="px-3 py-2">{item.alert_id || '-'}</td><td className="px-3 py-2">{item.analysis_case_id || '-'}</td><td className="px-3 py-2">{item.external_event_id || '-'}</td><td className="px-3 py-2 font-mono">{item.payload_hash || '-'}</td><td className="px-3 py-2">{item.title || '-'}</td><td className="px-3 py-2">{item.source || '-'}</td><td className="px-3 py-2">{item.severity || '-'}</td><td className="px-3 py-2 text-red-600">{item.error || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <ConnectorRunsPanel runs={recentRuns} selectedRun={selectedRun} onSelectRun={onSelectRun} />
     </div>
   );
 }
