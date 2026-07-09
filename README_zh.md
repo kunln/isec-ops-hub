@@ -1,14 +1,17 @@
-# Flocks
+# iSecOps Hub
 
 [English](README.md) | **简体中文**
 
 AI 原生 SecOps 平台
 
-![Flocks Web](assets/flocks.webp)
+> [!NOTE]
+> iSecOps Hub 在迁移阶段仍基于现有 `flocks` 内部 package/core 构建。普通功能开发不要重命名 `flocks` Python package。
+
+![iSecOps Hub WebUI](assets/flocks.webp)
 
 ## 1. 项目概览
 
-Flocks 是一个以 Python 构建的 AI 驱动型 SecOps 平台，具备多智能体协作、HTTP API 服务与现代化终端用户界面，用于辅助完成各类 SecOps 任务。
+iSecOps Hub 是一个以 Python 构建的 AI 驱动型 SecOps 平台，具备多智能体协作、HTTP API 服务与现代化终端用户界面，用于辅助完成各类 SecOps 任务。
 
 ## 2. 功能特性
 
@@ -24,7 +27,7 @@ Flocks 是一个以 Python 构建的 AI 驱动型 SecOps 平台，具备多智�
 
 ## 3. 安装与使用
 
-Flocks 支持两种部署方式，请**任选其一**：
+iSecOps Hub 支持两种部署方式，请**任选其一**：
 
 | 方式 | 说明 |
 |---|---|
@@ -89,7 +92,7 @@ powershell -ep Bypass -File .\scripts\install_zh.ps1
 
 **选项 C: Windows 安装包（EXE，BETA）** 
 
-Flocks 提供 **Windows x64** 下的 **Inno Setup 安装向导**（`.exe`）。请从 [GitHub Releases](https://github.com/AgentFlocks/flocks/releases) 页面下载对应版本的安装包。
+iSecOps Hub 提供 **Windows x64** 下的 **Inno Setup 安装向导**（`.exe`）。请从 [GitHub Releases](https://github.com/AgentFlocks/flocks/releases) 页面下载对应版本的安装包。
 
 | 平台 | 下载文件 |
 | --- | --- |
@@ -118,7 +121,7 @@ flocks stop
 - WebUI：默认 `http://127.0.0.1:5173`
 - 远程访问修改 `flocks start --server-host <ip> --webui-host <ip>`
 
-更多 CLI 命令使用 `flocks --help`
+iSecOps Hub CLI 当前使用 `flocks --help`
 
 ### 3.2 方案 2：Docker 安装
 
@@ -203,7 +206,7 @@ sudo chown -R <uid>:<gid> ~/.flocks
 # example: sudo chown -R 1001:1001 ~/.flocks
 ```
 
-### 4.3 远程访问 Flocks 服务
+### 4.3 远程访问 iSecOps Hub 服务
 ```bash
 __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=<your_domain> \
 flocks start --server-host 127.0.0.1 --webui-host 0.0.0.0
