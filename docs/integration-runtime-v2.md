@@ -470,6 +470,8 @@ Add package registry data model, manifest parser, and static built-in packages f
 
 Implement `run(instance, capability, params)`, wrap TDA/Mingyu through the Runtime, and keep old endpoints as compatibility wrappers.
 
+The first Capability Runtime skeleton validates package/capability requests, builds sanitized dry-run execution plans, and rejects destructive capabilities. It does not perform real HTTP requests, credential access, evidence ingestion, or v1 connector calls.
+
 ### Phase 4 Mapping Engine
 
 Move mapping to declarative/adapter package definitions and add fixture validation.
