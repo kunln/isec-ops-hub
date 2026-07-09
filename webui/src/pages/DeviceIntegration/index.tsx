@@ -19,6 +19,7 @@ import {
   type SecurityConnectorCustomerEvent,
   type SecurityConnectorCustomerSchedule,
   type SecurityConnectorCustomerSummary,
+  type IntegrationPackageSummary,
 } from '@/api/security';
 import type { APIServiceSummary, APIServiceCredentialField, Tool, MCPCatalogEntry } from '@/types';
 import { toolAPI } from '@/api/tool';
@@ -2456,6 +2457,86 @@ function GroupBanner({ group, onRenamed }: {
   );
 }
 
+
+function groupIntegrationPackages(packages: IntegrationPackageSummary[]) {
+  return packages.reduce<Record<string, IntegrationPackageSummary[]>>((groups, pkg) => {
+    const key = `${pkg.vendor || 'Unknown'} / ${pkg.category || 'uncategorized'}`;
+    groups[key] = groups[key] || [];
+    groups[key].push(pkg);
+    return groups;
+  }, {});
+}
+
+function BuiltInIntegrationPackagesSection({ packages }: { packages: IntegrationPackageSummary[] }) {
+  const grouped = useMemo(() => groupIntegrationPackages(packages), [packages]);
+  const groups = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+
+  return (
+    <section className="mt-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Database className="w-4 h-4 text-indigo-600" />
+        <h3 className="text-sm font-semibold text-zinc-800">Built-in Integration Packages</h3>
+        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">内置集成包</span>
+        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">{packages.length}</span>
+      </div>
+      <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
+        This is package metadata only. Configure credentials and sync profiles in later phases.<br />
+        当前仅展示集成包元数据，凭据配置和同步配置将在后续阶段提供。
+      </div>
+      {groups.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-white p-4 text-sm text-zinc-500">
+          暂无内置集成包元数据。
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {groups.map(([group, items]) => (
+            <div key={group}>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">{group}</div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {items.map((pkg) => (
+                  <div key={pkg.package_id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-zinc-900">{pkg.name}</div>
+                        <div className="mt-1 text-xs text-zinc-500">{pkg.vendor} · {pkg.product}</div>
+                      </div>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                        {pkg.category}
+                      </span>
+                    </div>
+                    {pkg.description && <p className="mt-2 line-clamp-2 text-xs text-zinc-500">{pkg.description}</p>}
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-600">
+                      <div><span className="text-zinc-400">Auth:</span> {pkg.auth_type}</div>
+                      <div><span className="text-zinc-400">Capabilities:</span> {pkg.capabilities.length}</div>
+                      <div><span className="text-zinc-400">Sensitive fields:</span> {pkg.sensitive_fields.length}</div>
+                      <div><span className="text-zinc-400">Version:</span> {pkg.version}</div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {pkg.capabilities.map((capability) => (
+                        <span key={capability} className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+                          {capability}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-3 space-y-1 text-xs text-zinc-600">
+                      <div className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">
+                        Raw response: {pkg.raw_response_policy === 'transient_only' ? 'transient only' : pkg.raw_response_policy}
+                      </div>
+                      <div className="rounded-lg bg-rose-50 px-2 py-1 text-rose-700">
+                        Raw log storage: {pkg.raw_log_storage}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ============================================================================
 // Main page
 // ============================================================================
@@ -2475,6 +2556,7 @@ export default function DeviceIntegrationPage() {
   const [mcpStatuses, setMcpStatuses] = useState<Record<string, McpStatusSummary>>({});
   const [groups, setGroups] = useState<DeviceGroup[]>([]);
   const [connectorSummary, setConnectorSummary] = useState<SecurityConnectorCustomerSummary | null>(null);
+  const [integrationPackages, setIntegrationPackages] = useState<IntegrationPackageSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [panel, setPanel] = useState<PanelMode>(null);
@@ -2488,7 +2570,7 @@ export default function DeviceIntegrationPage() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes] = await Promise.allSettled([
+      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes, packageRes] = await Promise.allSettled([
         deviceAPI.list(),
         providerAPI.listApiServices(),
         deviceAPI.listGroups(),
@@ -2496,6 +2578,7 @@ export default function DeviceIntegrationPage() {
         mcpAPI.catalogList(),
         mcpAPI.catalogConfigured(),
         mcpAPI.list(),
+        securityAPI.listIntegrationPackages(),
       ]);
       if (devRes.status !== 'fulfilled' || tplRes.status !== 'fulfilled' || grpRes.status !== 'fulfilled') {
         throw new Error('device integration load failed');
@@ -2514,6 +2597,7 @@ export default function DeviceIntegrationPage() {
       setMcpStatuses(mcpStatusRes.status === 'fulfilled' ? (mcpStatusRes.value.data || {}) : {});
       setGroups(grpRes.value.data || []);
       setConnectorSummary(diagnosticsRes.status === 'fulfilled' ? diagnosticsRes.value.data : null);
+      setIntegrationPackages(packageRes.status === 'fulfilled' ? packageRes.value.data || [] : []);
     } catch {
       toast.error('加载失败');
     } finally {
@@ -2915,6 +2999,7 @@ export default function DeviceIntegrationPage() {
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <IntegrationHealthPanel integrations={customerIntegrations} connectorSummary={connectorSummary} />
+          <BuiltInIntegrationPackagesSection packages={integrationPackages} />
 
           {activeProductCount === 0 ? (
             /* Empty state */

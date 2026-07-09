@@ -19,6 +19,8 @@ from flocks.security.connector_runs import (
 )
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
+from flocks.security.integrations import create_default_integration_registry
+from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
 from flocks.security.connectors.tda import TdaClient, ingest_tda_events
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
@@ -407,6 +409,39 @@ async def get_evidence_graph_route():
 async def rebuild_evidence_graph_route():
     return await connector_registry.rebuild_evidence_graph()
 
+
+
+
+def _integration_registry():
+    return create_default_integration_registry()
+
+
+def _integration_package_manifest(package_id: str) -> IntegrationPackageManifest:
+    package = _integration_registry().get_package(package_id)
+    if package is None:
+        raise HTTPException(status_code=404, detail="Integration package not found")
+    return package.manifest
+
+
+@router.get("/integrations/packages", response_model=list[IntegrationPackageManifest])
+async def list_integration_packages():
+    """List built-in Integration Package metadata without runtime side effects."""
+
+    return [package.manifest for package in _integration_registry().list_packages()]
+
+
+@router.get("/integrations/packages/{package_id}", response_model=IntegrationPackageManifest)
+async def get_integration_package(package_id: str):
+    """Return one built-in Integration Package manifest by id."""
+
+    return _integration_package_manifest(package_id)
+
+
+@router.get("/integrations/capabilities", response_model=list[IntegrationCapability])
+async def list_integration_capabilities():
+    """List built-in Integration Package capability metadata."""
+
+    return _integration_registry().list_capabilities()
 
 @router.get("/connectors")
 async def list_connectors():
