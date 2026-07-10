@@ -478,6 +478,8 @@ The first Capability Runtime skeleton validates package/capability requests, bui
 
 Move mapping to declarative/adapter package definitions and add fixture validation.
 
+The first Mapping Engine skeleton maps vendor-like dictionaries or fixtures into lightweight Evidence Events using declarative rules. It filters sensitive fields, drops raw payloads, normalizes severity, extracts assets/IOCs, and produces payload_hash without creating Alerts or Analysis Cases.
+
 ### Phase 5 Sync Engine
 
 Add Sync Profile, scheduled sync, cursor/checkpoint, retry, and dead letter handling.
