@@ -73,19 +73,22 @@ Suggested fields:
 
 ### Credential Profile
 
-A Credential Profile is the security object that stores credential configuration and secret references for an Integration Instance.
+A Credential Profile is the Integration Layer skeleton that stores credential metadata and future secret references for an Integration Instance. It stores `secret_ref` and `configured_fields` field names only; it does not store credential values, return secrets, provide test connection behavior, call connectors, make HTTP requests, run sync, or create Security objects.
 
 Suggested fields:
 
 - `credential_profile_id`
+- `display_name`
+- `profile_type`
+- `package_id`
 - `instance_id`
-- `auth_type`
+- `secret_ref`
+- `required_fields`
 - `configured_fields`
-- `secret_refs`
 - `expires_at`
-- `state`
+- `status`
 
-Plaintext credentials must not be stored in Security pages, Analysis Cases, Facts, or Integration Run `item_refs`.
+Plaintext credentials must not be stored in Security pages, Analysis Cases, Facts, Integration Run `item_refs`, Credential Profile metadata, or API responses.
 
 ### Capability
 
