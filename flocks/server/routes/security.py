@@ -20,13 +20,14 @@ from flocks.security.connector_runs import (
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.fact_ledger import summarize_fact_ledger
-from flocks.security.integrations import EvidenceDispatchRequest, create_default_integration_registry, preview_evidence_events as preview_dispatch_evidence_events
+from flocks.security.integrations import EvidenceDispatchRequest, create_default_adapter_registry, create_default_integration_registry, preview_evidence_events as preview_dispatch_evidence_events
 from flocks.security.integrations.credential_store import default_credential_profile_store
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
+from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, ManualSyncPreviewResult, preview_sync_profile_run
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.runs import build_integration_run_from_connector_sync_run
@@ -137,6 +138,14 @@ class SyncEnginePlanAPIRequest(BaseModel):
     requested_by: str | None = None
     params_override: dict[str, Any] = Field(default_factory=dict)
     dry_run: bool = True
+
+
+class ManualSyncPreviewAPIRequest(BaseModel):
+    sync_profile_id: str
+    requested_by: str | None = None
+    params_override: dict[str, Any] = Field(default_factory=dict)
+    dry_run: bool = True
+    preview_only: bool = True
 
 
 class IntegrationCapabilityPlanRequest(BaseModel):
@@ -621,6 +630,36 @@ async def plan_sync_engine(payload: SyncEnginePlanAPIRequest):
             dry_run=True,
         ),
         runtime=IntegrationCapabilityRuntime(_integration_registry()),
+    )
+    if result.status == "not_found":
+        raise HTTPException(status_code=404, detail="Sync profile not found")
+    if result.status in {"validation_failed", "rejected"}:
+        raise HTTPException(status_code=400, detail=result.model_dump(mode="json"))
+    return result
+
+
+@router.post(
+    "/integrations/sync-engine/preview",
+    response_model=ManualSyncPreviewResult,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def preview_sync_engine(payload: ManualSyncPreviewAPIRequest):
+    """Preview a Sync Profile through the safe adapter/evidence preview chain only."""
+
+    try:
+        request = ManualSyncPreviewRequest(
+            sync_profile_id=payload.sync_profile_id,
+            requested_by=payload.requested_by,
+            params_override=payload.params_override,
+            dry_run=True,
+            preview_only=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Manual sync preview request rejected unsafe params_override") from exc
+
+    result = await preview_sync_profile_run(
+        request,
+        adapter_registry=create_default_adapter_registry(include_fake=True),
     )
     if result.status == "not_found":
         raise HTTPException(status_code=404, detail="Sync profile not found")

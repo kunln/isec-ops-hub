@@ -597,3 +597,7 @@ The existing Device Integration route is being refined into an Integration Cente
 The first Sync Engine skeleton supports manual dry-run planning from a Sync Profile. It builds a Capability Runtime dry-run plan and records an IntegrationRun, but does not execute connectors, perform HTTP, read credentials, dispatch evidence, create security objects, or update Sync Profile cursors.
 
 The Integration Center can call the Sync Engine plan API from a Sync Profile to generate and display a dry-run plan and IntegrationRun reference. This UI action does not execute sync, call connectors, read credentials, dispatch evidence, create alerts/incidents, or remediate.
+
+### Manual Sync Preview Skeleton
+
+Manual Sync Preview links a Sync Profile to an Adapter Registry entry, runs a safe adapter in dry-run/preview-only mode, converts returned lightweight items into preview evidence events, and calls the Evidence Dispatcher in `preview_only` mode. It records an IntegrationRun with status `previewed`, but does not execute real sync, call vendor connectors, perform HTTP, read credentials, dispatch persisted evidence, create alerts/incidents, update cursors, send notifications, or remediate.
