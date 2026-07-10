@@ -580,3 +580,7 @@ This design PR does not include:
 - [ ] Are mapping fixtures provided?
 - [ ] Does Security only consume normalized evidence?
 - [ ] Is no automatic remediation performed?
+
+### Integration Center UI boundary
+
+The existing Device Integration route is being refined into an Integration Center experience while keeping the route and component filename stable for compatibility. The UI only exposes metadata management, reference-only credential views, read-only run history, and dry-run planning. It does not execute connectors, sync data, read credential values, dispatch evidence, create alerts/incidents, or remediate.
