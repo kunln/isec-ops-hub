@@ -252,6 +252,10 @@ The Mapping Engine converts vendor responses into Evidence Events. It handles sa
 
 The Sync Engine handles manual sync, future scheduled sync, incremental cursors, deduplication, retry, future dead letter handling, and IntegrationRun creation.
 
+### Adapter Interface
+
+The Adapter Interface defines the execution boundary between Sync Engine planning and future connector-backed fetches. This skeleton only introduces request/result contracts and a fake adapter for tests. It does not call connectors, perform HTTP, read credentials, dispatch evidence, create security objects, or store raw responses. `AdapterResult` may contain lightweight normalized items, item refs, cursor, summary, warnings, and errors, all safe-exported.
+
 ### Evidence Dispatcher
 
 The Evidence Dispatcher sends Evidence Events to `evidence_ingestion`, creates normalized Alerts/EvidenceItems, and may optionally create an Analysis Case and initial analysis. It must never auto-create an Incident unless an explicit human-driven path says so.
