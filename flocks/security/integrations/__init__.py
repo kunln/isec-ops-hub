@@ -14,6 +14,8 @@ from flocks.security.integrations.mapping import (
     get_path,
     normalize_severity,
 )
+from flocks.security.integrations.credential_store import CredentialProfileStore, default_credential_profile_store, resolve_credential_profile_ref
+from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
 from flocks.security.integrations.instances import (
     IntegrationInstance,
@@ -49,6 +51,10 @@ __all__ = [
     "first_of",
     "get_path",
     "normalize_severity",
+    "CredentialProfile",
+    "CredentialProfileCreate",
+    "CredentialProfileStore",
+    "CredentialProfileUpdate",
     "IntegrationInstance",
     "IntegrationInstanceCreate",
     "IntegrationInstanceUpdate",
@@ -63,8 +69,10 @@ __all__ = [
     "IntegrationCapabilityRuntime",
     "build_capability_run_request_from_instance",
     "create_default_integration_registry",
+    "default_credential_profile_store",
     "default_integration_instance_store",
     "get_builtin_integration_packages",
     "is_destructive_capability",
+    "resolve_credential_profile_ref",
     "sanitize_run_params",
 ]

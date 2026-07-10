@@ -21,6 +21,8 @@ from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.integrations import create_default_integration_registry
+from flocks.security.integrations.credential_store import default_credential_profile_store
+from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
@@ -440,6 +442,68 @@ async def get_integration_package(package_id: str):
     return _integration_package_manifest(package_id)
 
 
+
+
+def _credential_profile_validation_error(exc: ValueError) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/integrations/credential-profiles", response_model=list[CredentialProfile])
+async def list_credential_profiles(
+    package_id: str | None = None, instance_id: str | None = None, status: str | None = None
+):
+    """List Credential Profile metadata without returning credential values."""
+
+    return await default_credential_profile_store.list_profiles(
+        package_id=package_id, instance_id=instance_id, status=status
+    )
+
+
+@router.post(
+    "/integrations/credential-profiles",
+    response_model=CredentialProfile,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def create_credential_profile(payload: CredentialProfileCreate):
+    """Create Credential Profile metadata and secret references only."""
+
+    try:
+        return await default_credential_profile_store.create_profile(payload)
+    except ValueError as exc:
+        raise _credential_profile_validation_error(exc) from exc
+
+
+@router.get("/integrations/credential-profiles/{credential_profile_id}", response_model=CredentialProfile)
+async def get_credential_profile(credential_profile_id: str):
+    profile = await default_credential_profile_store.get_profile(credential_profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Credential profile not found")
+    return profile
+
+
+@router.patch(
+    "/integrations/credential-profiles/{credential_profile_id}",
+    response_model=CredentialProfile,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def update_credential_profile(credential_profile_id: str, payload: CredentialProfileUpdate):
+    try:
+        profile = await default_credential_profile_store.update_profile(credential_profile_id, payload)
+    except ValueError as exc:
+        raise _credential_profile_validation_error(exc) from exc
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Credential profile not found")
+    return profile
+
+
+@router.delete(
+    "/integrations/credential-profiles/{credential_profile_id}",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def delete_credential_profile(credential_profile_id: str):
+    if not await default_credential_profile_store.delete_profile(credential_profile_id):
+        raise HTTPException(status_code=404, detail="Credential profile not found")
+    return {"status": "deleted", "credential_profile_id": credential_profile_id}
 
 
 def _instance_validation_error(exc: ValueError) -> HTTPException:
