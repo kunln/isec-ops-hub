@@ -23,6 +23,8 @@ from flocks.security.integrations.evidence_dispatcher import (
 from flocks.security.integrations.credential_store import CredentialProfileStore, default_credential_profile_store, resolve_credential_profile_ref
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
+from flocks.security.integrations.sync_profile_store import SyncProfileStore, default_sync_profile_store
+from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 from flocks.security.integrations.instances import (
     IntegrationInstance,
     IntegrationInstanceCreate,
@@ -65,6 +67,10 @@ __all__ = [
     "CredentialProfileCreate",
     "CredentialProfileStore",
     "CredentialProfileUpdate",
+    "SyncProfile",
+    "SyncProfileCreate",
+    "SyncProfileStore",
+    "SyncProfileUpdate",
     "IntegrationInstance",
     "IntegrationInstanceCreate",
     "IntegrationInstanceUpdate",
@@ -81,6 +87,7 @@ __all__ = [
     "create_default_integration_registry",
     "default_credential_profile_store",
     "default_integration_instance_store",
+    "default_sync_profile_store",
     "get_builtin_integration_packages",
     "is_destructive_capability",
     "resolve_credential_profile_ref",
