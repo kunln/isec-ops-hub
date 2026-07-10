@@ -201,6 +201,8 @@ The Sync Engine handles manual sync, future scheduled sync, incremental cursors,
 
 The Evidence Dispatcher sends Evidence Events to `evidence_ingestion`, creates normalized Alerts/EvidenceItems, and may optionally create an Analysis Case and initial analysis. It must never auto-create an Incident unless an explicit human-driven path says so.
 
+The first Evidence Dispatcher skeleton previews lightweight Evidence Events produced by the Mapping Engine and may reuse the existing evidence ingestion pipeline only when explicitly requested; preview mode is read-only and creates no Alerts or Analysis Cases.
+
 ## 5. Package Manifest Design
 
 The following TDA `manifest.yaml` is an example package manifest. It illustrates the package shape; it does not hard-code TDA behavior into the Runtime.
