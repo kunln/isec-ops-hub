@@ -1,5 +1,14 @@
 """Integration Runtime v2 package registry skeleton."""
 
+from flocks.security.integrations.adapter import (
+    AdapterItemRef,
+    FakeIntegrationAdapter,
+    IntegrationAdapter,
+    IntegrationAdapterRequest,
+    IntegrationAdapterResult,
+    build_adapter_item_refs,
+    sanitize_adapter_mapping,
+)
 from flocks.security.integrations.builtin import get_builtin_integration_packages
 from flocks.security.integrations.builtin_mappings import MINGYU_RISK_MAPPING, TDA_ALERT_MAPPING
 from flocks.security.integrations.mapping import (
@@ -66,6 +75,13 @@ from flocks.security.integrations.runtime import (
 )
 
 __all__ = [
+    "sanitize_adapter_mapping",
+    "build_adapter_item_refs",
+    "IntegrationAdapterResult",
+    "IntegrationAdapterRequest",
+    "IntegrationAdapter",
+    "FakeIntegrationAdapter",
+    "AdapterItemRef",
     "EvidenceEventMappingResult",
     "MappingRule",
     "MINGYU_RISK_MAPPING",
