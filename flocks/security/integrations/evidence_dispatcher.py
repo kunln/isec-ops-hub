@@ -26,6 +26,8 @@ _RAW_OR_VERBOSE_KEYS = {
     "packet",
     "pcap",
     "payload",
+    "http_req_body",
+    "http_resp_body",
     "incident_id",
     "remediation",
     "remediation_action",
@@ -99,6 +101,13 @@ def _event_warnings(event: dict[str, Any], index: int) -> list[str]:
     return warnings
 
 
+def _safe_event(event: dict[str, Any], warnings: list[str], index: int) -> dict[str, Any]:
+    """Return an event copy safe to pass into evidence ingestion."""
+
+    warnings.extend(_event_warnings(event, index))
+    return _safe_value(event, warnings, f"event[{index}]")
+
+
 def _safe_summary(event: dict[str, Any], *, connector_context: dict[str, Any] | None, index: int, warnings: list[str]) -> dict[str, Any]:
     warnings.extend(_event_warnings(event, index))
     summary = summarize_external_event(event, connector_context=connector_context)
@@ -127,12 +136,13 @@ async def dispatch_evidence_events(request: EvidenceDispatchRequest, *, store=No
         return preview_evidence_events(request.events, connector_context=request.connector_context)
 
     warnings: list[str] = []
+    sanitized_events = [_safe_event(event, warnings, index) for index, event in enumerate(request.events)]
     summaries = [
-        _safe_summary(event, connector_context=request.connector_context, index=index, warnings=warnings)
-        for index, event in enumerate(request.events)
+        _safe_value(summarize_external_event(event, connector_context=request.connector_context), warnings, "summary")
+        for event in sanitized_events
     ]
     ingested = await ingest_external_events(
-        request.events,
+        sanitized_events,
         connector_context=request.connector_context,
         create_analysis_cases=request.create_analysis_cases,
         run_initial_analysis=request.run_initial_analysis,

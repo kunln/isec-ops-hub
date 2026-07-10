@@ -162,6 +162,47 @@ async def test_dispatch_preview_only_false_reuses_ingest_external_events():
 
 
 @pytest.mark.asyncio
+async def test_dispatch_preview_only_false_sanitizes_events_before_ingest():
+    store = MemorySecurityStore()
+    event = sample_event(
+        raw_payload="full raw payload",
+        http_req_body="full request body",
+        packet="packet bytes",
+        pcap="pcap bytes",
+        api_key="api-key-plaintext",
+        secret="secret-plaintext",
+        token="token-plaintext",
+        password="password-plaintext",
+    )
+    result = await dispatch_evidence_events(
+        EvidenceDispatchRequest(events=[event], preview_only=False, create_analysis_cases=False),
+        store=store,
+    )
+    assert result.created_alerts == 1
+    alerts = await store.list_alerts()
+    serialized = json.dumps(alerts[0].model_dump(mode="json"), ensure_ascii=False).lower()
+    for forbidden in [
+        "raw_payload",
+        "http_req_body",
+        "packet",
+        "pcap",
+        "api_key",
+        "secret",
+        "token",
+        "password",
+        "full raw payload",
+        "full request body",
+        "packet bytes",
+        "pcap bytes",
+        "api-key-plaintext",
+        "secret-plaintext",
+        "token-plaintext",
+        "password-plaintext",
+    ]:
+        assert forbidden not in serialized
+
+
+@pytest.mark.asyncio
 async def test_preview_only_false_create_analysis_cases_defaults_false():
     store = MemorySecurityStore()
     result = await dispatch_evidence_events(EvidenceDispatchRequest(events=[sample_event()], preview_only=False), store=store)
