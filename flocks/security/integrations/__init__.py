@@ -25,6 +25,7 @@ from flocks.security.integrations.credentials import CredentialProfile, Credenti
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import SyncProfileStore, default_sync_profile_store
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
+from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.instances import (
     IntegrationInstance,
     IntegrationInstanceCreate,
@@ -89,6 +90,9 @@ __all__ = [
     "SyncProfileCreate",
     "SyncProfileStore",
     "SyncProfileUpdate",
+    "SyncEnginePlanRequest",
+    "SyncEnginePlanResult",
+    "plan_sync_profile_run",
     "IntegrationInstance",
     "IntegrationInstanceCreate",
     "IntegrationInstanceUpdate",
