@@ -3,7 +3,7 @@
 This module adds an explicit approval-gated ingest path from Sync Profiles to
 sanitized Evidence/Alert creation. It does not execute real vendor sync, perform
 HTTP, resolve credentials, create Analysis Cases or Incidents, send
-notifications, remediate, or update Sync Profile cursors/last_run_id.
+notifications, remediate, or update Sync Profile cursors/last_run_id outside the successful confirmed ingest boundary.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from flocks.security.integrations.instance_store import default_integration_inst
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.runs import IntegrationRunCreate, safe_export_item_refs, safe_export_summary
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+from flocks.security.integrations.sync_state import SyncStateUpdateRequest, update_sync_profile_run_state
 
 _SECRET_LIKE_KEYS = {
     "api_key", "apikey", "secret", "token", "password", "credential", "authorization",
@@ -198,8 +199,8 @@ async def ingest_sync_profile_run(
         "capability": profile.capability,
         "confirmed": True,
         "request_summary": safe_export_summary({"dry_run": True, "preview_only": False, "confirmed": True, "params": {**profile.params, **request.params_override}}),
-        "safety_summary": {"dry_run": True, "preview_only": False, "confirmed": True, "credentials_read": False, "secret_ref_resolved": False, "create_analysis_cases": False, "run_initial_analysis": False, "cursor_updated": False, "last_run_id_updated": False},
-        "limitations": ["manual approval required", "no real sync", "no vendor connector calls", "no analysis cases", "no incidents", "no notifications", "no remediation", "no cursor updates"],
+        "safety_summary": {"dry_run": True, "preview_only": False, "confirmed": True, "credentials_read": False, "secret_ref_resolved": False, "create_analysis_cases": False, "run_initial_analysis": False, "cursor_updated": False, "last_run_id_updated": False, "last_status_updated": False, "last_synced_at_updated": False},
+        "limitations": ["manual approval required", "no real sync", "no vendor connector calls", "no analysis cases", "no incidents", "no notifications", "no remediation"],
     }
 
     async def validation_failed(message: str, adapter_id: str | None = None) -> ManualSyncIngestResult:
@@ -260,6 +261,32 @@ async def ingest_sync_profile_run(
         result_summary=result_summary, item_refs=item_refs,
         metadata={"source": "ManualSyncIngest", "dry_run": True, "preview_only": False, "confirmed": True},
     ))
+    state_update = await update_sync_profile_run_state(
+        SyncStateUpdateRequest(
+            sync_profile_id=profile.sync_profile_id,
+            run_id=run.run_id,
+            status="ingested",
+            cursor=adapter_result.cursor,
+            update_cursor=bool(adapter_result.cursor),
+        ),
+        sync_profile_store=sync_profile_store,
+    )
+    safety_summary = {
+        **base["safety_summary"],
+        "cursor_updated": state_update.cursor_updated,
+        "last_run_id_updated": state_update.last_run_updated,
+        "last_status_updated": state_update.last_status_updated,
+        "last_synced_at_updated": state_update.last_synced_at_updated,
+    }
+    dispatch_summary = {
+        "preview_only": dispatch_result.preview_only,
+        "create_analysis_cases": False,
+        "run_initial_analysis": False,
+        "cursor_updated": state_update.cursor_updated,
+        "last_run_id_updated": state_update.last_run_updated,
+        "last_status_updated": state_update.last_status_updated,
+        "last_synced_at_updated": state_update.last_synced_at_updated,
+    }
     return ManualSyncIngestResult(
         status="ingested", run_id=run.run_id, adapter_id=adapter_id, fetched_count=adapter_result.item_count,
         mapped_count=len(mapped_events), ingested_count=ingested_count, created_alerts=dispatch_result.created_alerts,
@@ -267,7 +294,8 @@ async def ingest_sync_profile_run(
         item_refs=item_refs, event_summaries=dispatch_result.event_summaries,
         adapter_summary=safe_export_summary(adapter_result.summary),
         mapping_summary={"mode": "safe_passthrough_ingest", "mapping_rules": len(mapping_rules or [])},
-        dispatch_summary={"preview_only": dispatch_result.preview_only, "create_analysis_cases": False, "run_initial_analysis": False},
-        warnings=[*adapter_result.warnings, *dispatch_result.warnings], errors=adapter_result.errors + dispatch_result.errors,
-        **base,
+        dispatch_summary=dispatch_summary,
+        safety_summary=safety_summary,
+        warnings=[*adapter_result.warnings, *dispatch_result.warnings], errors=adapter_result.errors + dispatch_result.errors + state_update.errors,
+        **{key: value for key, value in base.items() if key != "safety_summary"},
     )

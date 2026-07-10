@@ -40,6 +40,7 @@ from flocks.security.integrations.credential_store import CredentialProfileStore
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import SyncProfileStore, default_sync_profile_store
+from flocks.security.integrations.sync_state import SyncStateUpdateRequest, SyncStateUpdateResult, update_sync_profile_run_state
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, ManualSyncPreviewResult, preview_sync_profile_run
@@ -120,6 +121,9 @@ __all__ = [
     "SyncProfileCreate",
     "SyncProfileStore",
     "SyncProfileUpdate",
+    "SyncStateUpdateRequest",
+    "SyncStateUpdateResult",
+    "update_sync_profile_run_state",
     "SyncEnginePlanRequest",
     "SyncEnginePlanResult",
     "plan_sync_profile_run",

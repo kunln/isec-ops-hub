@@ -89,6 +89,30 @@ class SyncProfileStore:
         await Storage.set(_profile_key(sync_profile_id), updated, SYNC_PROFILE_STORAGE_TYPE)
         return updated
 
+
+    async def update_profile_run_state(
+        self,
+        sync_profile_id: str,
+        *,
+        last_run_id: str,
+        last_status: str,
+        last_synced_at: str,
+        cursor: dict[str, Any] | None = None,
+    ) -> SyncProfile | None:
+        current = await self.get_profile(sync_profile_id)
+        if current is None:
+            return None
+        data = current.model_dump(mode="json")
+        data["last_run_id"] = last_run_id
+        data["last_status"] = last_status
+        data["last_synced_at"] = last_synced_at
+        if cursor is not None:
+            data["cursor"] = dict(cursor)
+        data["updated_at"] = utc_now()
+        updated = SyncProfile(**data)
+        await Storage.set(_profile_key(sync_profile_id), updated, SYNC_PROFILE_STORAGE_TYPE)
+        return updated
+
     async def delete_profile(self, sync_profile_id: str) -> bool:
         return await Storage.delete(_profile_key(sync_profile_id))
 
