@@ -71,6 +71,32 @@ Suggested fields:
 - `created_at`
 - `updated_at`
 
+### Sync Profile
+
+A Sync Profile defines synchronization metadata for a specific Integration Instance capability. The first Sync Profile skeleton persists synchronization metadata, parameters, cursors, and scheduling intent only. It does not execute sync, call connectors, perform HTTP, read credentials, dispatch evidence, or create security objects.
+
+Suggested fields:
+
+- `sync_profile_id`
+- `display_name`
+- `instance_id`
+- `package_id`
+- `capability`
+- `mode`
+- `enabled`
+- `schedule`
+- `cursor`
+- `params`
+- `deduplicate`
+- `create_analysis_cases`
+- `run_initial_analysis`
+- `last_run_id`
+- `last_status`
+- `last_synced_at`
+- `created_at`
+- `updated_at`
+- `metadata`
+
 ### Credential Profile
 
 A Credential Profile is the Integration Layer skeleton that stores credential metadata and future secret references for an Integration Instance. It stores `secret_ref` and `configured_fields` field names only; it does not store credential values, return secrets, provide test connection behavior, call connectors, make HTTP requests, run sync, or create Security objects.
@@ -489,7 +515,7 @@ The first Mapping Engine skeleton maps vendor-like dictionaries or fixtures into
 
 ### Phase 5 Sync Engine
 
-Add Sync Profile, scheduled sync, cursor/checkpoint, retry, and dead letter handling.
+Add Sync Profile, scheduled sync, cursor/checkpoint, retry, and dead letter handling. The first Sync Profile skeleton persists synchronization metadata, parameters, cursors, and scheduling intent only. It does not execute sync, call connectors, perform HTTP, read credentials, dispatch evidence, or create security objects.
 
 ### Phase 6 Rename UX
 

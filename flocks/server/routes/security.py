@@ -24,6 +24,8 @@ from flocks.security.integrations import EvidenceDispatchRequest, create_default
 from flocks.security.integrations.credential_store import default_credential_profile_store
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import default_integration_instance_store
+from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
 from flocks.security.integrations.runtime import IntegrationCapabilityRunRequest, IntegrationCapabilityRuntime
@@ -523,6 +525,74 @@ async def delete_credential_profile(credential_profile_id: str):
     if not await default_credential_profile_store.delete_profile(credential_profile_id):
         raise HTTPException(status_code=404, detail="Credential profile not found")
     return {"status": "deleted", "credential_profile_id": credential_profile_id}
+
+
+
+def _sync_profile_validation_error(exc: ValueError) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/integrations/sync-profiles", response_model=list[SyncProfile])
+async def list_sync_profiles(
+    instance_id: str | None = None,
+    package_id: str | None = None,
+    capability: str | None = None,
+    enabled: bool | None = None,
+):
+    """List Sync Profile metadata without executing synchronization."""
+
+    if instance_id is not None and await default_integration_instance_store.get_instance(instance_id) is None:
+        raise HTTPException(status_code=400, detail=f"Unknown integration instance: {instance_id}")
+    return await default_sync_profile_store.list_profiles(
+        instance_id=instance_id, package_id=package_id, capability=capability, enabled=enabled
+    )
+
+
+@router.post(
+    "/integrations/sync-profiles",
+    response_model=SyncProfile,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def create_sync_profile(payload: SyncProfileCreate):
+    """Create Sync Profile metadata and cursor references only."""
+
+    try:
+        return await default_sync_profile_store.create_profile(payload)
+    except ValueError as exc:
+        raise _sync_profile_validation_error(exc) from exc
+
+
+@router.get("/integrations/sync-profiles/{sync_profile_id}", response_model=SyncProfile)
+async def get_sync_profile(sync_profile_id: str):
+    profile = await default_sync_profile_store.get_profile(sync_profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Sync profile not found")
+    return profile
+
+
+@router.patch(
+    "/integrations/sync-profiles/{sync_profile_id}",
+    response_model=SyncProfile,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def update_sync_profile(sync_profile_id: str, payload: SyncProfileUpdate):
+    try:
+        profile = await default_sync_profile_store.update_profile(sync_profile_id, payload)
+    except ValueError as exc:
+        raise _sync_profile_validation_error(exc) from exc
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Sync profile not found")
+    return profile
+
+
+@router.delete(
+    "/integrations/sync-profiles/{sync_profile_id}",
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def delete_sync_profile(sync_profile_id: str):
+    if not await default_sync_profile_store.delete_profile(sync_profile_id):
+        raise HTTPException(status_code=404, detail="Sync profile not found")
+    return {"status": "deleted", "sync_profile_id": sync_profile_id}
 
 
 def _instance_validation_error(exc: ValueError) -> HTTPException:
