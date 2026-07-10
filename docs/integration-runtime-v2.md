@@ -584,3 +584,6 @@ This design PR does not include:
 ### Integration Center UI boundary
 
 The existing Device Integration route is being refined into an Integration Center experience while keeping the route and component filename stable for compatibility. The UI only exposes metadata management, reference-only credential views, read-only run history, and dry-run planning. It does not execute connectors, sync data, read credential values, dispatch evidence, create alerts/incidents, or remediate.
+
+
+The first Sync Engine skeleton supports manual dry-run planning from a Sync Profile. It builds a Capability Runtime dry-run plan and records an IntegrationRun, but does not execute connectors, perform HTTP, read credentials, dispatch evidence, create security objects, or update Sync Profile cursors.

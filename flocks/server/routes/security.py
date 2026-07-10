@@ -26,6 +26,7 @@ from flocks.security.integrations.credentials import CredentialProfile, Credenti
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
+from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.runs import build_integration_run_from_connector_sync_run
@@ -130,6 +131,13 @@ class EvidenceIngestionRequest(BaseModel):
     create_analysis_cases: bool = True
     run_initial_analysis: bool = True
     deduplicate: bool = True
+
+class SyncEnginePlanAPIRequest(BaseModel):
+    sync_profile_id: str
+    requested_by: str | None = None
+    params_override: dict[str, Any] = Field(default_factory=dict)
+    dry_run: bool = True
+
 
 class IntegrationCapabilityPlanRequest(BaseModel):
     package_id: str | None = None
@@ -595,6 +603,30 @@ async def delete_sync_profile(sync_profile_id: str):
     if not await default_sync_profile_store.delete_profile(sync_profile_id):
         raise HTTPException(status_code=404, detail="Sync profile not found")
     return {"status": "deleted", "sync_profile_id": sync_profile_id}
+
+
+@router.post(
+    "/integrations/sync-engine/plan",
+    response_model=SyncEnginePlanResult,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def plan_sync_engine(payload: SyncEnginePlanAPIRequest):
+    """Plan a Sync Profile dry-run and record an IntegrationRun only."""
+
+    result = await plan_sync_profile_run(
+        SyncEnginePlanRequest(
+            sync_profile_id=payload.sync_profile_id,
+            requested_by=payload.requested_by,
+            params_override=payload.params_override,
+            dry_run=True,
+        ),
+        runtime=IntegrationCapabilityRuntime(_integration_registry()),
+    )
+    if result.status == "not_found":
+        raise HTTPException(status_code=404, detail="Sync profile not found")
+    if result.status in {"validation_failed", "rejected"}:
+        raise HTTPException(status_code=400, detail=result.model_dump(mode="json"))
+    return result
 
 
 def _instance_validation_error(exc: ValueError) -> HTTPException:
