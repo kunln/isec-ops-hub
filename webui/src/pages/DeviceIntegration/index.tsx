@@ -20,7 +20,6 @@ import {
   type SecurityConnectorCustomerSchedule,
   type SecurityConnectorCustomerSummary,
   type IntegrationPackageSummary,
-  type IntegrationCapabilityPlanResponse,
   type SyncEnginePlanResult,
   type ManualSyncPreviewResult,
   type ManualSyncIngestResult,
@@ -2581,78 +2580,17 @@ function groupIntegrationPackages(packages: IntegrationPackageSummary[]) {
 function BuiltInIntegrationPackagesSection({ packages }: { packages: IntegrationPackageSummary[] }) {
   const grouped = useMemo(() => groupIntegrationPackages(packages), [packages]);
   const groups = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
-  const [planningKey, setPlanningKey] = useState<string | null>(null);
-  const [planResult, setPlanResult] = useState<IntegrationCapabilityPlanResponse | null>(null);
-  const [planError, setPlanError] = useState<string | null>(null);
-
-  const handleDryRunPlan = async (pkg: IntegrationPackageSummary, capability: string) => {
-    const key = `${pkg.package_id}:${capability}`;
-    setPlanningKey(key);
-    setPlanError(null);
-    try {
-      const response = await securityAPI.planIntegrationCapability({
-        package_id: pkg.package_id,
-        capability,
-        mode: 'manual',
-        params: {},
-        dry_run: true,
-      });
-      setPlanResult(response.data);
-    } catch (error) {
-      setPlanError(apiErrorMessage(error, '生成 dry-run plan 失败'));
-    } finally {
-      setPlanningKey(null);
-    }
-  };
 
   return (
     <section className="mt-6">
       <div className="flex items-center gap-2 mb-3">
         <Database className="w-4 h-4 text-indigo-600" />
-        <h3 className="text-sm font-semibold text-zinc-800">Built-in Integration Packages</h3>
-        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">内置集成包</span>
+        <h3 className="text-sm font-semibold text-zinc-800">可接入产品</h3>
+        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">Products</span>
         <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">{packages.length}</span>
       </div>
-      <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-        This is package metadata only. Dry-run Plan only generates an execution plan; it does not connect to devices, sync data, create alerts, or read credentials.<br />
-        当前仅展示集成包元数据。“生成计划”只生成执行计划，不连接设备、不同步、不创建告警、不读取凭据。
-      </div>
-      {planError && (
-        <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
-          {planError}
-        </div>
-      )}
-      {planResult && (
-        <div className="mb-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="font-semibold">Dry-run Plan / 生成计划：{planResult.package_id} · {planResult.capability}</div>
-            <button onClick={() => setPlanResult(null)} className="rounded-md p-1 text-emerald-700 hover:bg-emerald-100" title="关闭">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            <div><span className="font-medium">Status:</span> {planResult.status}</div>
-            <div><span className="font-medium">Mode:</span> {String(planResult.mode || 'manual')} · <span className="font-medium">Dry-run:</span> {String(planResult.dry_run ?? planResult.request_summary?.dry_run ?? true)}</div>
-          </div>
-          <div className="mt-2 grid gap-2 lg:grid-cols-2">
-            {[
-              ['request_summary', planResult.request_summary],
-              ['capability_summary', planResult.capability_summary],
-              ['safety_summary', planResult.safety_summary],
-              ['limitations', planResult.limitations],
-            ].map(([label, value]) => (
-              <div key={label as string} className="rounded-lg bg-white/70 p-2">
-                <div className="mb-1 font-medium text-emerald-800">{label as string}</div>
-                <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-700">{JSON.stringify(value || {}, null, 2)}</pre>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       {groups.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-          暂无内置集成包元数据。
-        </div>
+        <EmptyState text="当前没有可接入产品，请检查内置集成包注册。" />
       ) : (
         <div className="space-y-4">
           {groups.map(([group, items]) => (
@@ -2663,47 +2601,30 @@ function BuiltInIntegrationPackagesSection({ packages }: { packages: Integration
                   <div key={pkg.package_id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-zinc-900">{pkg.name}</div>
-                        <div className="mt-1 text-xs text-zinc-500">{pkg.vendor} · {pkg.product}</div>
+                        <div className="text-sm font-semibold text-zinc-900">{pkg.product || pkg.name}</div>
+                        <div className="mt-1 text-xs text-zinc-500">厂商：{pkg.vendor || '-'}</div>
                       </div>
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
-                        {pkg.category}
-                      </span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">{pkg.category || '未分类'}</span>
                     </div>
                     {pkg.description && <p className="mt-2 line-clamp-2 text-xs text-zinc-500">{pkg.description}</p>}
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-600">
-                      <div><span className="text-zinc-400">Auth:</span> {pkg.auth_type}</div>
-                      <div><span className="text-zinc-400">Capabilities:</span> {pkg.capabilities.length}</div>
-                      <div><span className="text-zinc-400">Sensitive fields:</span> {pkg.sensitive_fields.length}</div>
-                      <div><span className="text-zinc-400">Version:</span> {pkg.version}</div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {pkg.capabilities.map((capability) => {
-                        const key = `${pkg.package_id}:${capability}`;
-                        return (
-                          <span key={capability} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
-                            <span>{capability}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleDryRunPlan(pkg, capability)}
-                              disabled={planningKey === key}
-                              className="ml-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              title="只生成执行计划，不连接设备、不同步、不创建告警、不读取凭据。"
-                            >
-                              {planningKey === key ? 'Planning...' : 'Dry-run Plan / 生成计划'}
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
                     <div className="mt-3 space-y-1 text-xs text-zinc-600">
-                      <div className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">
-                        Raw response: {pkg.raw_response_policy === 'transient_only' ? 'transient only' : pkg.raw_response_policy}
-                      </div>
-                      <div className="rounded-lg bg-rose-50 px-2 py-1 text-rose-700">
-                        Raw log storage: {pkg.raw_log_storage}
-                      </div>
+                      <div>产品名：{pkg.name}</div>
+                      <div>当前状态：元数据已就绪 · 真实适配器未接入 · 当前支持计划/预览链路</div>
                     </div>
+                    <details className="mt-3 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-600">
+                      <summary className="cursor-pointer font-medium text-zinc-700">能力详情</summary>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {pkg.capabilities.length ? pkg.capabilities.map((capability) => (
+                          <span key={capability} className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">{capability}</span>
+                        )) : <span className="text-zinc-400">暂无能力元数据</span>}
+                      </div>
+                      <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                        <div>package_id: {pkg.package_id}</div>
+                        <div>version: {pkg.version}</div>
+                        <div>auth_type: {pkg.auth_type}</div>
+                        <div>sensitive_fields: {pkg.sensitive_fields.length}</div>
+                      </div>
+                    </details>
                   </div>
                 ))}
               </div>
@@ -2714,7 +2635,6 @@ function BuiltInIntegrationPackagesSection({ packages }: { packages: Integration
     </section>
   );
 }
-
 
 function maskSecretRef(ref?: string | null) {
   if (!ref) return '-';
@@ -2769,14 +2689,14 @@ function IntegrationCenterOverview({
   counts: Record<string, number | null>;
 }) {
   const cards = [
-    ['Integration Packages', '集成包', counts.packages],
-    ['Integration Instances', '集成实例', counts.instances],
-    ['Credential Profiles', '凭据配置引用', counts.credentials],
-    ['Sync Profiles', '同步策略', counts.syncProfiles],
-    ['Integration Runs', '运行记录', counts.runs],
+    ['可接入产品', 'Products', counts.packages],
+    ['已创建实例', 'Instances', counts.instances],
+    ['凭据引用', 'Credential References', counts.credentials],
+    ['同步策略', 'Sync Setup', counts.syncProfiles],
+    ['运行记录', 'Run History', counts.runs],
   ];
   return (
-    <SectionCard title="Overview / 概览" subtitle="只读汇总当前 Integration Center 元数据范围。" count="readonly">
+    <SectionCard title="接入概览" subtitle="一眼查看可接入产品、实例、凭据引用、同步策略和运行记录数量。" count="readonly">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map(([label, cn, value]) => (
           <div key={label as string} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
@@ -2793,9 +2713,9 @@ function IntegrationCenterOverview({
 function IntegrationInstancesSection({ instances, packages, error }: { instances: IntegrationInstance[]; packages: IntegrationPackageSummary[]; error?: string | null }) {
   const packageById = useMemo(() => Object.fromEntries(packages.map((pkg) => [pkg.package_id, pkg])), [packages]);
   return (
-    <SectionCard title="Integration Instances / 集成实例" subtitle="集成实例仅保存连接目标和元数据，不保存凭据值，不执行连接测试。" count={error ? '-' : instances.length}>
+    <SectionCard title="已创建实例" subtitle="实例用于描述一个具体安全产品目标；这里只展示配置概览。" count={error ? '-' : instances.length}>
       <LoadHint error={error} />
-      {instances.length === 0 ? <EmptyState text="暂无集成实例元数据。" /> : (
+      {instances.length === 0 ? <EmptyState text="还没有创建集成实例。下一步：选择产品后创建实例。当前 UI 创建入口后续完善，也可以先通过 API 创建测试实例。" /> : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">
             <thead className="text-zinc-400"><tr>{['display_name','package_id','vendor/product','base_url','enabled','health_status','credential_profile_id','environment','updated_at / created_at'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead>
@@ -2814,9 +2734,9 @@ function IntegrationInstancesSection({ instances, packages, error }: { instances
 
 function CredentialProfilesSection({ profiles, error }: { profiles: CredentialProfile[]; error?: string | null }) {
   return (
-    <SectionCard title="Credential Profiles / 凭据配置引用" subtitle="仅展示凭据配置引用和字段名；不展示明文 secret，不读取 credential value。" count={error ? '-' : profiles.length}>
+    <SectionCard title="凭据引用" subtitle="当前只展示引用和字段名，不保存或展示明文凭据。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
-      {profiles.length === 0 ? <EmptyState text="暂无凭据配置引用。" /> : <div className="grid gap-3 lg:grid-cols-2">{profiles.map((p) => <div key={p.credential_profile_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="font-semibold text-zinc-900">{p.display_name}</div><div className="mt-2 grid gap-1 sm:grid-cols-2"><div>profile_type: {p.profile_type}</div><div>status: {p.status}</div><div>package_id: {valueOrDash(p.package_id)}</div><div>instance_id: {valueOrDash(p.instance_id)}</div><div>configured_fields: {(p.configured_fields || []).join(', ') || '-'}</div><div>required_fields: {(p.required_fields || []).join(', ') || '-'}</div><div>secret_ref: {maskSecretRef(p.secret_ref)}</div><div>updated_at / created_at: {valueOrDash(p.updated_at)} / {valueOrDash(p.created_at)}</div></div></div>)}</div>}
+      {profiles.length === 0 ? <EmptyState text="还没有凭据引用。当前只展示引用，不保存明文凭据。" /> : <div className="grid gap-3 lg:grid-cols-2">{profiles.map((p) => <div key={p.credential_profile_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="font-semibold text-zinc-900">{p.display_name}</div><div className="mt-2 grid gap-1 sm:grid-cols-2"><div>profile_type: {p.profile_type}</div><div>status: {p.status}</div><div>package_id: {valueOrDash(p.package_id)}</div><div>instance_id: {valueOrDash(p.instance_id)}</div><div>configured_fields: {(p.configured_fields || []).join(', ') || '-'}</div><div>required_fields: {(p.required_fields || []).join(', ') || '-'}</div><div>凭据引用: {maskSecretRef(p.secret_ref)}</div><div>updated_at / created_at: {valueOrDash(p.updated_at)} / {valueOrDash(p.created_at)}</div></div></div>)}</div>}
     </SectionCard>
   );
 }
@@ -2879,7 +2799,7 @@ function SyncPreviewResultCard({ result, onClose }: { result: ManualSyncPreviewR
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="grid gap-2 md:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-5">
         <div><span className="font-medium">status:</span> {result.status}</div>
         <div><span className="font-medium">run_id:</span> {valueOrDash(result.run_id)}</div>
         <div><span className="font-medium">dry_run:</span> {String(result.dry_run)}</div>
@@ -2927,7 +2847,7 @@ function SyncIngestResultCard({ result, onClose }: { result: ManualSyncIngestRes
         <div className="font-semibold">Latest Ingest Result / 最近入库结果：{result.sync_profile_id}</div>
         <button type="button" onClick={onClose} className="rounded-md p-1 text-amber-700 hover:bg-amber-100" title="关闭"><X className="h-3.5 w-3.5" /></button>
       </div>
-      <div className="grid gap-2 md:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-5">
         <div><span className="font-medium">status:</span> {result.status}</div><div><span className="font-medium">run_id:</span> {valueOrDash(result.run_id)}</div><div><span className="font-medium">dry_run:</span> {String(result.dry_run)}</div><div><span className="font-medium">preview_only:</span> {String(result.preview_only)}</div><div><span className="font-medium">confirmed:</span> {String(result.confirmed)}</div><div><span className="font-medium">package_id:</span> {valueOrDash(result.package_id)}</div><div><span className="font-medium">instance_id:</span> {valueOrDash(result.instance_id)}</div><div><span className="font-medium">capability:</span> {valueOrDash(result.capability)}</div><div><span className="font-medium">adapter_id:</span> {valueOrDash(result.adapter_id)}</div><div><span className="font-medium">fetched_count:</span> {result.fetched_count}</div><div><span className="font-medium">mapped_count:</span> {result.mapped_count}</div><div><span className="font-medium">ingested_count:</span> {result.ingested_count}</div><div><span className="font-medium">created_alerts:</span> {result.created_alerts}</div><div><span className="font-medium">created_analysis_cases:</span> {result.created_analysis_cases}</div><div><span className="font-medium">skipped_duplicates:</span> {result.skipped_duplicates}</div>
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-3">
@@ -2940,7 +2860,52 @@ function SyncIngestResultCard({ result, onClose }: { result: ManualSyncIngestRes
   );
 }
 
-function SyncProfilesSection({
+function SyncSetupSection({ profiles, error }: { profiles: SyncProfile[]; error?: string | null }) {
+  return (
+    <SectionCard title="同步策略" subtitle="从哪个实例同步什么数据；配置本身不会执行同步。" count={error ? '-' : profiles.length}>
+      <LoadHint error={error} />
+      <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+        同步策略用于描述：从哪个集成实例、同步哪类数据、采用什么模式。配置本身不会执行同步。
+      </div>
+      {profiles.length === 0 ? <EmptyState text="还没有同步策略。需要先创建集成实例，再配置同步策略。当前 UI 创建入口后续完善，可先通过 API 创建测试策略。" /> : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {profiles.map((p) => (
+            <div key={p.sync_profile_id} className="rounded-2xl border border-zinc-200 bg-white p-4 text-xs text-zinc-700 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-900">{p.display_name}</div>
+                  <div className="mt-1 text-zinc-500">实例：{p.instance_id}</div>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] ${p.enabled ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-500'}`}>{p.enabled ? 'enabled' : 'disabled'}</span>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div>产品：{p.package_id}</div>
+                <div>能力：{p.capability}</div>
+                <div>模式：{p.mode}</div>
+                <div>最近状态：{p.last_status}</div>
+                <div className="sm:col-span-2">最近同步：{valueOrDash(p.last_synced_at)}</div>
+              </div>
+              <details className="mt-3 rounded-xl bg-zinc-50 p-3">
+                <summary className="cursor-pointer font-medium text-zinc-700">技术详情</summary>
+                <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                  <div>sync_profile_id: {p.sync_profile_id}</div>
+                  <div>schedule: {valueOrDash(p.schedule)}</div>
+                  <div>deduplicate: {String(p.deduplicate)}</div>
+                  <div>create_analysis_cases: {String(p.create_analysis_cases)}</div>
+                  <div>run_initial_analysis: {String(p.run_initial_analysis)}</div>
+                  <div>last_run_id: {valueOrDash(p.last_run_id)}</div>
+                </div>
+                <pre className="mt-2 max-h-44 overflow-auto rounded-lg bg-white p-2 text-[11px] text-zinc-600">{JSON.stringify({ params: p.params, metadata: p.metadata }, null, 2)}</pre>
+              </details>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function PreviewIngestSection({
   profiles,
   error,
   syncPlanLoadingId,
@@ -2978,10 +2943,10 @@ function SyncProfilesSection({
   onClearIngestResult: () => void;
 }) {
   return (
-    <SectionCard title="Sync Profiles / 同步策略" subtitle="同步策略当前仅表示同步意图和元数据；本页面不会执行同步。Generate Plan / 生成计划 仅调用 Sync Engine dry-run plan API，记录一次 planned/validation_failed IntegrationRun，不更新 cursor，不更新 last_run_id，不执行同步。Preview Sync / 预览同步 仅调用 Manual Sync Preview API，返回 preview-only 事件摘要和 IntegrationRun 引用，不创建 Evidence/Alert/Case/Incident，不更新 cursor，不更新 last_run_id。Confirm Ingest / 确认入库 仅在人工二次确认后调用 Manual Sync Ingest API，强制 dry-run 安全标志，不创建 Analysis Case/Incident，不执行处置。" count={error ? '-' : profiles.length}>
+    <SectionCard title="预览与入库" subtitle="按生成计划、预览结果、人工确认入库三步安全接入数据。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
       <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-        Generate Plan / 生成计划仅生成 dry-run 执行计划，不连接设备、不同步、不读取凭据、不创建告警/事件。Preview Sync / 预览同步仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。Ingest：人工确认后受控入库 Evidence/Alert，不创建 Analysis Case，不创建 Incident，不处置。
+        我现在能不能安全地把数据接进来？先生成计划，再预览结果；只有点击确认入库并完成二次确认后，才会创建 Evidence/Alert，不创建 Case/Incident，不执行处置。
       </div>
       {syncPlanError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPlanError}</div>}
       {syncPreviewError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPreviewError}</div>}
@@ -2989,60 +2954,100 @@ function SyncProfilesSection({
       {syncPlanResult && <SyncPlanResultCard result={syncPlanResult} onClose={onClearPlanResult} />}
       {syncPreviewResult && <SyncPreviewResultCard result={syncPreviewResult} onClose={onClearPreviewResult} />}
       {syncIngestResult && <SyncIngestResultCard result={syncIngestResult} onClose={onClearIngestResult} />}
-      {profiles.length === 0 ? <EmptyState text="暂无同步策略元数据。" /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-400"><tr>{['display_name','sync_profile_id','instance_id','package_id','capability','mode','enabled','schedule','last_status','last_run_id','last_synced_at','deduplicate','create_analysis_cases','run_initial_analysis','plan','preview','ingest'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-zinc-100">{profiles.map((p) => <tr key={p.sync_profile_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{p.display_name}</td><td className="px-2 py-2">{p.sync_profile_id}</td><td className="px-2 py-2">{p.instance_id}</td><td className="px-2 py-2">{p.package_id}</td><td className="px-2 py-2">{p.capability}</td><td className="px-2 py-2">{p.mode}</td><td className="px-2 py-2">{String(p.enabled)}</td><td className="px-2 py-2">{valueOrDash(p.schedule)}</td><td className="px-2 py-2">{p.last_status}</td><td className="px-2 py-2">{valueOrDash(p.last_run_id)}</td><td className="px-2 py-2">{valueOrDash(p.last_synced_at)}</td><td className="px-2 py-2">{String(p.deduplicate)}</td><td className="px-2 py-2">{String(p.create_analysis_cases)}</td><td className="px-2 py-2">{String(p.run_initial_analysis)}</td><td className="px-2 py-2"><button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" title="只生成执行计划；不连接设备、不同步、不读取凭据、不创建告警/事件。">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划：只生成执行计划</button></td><td className="px-2 py-2"><button type="button" onClick={() => onPreviewSync(p)} disabled={syncPreviewLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60" title="仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。">{syncPreviewLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步：仅预览同步结果</button></td><td className="px-2 py-2"><button type="button" onClick={() => onConfirmIngest(p)} disabled={syncIngestLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60" title="人工确认后将创建 Evidence/Alert，但不会创建 Analysis Case、Incident，也不会执行处置。">{syncIngestLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Confirm Ingest / 确认入库</button><div className="mt-1 max-w-48 text-[10px] text-zinc-500">人工确认后将创建 Evidence/Alert，但不会创建 Analysis Case、Incident，也不会执行处置。</div></td></tr>)}</tbody></table></div>}
+      {profiles.length === 0 ? <EmptyState text="还没有同步策略。同步策略用于描述从哪个实例同步哪类数据；创建策略后才能生成计划、预览结果并确认入库。" /> : (
+        <div className="space-y-4">
+          {profiles.map((p) => (
+            <div key={p.sync_profile_id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-900">{p.display_name}</div>
+                  <div className="mt-1 text-xs text-zinc-500">产品 {p.package_id} · 能力 {p.capability} · 实例 {p.instance_id}</div>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] ${p.enabled ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-500'}`}>当前策略 {p.enabled ? 'enabled' : 'disabled'}</span>
+              </div>
+              <div className="mt-3 grid gap-2 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-600 md:grid-cols-3">
+                <div>最近状态：{p.last_status}</div>
+                <div>最近运行：{valueOrDash(p.last_run_id)}</div>
+                <div>最近同步：{valueOrDash(p.last_synced_at)}</div>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                <ActionStep number="1" title="生成计划" description="只验证执行计划，不取数、不入库">
+                  <button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划</button>
+                </ActionStep>
+                <ActionStep number="2" title="预览结果" description="只预览会产生的数据，不创建 Evidence/Alert">
+                  <button type="button" onClick={() => onPreviewSync(p)} disabled={syncPreviewLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPreviewLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步</button>
+                </ActionStep>
+                <ActionStep number="3" title="确认入库" description="二次确认后创建 Evidence/Alert，不创建 Case/Incident，不处置">
+                  <button type="button" onClick={() => onConfirmIngest(p)} disabled={syncIngestLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">{syncIngestLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Confirm Ingest / 确认入库</button>
+                </ActionStep>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </SectionCard>
+  );
+}
+
+function ActionStep({ number, title, description, children }: { number: string; title: string; description: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs">
+      <div className="flex items-center gap-2 font-semibold text-zinc-900"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] text-zinc-700">{number}</span>{title}</div>
+      <p className="mt-2 min-h-8 text-zinc-500">{description}</p>
+      <div className="mt-3">{children}</div>
+    </div>
   );
 }
 
 function IntegrationRunsSection({ runs, error }: { runs: IntegrationRun[]; error?: string | null }) {
   return (
-    <SectionCard title="Integration Runs / 运行记录" subtitle="只读运行历史；摘要使用安全导出，不展示 raw payload，不提供重跑入口。" count={error ? '-' : runs.length}>
+    <SectionCard title="运行记录" subtitle="这里记录每次生成计划、预览和确认入库动作，便于审计和排查。" count={error ? '-' : runs.length}>
       <LoadHint error={error} />
-      {runs.length === 0 ? <EmptyState text="暂无运行记录。" /> : <div className="space-y-3">{runs.map((r) => <div key={r.run_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div className="font-semibold text-zinc-900">{r.run_id}</div><span className="rounded-full bg-white px-2 py-0.5 text-zinc-600">{r.status}</span></div><div className="mt-2 grid gap-1 md:grid-cols-3"><div>run_type: {r.run_type}</div><div>package_id: {valueOrDash(r.package_id)}</div><div>instance_id: {valueOrDash(r.instance_id)}</div><div>sync_profile_id: {valueOrDash(r.sync_profile_id)}</div><div>capability: {valueOrDash(r.capability)}</div><div>connector: {valueOrDash(r.connector_id)} / {valueOrDash(r.connector_name)}</div><div>mode: {r.mode}</div><div>started_at: {valueOrDash(r.started_at)}</div><div>finished_at: {valueOrDash(r.finished_at)}</div><div>requested_by: {valueOrDash(r.requested_by)}</div></div><details className="mt-2"><summary className="cursor-pointer text-zinc-500">request_summary / result_summary</summary><pre className="mt-2 max-h-56 overflow-auto rounded-lg bg-white p-2 text-[11px] text-zinc-600">{JSON.stringify({ request_summary: r.request_summary, result_summary: r.result_summary }, null, 2)}</pre></details></div>)}</div>}
+      {runs.length === 0 ? <EmptyState text="还没有运行记录。生成计划、预览同步或确认入库后，这里会出现记录。" /> : <div className="space-y-3">{runs.map((r) => <div key={r.run_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div className="font-semibold text-zinc-900">{r.run_id}</div><span className="rounded-full bg-white px-2 py-0.5 text-zinc-600">{r.status}</span></div><div className="mt-2 grid gap-1 md:grid-cols-3"><div>run_type: {r.run_type}</div><div>package_id: {valueOrDash(r.package_id)}</div><div>capability: {valueOrDash(r.capability)}</div><div>started_at: {valueOrDash(r.started_at)}</div><div>finished_at: {valueOrDash(r.finished_at)}</div><div>sync_profile_id: {valueOrDash(r.sync_profile_id)}</div></div><details className="mt-2"><summary className="cursor-pointer text-zinc-500">request_summary / result_summary</summary><pre className="mt-2 max-h-56 overflow-auto rounded-lg bg-white p-2 text-[11px] text-zinc-600">{JSON.stringify({ request_summary: r.request_summary, result_summary: r.result_summary }, null, 2)}</pre></details></div>)}</div>}
     </SectionCard>
   );
 }
 
 
-type IntegrationCenterTab = 'setup' | 'sync' | 'runs' | 'legacy';
+type IntegrationCenterTab = 'products' | 'syncSetup' | 'previewIngest' | 'runs' | 'legacy';
 
 const INTEGRATION_CENTER_TABS: Array<{ id: IntegrationCenterTab; label: string; description: string }> = [
-  { id: 'setup', label: 'Access Setup / 接入配置', description: '集成包、实例、凭据引用' },
-  { id: 'sync', label: 'Sync Policies / 同步策略', description: '策略、Plan、Preview 与 Confirm Ingest' },
-  { id: 'runs', label: 'Run History / 运行记录', description: 'Runtime v2 操作审计' },
-  { id: 'legacy', label: 'Legacy Connector / 旧版接入', description: '历史设备接入与旧同步' },
+  { id: 'products', label: '产品接入 / Products', description: '选择产品，查看实例和凭据引用' },
+  { id: 'syncSetup', label: '同步配置 / Sync Setup', description: '配置从哪里同步什么数据' },
+  { id: 'previewIngest', label: '预览与入库 / Preview & Ingest', description: '生成计划、预览结果、人工确认入库' },
+  { id: 'runs', label: '运行记录 / Run History', description: '查看计划、预览、入库记录' },
+  { id: 'legacy', label: '旧版接入 / Legacy', description: '历史设备接入与旧同步' },
 ];
 
 function IntegrationFlow() {
   const steps = [
-    '选择集成包',
-    '创建集成实例',
-    '绑定凭据引用',
-    '配置同步策略',
-    '生成计划',
-    '预览结果',
-    '人工确认入库',
+    ['选择产品', '选择要接入的安全产品'],
+    ['配置实例', '填写目标地址和凭据引用'],
+    ['配置同步', '定义同步能力和参数'],
+    ['预览结果', '先看会产生什么数据'],
+    ['确认入库', '人工确认后创建 Evidence/Alert'],
+    ['查看记录', '审计每次操作'],
   ];
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-900">Integration flow / 集成流程</h2>
-          <p className="text-xs text-zinc-500">前六步用于安全预览；第 7 步为受控人工确认动作（requires confirmation），不会自动执行。</p>
+          <h2 className="text-sm font-semibold text-zinc-900">当前任务步骤</h2>
+          <p className="text-xs text-zinc-500">按任务完成产品接入、同步配置、安全预览、人工确认和审计查看。</p>
         </div>
-        <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-500">Safe preview mode</span>
+        <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">第 5 步需二次确认</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
-        {steps.map((step, index) => {
-          const disabled = false;
-          const confirmationStep = index === steps.length - 1;
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        {steps.map(([step, description], index) => {
+          const confirmationStep = index === 4;
           return (
-            <div key={step} className={`rounded-xl border p-3 text-xs ${disabled ? 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400' : 'border-indigo-100 bg-indigo-50 text-indigo-900'}`}>
+            <div key={step} className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${disabled ? 'bg-zinc-200 text-zinc-500' : 'bg-indigo-600 text-white'}`}>{index + 1}</span>
-                {confirmationStep && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-amber-700">受控 / requires confirmation</span>}
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-semibold text-white">{index + 1}</span>
+                {confirmationStep && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">需二次确认</span>}
               </div>
-              <div className="font-medium">{step}</div>
+              <div className="font-medium">步骤 {index + 1}：{step}</div>
+              <p className="mt-1 text-[11px] text-indigo-700">{description}</p>
             </div>
           );
         })}
@@ -3054,7 +3059,7 @@ function IntegrationFlow() {
 function IntegrationCenterTabs({ active, onChange }: { active: IntegrationCenterTab; onChange: (tab: IntegrationCenterTab) => void }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
-      <div className="grid gap-2 md:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-5">
         {INTEGRATION_CENTER_TABS.map((tab) => {
           const selected = active === tab.id;
           return (
@@ -3114,7 +3119,7 @@ export default function DeviceIntegrationPage() {
   const [credentialSource, setCredentialSource] = useState<SecurityConnectorCustomerDataSource | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [credentialSaving, setCredentialSaving] = useState(false);
-  const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationCenterTab>('setup');
+  const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationCenterTab>('products');
 
   const currentGroup: DeviceGroup | undefined = groups[0];
 
@@ -3185,7 +3190,7 @@ export default function DeviceIntegrationPage() {
         dry_run: true,
       });
       setSyncPlanResult(response.data);
-      toast.success('dry-run 计划已生成');
+      toast.success('计划已生成');
       await fetchData(true);
     } catch (error) {
       const detailResult = syncPlanResultFromError(error);
@@ -3611,7 +3616,7 @@ export default function DeviceIntegrationPage() {
     <div className="h-full flex flex-col">
       <PageHeader
         title="Integration Center / 集成中心"
-        description="集成中心用于统一管理安全产品接入、同步策略和运行审计。当前默认采用安全预览模式：生成计划与预览结果均不会连接真实厂商、不会读取明文凭据、不会自动创建事件、不会执行处置。"
+        description="集成中心用于把安全产品的数据接入到平台。你可以先选择产品、配置实例和同步策略，再通过计划、预览、确认入库三个步骤安全接入数据。"
         icon={<Shield className="w-5 h-5" />}
         action={
           <div className="flex items-center gap-2">
@@ -3634,18 +3639,17 @@ export default function DeviceIntegrationPage() {
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="space-y-6">
-            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-900 shadow-sm">
-              <div className="font-semibold">安全边界 / Safety boundary</div>
-              <p className="mt-1 text-xs text-indigo-800">当前默认采用安全预览模式：生成计划与预览结果均不会连接真实厂商、不会读取明文凭据、不会自动创建事件、不会执行处置。Confirm Ingest 为受控人工确认动作，强制安全标志；不会自动创建事件、Incident 或执行处置。</p>
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800 shadow-sm">
+              默认安全模式：不会读取明文凭据，不会自动创建事件，不会执行处置。
             </div>
 
             <IntegrationFlow />
             <IntegrationCenterTabs active={activeIntegrationTab} onChange={setActiveIntegrationTab} />
 
-            {activeIntegrationTab === 'setup' && (
+            {activeIntegrationTab === 'products' && (
               <div className="space-y-6">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-                  接入配置用于描述可接入的安全产品、实例目标和凭据引用。当前仅保存元数据和引用，不保存明文凭据，不执行连接测试。
+                  我能接什么产品？现在接了几个？这里集中查看可接入产品、已创建实例和凭据引用。
                 </div>
                 <IntegrationCenterOverview counts={{ packages: integrationCenterErrors.packages ? null : integrationPackages.length, instances: integrationCenterErrors.instances ? null : integrationInstances.length, credentials: integrationCenterErrors.credentials ? null : credentialProfiles.length, syncProfiles: integrationCenterErrors.syncProfiles ? null : syncProfiles.length, runs: integrationCenterErrors.runs ? null : integrationRuns.length }} />
                 <BuiltInIntegrationPackagesSection packages={integrationPackages} />
@@ -3654,17 +3658,15 @@ export default function DeviceIntegrationPage() {
               </div>
             )}
 
-            {activeIntegrationTab === 'sync' && (
+            {activeIntegrationTab === 'syncSetup' && (
               <div className="space-y-6">
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-                  <div className="font-semibold">同步策略用于描述从哪个集成实例同步什么能力。当前支持两个安全动作：</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li><span className="font-medium">Plan：</span>只生成执行计划，不取数、不入库；</li>
-                    <li><span className="font-medium">Preview：</span>只生成同步结果预览，不创建 Evidence/Alert/Case/Incident；</li>
-                    <li><span className="font-medium">Ingest：</span>人工确认后受控入库 Evidence/Alert，不创建 Case/Incident，不执行处置。</li>
-                  </ul>
-                </div>
-                <SyncProfilesSection
+                <SyncSetupSection profiles={syncProfiles} error={integrationCenterErrors.syncProfiles} />
+              </div>
+            )}
+
+            {activeIntegrationTab === 'previewIngest' && (
+              <div className="space-y-6">
+                <PreviewIngestSection
                   profiles={syncProfiles}
                   error={integrationCenterErrors.syncProfiles}
                   syncPlanLoadingId={syncPlanLoadingId}
@@ -3689,7 +3691,7 @@ export default function DeviceIntegrationPage() {
             {activeIntegrationTab === 'runs' && (
               <div className="space-y-6">
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-700">
-                  运行记录用于审计计划生成、预览、未来人工确认入库等动作。当前记录的是 Integration Runtime v2 的操作轨迹，不代表已创建事件或已执行处置。
+                  这里记录每次生成计划、预览和确认入库动作，便于审计和排查。
                 </div>
                 <IntegrationRunsSection runs={integrationRuns} error={integrationCenterErrors.runs} />
               </div>
@@ -3699,7 +3701,7 @@ export default function DeviceIntegrationPage() {
               <div className="space-y-6">
                 <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p>Legacy Connector 为历史设备接入与旧数据源同步能力，保留用于兼容现有环境。Integration Runtime v2 的集成包、实例、凭据引用、同步策略和运行记录已在前三个 Tab 中分层展示。</p>
+                    <p>旧版接入用于兼容历史设备集成、连接测试和旧同步调度。新的 Integration Runtime v2 配置请使用前面的产品接入、同步配置、预览与入库。</p>
                     <button
                       onClick={() => void openAddWizard()}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700"

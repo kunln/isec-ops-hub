@@ -609,3 +609,8 @@ The Integration Center can call the Manual Sync Preview API from a Sync Profile 
 Manual Sync Ingest is an explicit approval-gated path that converts sanitized adapter preview events into persisted Evidence/Alert records through the Evidence Dispatcher with `preview_only=False`. It requires `confirmed=True`, does not execute real vendor sync, does not read credentials, does not create Analysis Cases or Incidents, does not update cursors or `last_run_id`, does not send notifications, and does not remediate.
 
 The Integration Center UI is organized into Access Setup, Sync Policies, Run History, and Legacy Connector tabs. Runtime v2 metadata and safe preview actions are separated from legacy device connector operations. The Integration Center exposes Confirm Ingest as an explicit confirmation-gated UI action. It calls the Manual Sync Ingest API with confirmed=true and forced safety flags. It may create Evidence/Alert records through the dispatcher, but does not create Analysis Cases or Incidents, update cursors, send notifications, or remediate.
+
+
+## Integration Center UI
+
+The Integration Center UI is organized around user tasks rather than internal runtime objects: Products, Sync Setup, Preview & Ingest, Run History, and Legacy. Technical runtime objects remain available in details, but primary UI copy should guide operators through product onboarding, sync configuration, preview, confirmation-gated ingest, and audit review.
