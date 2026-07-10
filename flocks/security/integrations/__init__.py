@@ -23,6 +23,19 @@ from flocks.security.integrations.evidence_dispatcher import (
 from flocks.security.integrations.credential_store import CredentialProfileStore, default_credential_profile_store, resolve_credential_profile_ref
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
+from flocks.security.integrations.integration_run_store import (
+    IntegrationRunStore,
+    default_integration_run_store,
+    finish_integration_run,
+    record_integration_run,
+)
+from flocks.security.integrations.integration_runs import (
+    IntegrationRun,
+    IntegrationRunCreate,
+    IntegrationRunUpdate,
+    build_integration_run_from_connector_sync_run,
+    integration_run_from_connector_run,
+)
 from flocks.security.integrations.instances import (
     IntegrationInstance,
     IntegrationInstanceCreate,
@@ -48,6 +61,8 @@ from flocks.security.integrations.runtime import (
     is_destructive_capability,
     sanitize_run_params,
 )
+from flocks.security.integrations.sync_profile_store import SyncProfileStore, default_sync_profile_store
+from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 
 __all__ = [
     "EvidenceEventMappingResult",
@@ -74,6 +89,14 @@ __all__ = [
     "IntegrationInstanceCreate",
     "IntegrationInstanceUpdate",
     "IntegrationInstanceStore",
+    "IntegrationRun",
+    "IntegrationRunCreate",
+    "IntegrationRunStore",
+    "IntegrationRunUpdate",
+    "SyncProfile",
+    "SyncProfileCreate",
+    "SyncProfileStore",
+    "SyncProfileUpdate",
     "IntegrationCapability",
     "IntegrationPackage",
     "IntegrationPackageManifest",
@@ -88,6 +111,12 @@ __all__ = [
     "register_manifest_file",
     "default_credential_profile_store",
     "default_integration_instance_store",
+    "build_integration_run_from_connector_sync_run",
+    "default_integration_run_store",
+    "default_sync_profile_store",
+    "finish_integration_run",
+    "integration_run_from_connector_run",
+    "record_integration_run",
     "get_builtin_integration_packages",
     "is_destructive_capability",
     "resolve_credential_profile_ref",
