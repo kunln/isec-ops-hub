@@ -479,6 +479,8 @@ Implement `run(instance, capability, params)`, wrap TDA/Mingyu through the Runti
 
 The first Capability Runtime skeleton validates package/capability requests, builds sanitized dry-run execution plans, and rejects destructive capabilities. It does not perform real HTTP requests, credential access, evidence ingestion, or v1 connector calls.
 
+The first Capability Runtime API exposes dry-run planning only. It validates packages, instances, and capabilities and returns sanitized plan details without executing connectors, performing HTTP, reading credentials, syncing data, dispatching evidence, or creating security objects.
+
 ### Phase 4 Mapping Engine
 
 Move mapping to declarative/adapter package definitions and add fixture validation.

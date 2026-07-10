@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from flocks.commercial.access_control import require_capability
 from flocks.server.auth import get_optional_user
@@ -24,8 +24,9 @@ from flocks.security.integrations import EvidenceDispatchRequest, create_default
 from flocks.security.integrations.credential_store import default_credential_profile_store
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import default_integration_instance_store
-from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate
+from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
+from flocks.security.integrations.runtime import IntegrationCapabilityRunRequest, IntegrationCapabilityRuntime
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
 from flocks.security.connectors.tda import TdaClient, ingest_tda_events
 from flocks.security.connectors.expiry_monitor import connector_credential_expiry_monitor_scheduler
@@ -125,6 +126,15 @@ class EvidenceIngestionRequest(BaseModel):
     create_analysis_cases: bool = True
     run_initial_analysis: bool = True
     deduplicate: bool = True
+
+class IntegrationCapabilityPlanRequest(BaseModel):
+    package_id: str | None = None
+    instance_id: str | None = None
+    capability: str
+    mode: str = "manual"
+    params: dict[str, Any] = Field(default_factory=dict)
+    dry_run: bool = True
+
 
 
 def _analysis_case_incident_severity(severity: str) -> IncidentSeverity:
@@ -573,6 +583,42 @@ async def delete_integration_instance(instance_id: str):
         raise HTTPException(status_code=404, detail="Integration instance not found")
     return {"status": "deleted", "instance_id": instance_id}
 
+
+
+
+@router.post("/integrations/capability-runtime/plan")
+async def plan_integration_capability(payload: IntegrationCapabilityPlanRequest):
+    """Return a sanitized Capability Runtime dry-run plan only.
+
+    This endpoint never executes connectors, performs HTTP, reads credential
+    values, resolves Credential Profile secret refs, syncs data, dispatches
+    evidence, persists Integration Runs, or creates Security objects.
+    """
+
+    runtime = IntegrationCapabilityRuntime(_integration_registry())
+    if payload.instance_id:
+        instance = await default_integration_instance_store.get_instance(payload.instance_id)
+        if instance is None:
+            raise HTTPException(status_code=404, detail="Integration instance not found")
+        request = build_capability_run_request_from_instance(
+            instance, payload.capability, params=payload.params, dry_run=True
+        ).model_copy(update={"mode": payload.mode, "dry_run": True})
+    else:
+        if not payload.package_id:
+            raise HTTPException(status_code=400, detail="package_id is required when instance_id is not provided")
+        request = IntegrationCapabilityRunRequest(
+            package_id=payload.package_id,
+            capability=payload.capability,
+            mode=payload.mode,
+            params=payload.params,
+            dry_run=True,
+        )
+
+    plan = runtime.build_plan(request)
+    if plan.status in {"validation_failed", "rejected"}:
+        raise HTTPException(status_code=400, detail=plan.model_dump())
+    plan_payload = plan.model_dump()
+    return {"status": plan.status, "plan": plan_payload, "dry_run": True, **plan_payload}
 
 @router.get("/integrations/capabilities", response_model=list[IntegrationCapability])
 async def list_integration_capabilities():
