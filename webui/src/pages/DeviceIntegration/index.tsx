@@ -22,6 +22,7 @@ import {
   type IntegrationPackageSummary,
   type IntegrationCapabilityPlanResponse,
   type SyncEnginePlanResult,
+  type ManualSyncPreviewResult,
   type IntegrationInstance,
   type CredentialProfile,
   type SyncProfile,
@@ -170,6 +171,42 @@ function syncPlanResultFromError(error: unknown): SyncEnginePlanResult | null {
     plan_summary: payload.plan_summary || {},
     safety_summary: payload.safety_summary || {},
     limitations: Array.isArray(payload.limitations) ? payload.limitations : [],
+    errors: Array.isArray(payload.errors) ? payload.errors : [],
+  };
+}
+
+function syncPreviewResultFromError(error: unknown): ManualSyncPreviewResult | null {
+  if (!error || typeof error !== 'object') return null;
+  const err = error as { response?: { data?: unknown } };
+  const data = err.response?.data;
+  const detail = data && typeof data === 'object' && 'detail' in data
+    ? (data as { detail?: unknown }).detail
+    : data;
+  if (!detail || typeof detail !== 'object') return null;
+  const payload = detail as Partial<ManualSyncPreviewResult>;
+  if (!payload.status && !payload.sync_profile_id && !payload.errors && !payload.limitations) return null;
+  return {
+    status: String(payload.status || 'validation_failed'),
+    dry_run: payload.dry_run ?? true,
+    preview_only: payload.preview_only ?? true,
+    sync_profile_id: String(payload.sync_profile_id || ''),
+    run_id: payload.run_id ?? null,
+    package_id: payload.package_id ?? null,
+    instance_id: payload.instance_id ?? null,
+    capability: payload.capability ?? null,
+    adapter_id: payload.adapter_id ?? null,
+    fetched_count: Number(payload.fetched_count || 0),
+    mapped_count: Number(payload.mapped_count || 0),
+    preview_count: Number(payload.preview_count || 0),
+    item_refs: Array.isArray(payload.item_refs) ? payload.item_refs : [],
+    event_summaries: Array.isArray(payload.event_summaries) ? payload.event_summaries : [],
+    request_summary: payload.request_summary || {},
+    adapter_summary: payload.adapter_summary || {},
+    mapping_summary: payload.mapping_summary || {},
+    dispatch_summary: payload.dispatch_summary || {},
+    safety_summary: payload.safety_summary || {},
+    limitations: Array.isArray(payload.limitations) ? payload.limitations : [],
+    warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
     errors: Array.isArray(payload.errors) ? payload.errors : [],
   };
 }
@@ -2783,32 +2820,94 @@ function SyncPlanResultCard({ result, onClose }: { result: SyncEnginePlanResult;
   );
 }
 
+function SyncPreviewResultCard({ result, onClose }: { result: ManualSyncPreviewResult; onClose: () => void }) {
+  const summaryBlocks: Array<[string, unknown]> = [
+    ['item_refs', result.item_refs],
+    ['event_summaries', result.event_summaries],
+    ['request_summary', result.request_summary],
+    ['adapter_summary', result.adapter_summary],
+    ['mapping_summary', result.mapping_summary],
+    ['dispatch_summary', result.dispatch_summary],
+    ['safety_summary', result.safety_summary],
+  ];
+  return (
+    <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs text-sky-900">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="font-semibold">Latest Preview Result / 最近预览结果：{result.sync_profile_id}</div>
+        <button type="button" onClick={onClose} className="rounded-md p-1 text-sky-700 hover:bg-sky-100" title="关闭">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="grid gap-2 md:grid-cols-4">
+        <div><span className="font-medium">status:</span> {result.status}</div>
+        <div><span className="font-medium">run_id:</span> {valueOrDash(result.run_id)}</div>
+        <div><span className="font-medium">dry_run:</span> {String(result.dry_run)}</div>
+        <div><span className="font-medium">preview_only:</span> {String(result.preview_only)}</div>
+        <div><span className="font-medium">package_id:</span> {valueOrDash(result.package_id)}</div>
+        <div><span className="font-medium">instance_id:</span> {valueOrDash(result.instance_id)}</div>
+        <div><span className="font-medium">capability:</span> {valueOrDash(result.capability)}</div>
+        <div><span className="font-medium">adapter_id:</span> {valueOrDash(result.adapter_id)}</div>
+        <div><span className="font-medium">fetched_count:</span> {result.fetched_count}</div>
+        <div><span className="font-medium">mapped_count:</span> {result.mapped_count}</div>
+        <div><span className="font-medium">preview_count:</span> {result.preview_count}</div>
+      </div>
+      {(result.limitations.length > 0 || result.warnings.length > 0 || result.errors.length > 0) && (
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
+          <div className="rounded-lg bg-white/70 p-2"><div className="mb-1 font-medium">limitations</div><ul className="list-disc pl-4 text-zinc-700">{result.limitations.length ? result.limitations.map((item, idx) => <li key={idx}>{item}</li>) : <li>-</li>}</ul></div>
+          <div className="rounded-lg bg-white/70 p-2"><div className="mb-1 font-medium">warnings</div><ul className="list-disc pl-4 text-zinc-700">{result.warnings.length ? result.warnings.map((item, idx) => <li key={idx}>{item}</li>) : <li>-</li>}</ul></div>
+          <div className="rounded-lg bg-white/70 p-2"><div className="mb-1 font-medium">errors</div><ul className="list-disc pl-4 text-zinc-700">{result.errors.length ? result.errors.map((item, idx) => <li key={idx}>{item}</li>) : <li>-</li>}</ul></div>
+        </div>
+      )}
+      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+        {summaryBlocks.map(([label, value]) => (
+          <details key={label} className="rounded-lg bg-white/70 p-2">
+            <summary className="cursor-pointer font-medium text-sky-800">{label}</summary>
+            <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-700">{JSON.stringify(value || (Array.isArray(value) ? [] : {}), null, 2)}</pre>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SyncProfilesSection({
   profiles,
   error,
   syncPlanLoadingId,
   syncPlanResult,
   syncPlanError,
+  syncPreviewLoadingId,
+  syncPreviewResult,
+  syncPreviewError,
   onGeneratePlan,
   onClearPlanResult,
+  onPreviewSync,
+  onClearPreviewResult,
 }: {
   profiles: SyncProfile[];
   error?: string | null;
   syncPlanLoadingId: string | null;
   syncPlanResult: SyncEnginePlanResult | null;
   syncPlanError: string | null;
+  syncPreviewLoadingId: string | null;
+  syncPreviewResult: ManualSyncPreviewResult | null;
+  syncPreviewError: string | null;
   onGeneratePlan: (profile: SyncProfile) => void;
   onClearPlanResult: () => void;
+  onPreviewSync: (profile: SyncProfile) => void;
+  onClearPreviewResult: () => void;
 }) {
   return (
-    <SectionCard title="Sync Profiles / 同步策略" subtitle="同步策略当前仅表示同步意图和元数据；本页面不会执行同步。Generate Plan / 生成计划 仅调用 Sync Engine dry-run plan API，记录一次 planned/validation_failed IntegrationRun，不更新 cursor，不更新 last_run_id，不执行同步。" count={error ? '-' : profiles.length}>
+    <SectionCard title="Sync Profiles / 同步策略" subtitle="同步策略当前仅表示同步意图和元数据；本页面不会执行同步。Generate Plan / 生成计划 仅调用 Sync Engine dry-run plan API，记录一次 planned/validation_failed IntegrationRun，不更新 cursor，不更新 last_run_id，不执行同步。Preview Sync / 预览同步 仅调用 Manual Sync Preview API，返回 preview-only 事件摘要和 IntegrationRun 引用，不创建 Evidence/Alert/Case/Incident，不更新 cursor，不更新 last_run_id。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
       <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-        Generate Plan / 生成计划仅生成 dry-run 执行计划，不连接设备、不同步、不读取凭据、不创建告警/事件。
+        Generate Plan / 生成计划仅生成 dry-run 执行计划，不连接设备、不同步、不读取凭据、不创建告警/事件。Preview Sync / 预览同步仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。
       </div>
       {syncPlanError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPlanError}</div>}
+      {syncPreviewError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPreviewError}</div>}
       {syncPlanResult && <SyncPlanResultCard result={syncPlanResult} onClose={onClearPlanResult} />}
-      {profiles.length === 0 ? <EmptyState text="暂无同步策略元数据。" /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-400"><tr>{['display_name','sync_profile_id','instance_id','package_id','capability','mode','enabled','schedule','last_status','last_run_id','last_synced_at','deduplicate','create_analysis_cases','run_initial_analysis','plan'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-zinc-100">{profiles.map((p) => <tr key={p.sync_profile_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{p.display_name}</td><td className="px-2 py-2">{p.sync_profile_id}</td><td className="px-2 py-2">{p.instance_id}</td><td className="px-2 py-2">{p.package_id}</td><td className="px-2 py-2">{p.capability}</td><td className="px-2 py-2">{p.mode}</td><td className="px-2 py-2">{String(p.enabled)}</td><td className="px-2 py-2">{valueOrDash(p.schedule)}</td><td className="px-2 py-2">{p.last_status}</td><td className="px-2 py-2">{valueOrDash(p.last_run_id)}</td><td className="px-2 py-2">{valueOrDash(p.last_synced_at)}</td><td className="px-2 py-2">{String(p.deduplicate)}</td><td className="px-2 py-2">{String(p.create_analysis_cases)}</td><td className="px-2 py-2">{String(p.run_initial_analysis)}</td><td className="px-2 py-2"><button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" title="仅生成 dry-run 执行计划，不连接设备、不同步、不读取凭据、不创建告警/事件。">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划</button></td></tr>)}</tbody></table></div>}
+      {syncPreviewResult && <SyncPreviewResultCard result={syncPreviewResult} onClose={onClearPreviewResult} />}
+      {profiles.length === 0 ? <EmptyState text="暂无同步策略元数据。" /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-400"><tr>{['display_name','sync_profile_id','instance_id','package_id','capability','mode','enabled','schedule','last_status','last_run_id','last_synced_at','deduplicate','create_analysis_cases','run_initial_analysis','plan','preview'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-zinc-100">{profiles.map((p) => <tr key={p.sync_profile_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{p.display_name}</td><td className="px-2 py-2">{p.sync_profile_id}</td><td className="px-2 py-2">{p.instance_id}</td><td className="px-2 py-2">{p.package_id}</td><td className="px-2 py-2">{p.capability}</td><td className="px-2 py-2">{p.mode}</td><td className="px-2 py-2">{String(p.enabled)}</td><td className="px-2 py-2">{valueOrDash(p.schedule)}</td><td className="px-2 py-2">{p.last_status}</td><td className="px-2 py-2">{valueOrDash(p.last_run_id)}</td><td className="px-2 py-2">{valueOrDash(p.last_synced_at)}</td><td className="px-2 py-2">{String(p.deduplicate)}</td><td className="px-2 py-2">{String(p.create_analysis_cases)}</td><td className="px-2 py-2">{String(p.run_initial_analysis)}</td><td className="px-2 py-2"><button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" title="只生成执行计划；不连接设备、不同步、不读取凭据、不创建告警/事件。">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划</button></td><td className="px-2 py-2"><button type="button" onClick={() => onPreviewSync(p)} disabled={syncPreviewLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60" title="仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。">{syncPreviewLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步</button></td></tr>)}</tbody></table></div>}
     </SectionCard>
   );
 }
@@ -2850,6 +2949,9 @@ export default function DeviceIntegrationPage() {
   const [syncPlanLoadingId, setSyncPlanLoadingId] = useState<string | null>(null);
   const [syncPlanResult, setSyncPlanResult] = useState<SyncEnginePlanResult | null>(null);
   const [syncPlanError, setSyncPlanError] = useState<string | null>(null);
+  const [syncPreviewLoadingId, setSyncPreviewLoadingId] = useState<string | null>(null);
+  const [syncPreviewResult, setSyncPreviewResult] = useState<ManualSyncPreviewResult | null>(null);
+  const [syncPreviewError, setSyncPreviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [panel, setPanel] = useState<PanelMode>(null);
@@ -2934,6 +3036,28 @@ export default function DeviceIntegrationPage() {
       setSyncPlanError(apiErrorMessage(error, '生成计划失败'));
     } finally {
       setSyncPlanLoadingId(null);
+    }
+  };
+
+  const handlePreviewSync = async (profile: SyncProfile) => {
+    setSyncPreviewLoadingId(profile.sync_profile_id);
+    setSyncPreviewError(null);
+    try {
+      const response = await securityAPI.previewSyncEngine({
+        sync_profile_id: profile.sync_profile_id,
+        params_override: {},
+        dry_run: true,
+        preview_only: true,
+      });
+      setSyncPreviewResult(response.data);
+      toast.success('同步预览已生成');
+      await fetchData(true);
+    } catch (error) {
+      const detailResult = syncPreviewResultFromError(error);
+      if (detailResult) setSyncPreviewResult(detailResult);
+      setSyncPreviewError(apiErrorMessage(error, '生成预览失败'));
+    } finally {
+      setSyncPreviewLoadingId(null);
     }
   };
 
@@ -3346,8 +3470,13 @@ export default function DeviceIntegrationPage() {
             syncPlanLoadingId={syncPlanLoadingId}
             syncPlanResult={syncPlanResult}
             syncPlanError={syncPlanError}
+            syncPreviewLoadingId={syncPreviewLoadingId}
+            syncPreviewResult={syncPreviewResult}
+            syncPreviewError={syncPreviewError}
             onGeneratePlan={(profile) => void handleGenerateSyncPlan(profile)}
             onClearPlanResult={() => setSyncPlanResult(null)}
+            onPreviewSync={(profile) => void handlePreviewSync(profile)}
+            onClearPreviewResult={() => setSyncPreviewResult(null)}
           />
           <IntegrationRunsSection runs={integrationRuns} error={integrationCenterErrors.runs} />
 

@@ -601,3 +601,5 @@ The Integration Center can call the Sync Engine plan API from a Sync Profile to 
 ### Manual Sync Preview Skeleton
 
 Manual Sync Preview links a Sync Profile to an Adapter Registry entry, runs a safe adapter in dry-run/preview-only mode, converts returned lightweight items into preview evidence events, and calls the Evidence Dispatcher in `preview_only` mode. It records an IntegrationRun with status `previewed`, but does not execute real sync, call vendor connectors, perform HTTP, read credentials, dispatch persisted evidence, create alerts/incidents, update cursors, send notifications, or remediate.
+
+The Integration Center can call the Manual Sync Preview API from a Sync Profile to display preview-only fetched/mapped/dispatch summaries and an IntegrationRun reference. This UI action does not execute real sync, call vendor connectors, read credentials, persist evidence, create alerts/incidents, update cursors, or remediate.

@@ -247,6 +247,40 @@ export interface SyncEnginePlanResult {
   errors: string[];
 }
 
+
+export interface ManualSyncPreviewRequest {
+  sync_profile_id: string;
+  requested_by?: string | null;
+  params_override?: Record<string, any>;
+  dry_run?: boolean;
+  preview_only?: boolean;
+}
+
+export interface ManualSyncPreviewResult {
+  status: string;
+  dry_run: boolean;
+  preview_only: boolean;
+  sync_profile_id: string;
+  run_id?: string | null;
+  package_id?: string | null;
+  instance_id?: string | null;
+  capability?: string | null;
+  adapter_id?: string | null;
+  fetched_count: number;
+  mapped_count: number;
+  preview_count: number;
+  item_refs: Record<string, any>[];
+  event_summaries: Record<string, any>[];
+  request_summary: Record<string, any>;
+  adapter_summary: Record<string, any>;
+  mapping_summary: Record<string, any>;
+  dispatch_summary: Record<string, any>;
+  safety_summary: Record<string, any>;
+  limitations: string[];
+  warnings: string[];
+  errors: string[];
+}
+
 export interface IntegrationRun {
   run_id: string;
   run_type: string;
@@ -1414,6 +1448,13 @@ export const securityAPI = {
       ...payload,
       params_override: payload.params_override || {},
       dry_run: true,
+    }),
+  previewSyncEngine: (payload: ManualSyncPreviewRequest) =>
+    client.post<ManualSyncPreviewResult>('/api/security/integrations/sync-engine/preview', {
+      ...payload,
+      params_override: payload.params_override || {},
+      dry_run: true,
+      preview_only: true,
     }),
   listIntegrationRuns: (params?: { package_id?: string; instance_id?: string; sync_profile_id?: string; capability?: string; status?: string; limit?: number }) =>
     client.get<IntegrationRun[]>('/api/security/integrations/runs', { params }),
