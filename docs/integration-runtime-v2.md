@@ -177,6 +177,32 @@ Integration Center
 
 The Integration Registry handles package discovery, manifest loading, capability indexing, version compatibility, package status, and validation. It is also the future home of Capability Registry behavior, where declared capabilities are indexed and made available to the Runtime.
 
+The first Manifest Loader supports loading declarative Integration Package manifests into the registry with validation. It does not execute connectors, scan directories automatically, read credentials, or store raw responses. It accepts JSON manifests and can load YAML manifests when the optional YAML parser is available. Capability mapping declarations are preserved as metadata only and are not executed by the loader.
+
+Minimal JSON manifest example:
+
+```json
+{
+  "package_id": "example.security_device",
+  "name": "Example Security Device",
+  "vendor": "Example",
+  "product": "Security Device",
+  "version": "1.0.0",
+  "category": "security_device",
+  "capabilities": [
+    {
+      "capability": "alert.search",
+      "display_name": "Search alerts",
+      "method": "POST",
+      "path": "/alerts/search",
+      "mapping": {"builtin": "TDA_ALERT_MAPPING"}
+    }
+  ],
+  "raw_response_policy": "transient_only",
+  "raw_log_storage": "forbidden"
+}
+```
+
 ### Auth Engine
 
 The Auth Engine handles API key authentication, bearer tokens, basic auth, HMAC, cookie/session flows, future OAuth2 support, secret redaction, and header injection.

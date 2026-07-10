@@ -1,0 +1,24 @@
+{
+  "package_id": "example.asiainfo_tda_manifest",
+  "name": "AsiaInfo TDA Fixture",
+  "vendor": "AsiaInfo",
+  "product": "TDA",
+  "version": "1.0.0",
+  "category": "security_device",
+  "description": "Minimal test fixture for declarative manifest loading.",
+  "auth_type": "hmac",
+  "raw_response_policy": "transient_only",
+  "raw_log_storage": "forbidden",
+  "sensitive_fields": ["api_key", "secret", "sign"],
+  "capabilities": [
+    {
+      "capability": "alert.search",
+      "display_name": "Search alerts",
+      "description": "Search TDA alerts",
+      "method": "POST",
+      "path": "/ngtda/diagnosis/alert_list",
+      "pagination": {"type": "page"},
+      "mapping": {"builtin": "TDA_ALERT_MAPPING"}
+    }
+  ]
+}
