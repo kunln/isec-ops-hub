@@ -28,6 +28,7 @@ from flocks.security.integrations.sync_profile_store import default_sync_profile
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, ManualSyncPreviewResult, preview_sync_profile_run
+from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ManualSyncIngestResult, ingest_sync_profile_run
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.runs import build_integration_run_from_connector_sync_run
@@ -146,6 +147,17 @@ class ManualSyncPreviewAPIRequest(BaseModel):
     params_override: dict[str, Any] = Field(default_factory=dict)
     dry_run: bool = True
     preview_only: bool = True
+
+
+class ManualSyncIngestAPIRequest(BaseModel):
+    sync_profile_id: str
+    requested_by: str | None = None
+    params_override: dict[str, Any] = Field(default_factory=dict)
+    confirmed: bool = False
+    dry_run: bool = True
+    preview_only: bool = False
+    create_analysis_cases: bool = False
+    run_initial_analysis: bool = False
 
 
 class IntegrationCapabilityPlanRequest(BaseModel):
@@ -664,6 +676,41 @@ async def preview_sync_engine(payload: ManualSyncPreviewAPIRequest):
     if result.status == "not_found":
         raise HTTPException(status_code=404, detail="Sync profile not found")
     if result.status in {"validation_failed", "rejected"}:
+        raise HTTPException(status_code=400, detail=result.model_dump(mode="json"))
+    return result
+
+
+@router.post(
+    "/integrations/sync-engine/ingest",
+    response_model=ManualSyncIngestResult,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def ingest_sync_engine(payload: ManualSyncIngestAPIRequest):
+    """Ingest a Sync Profile through the explicit approval-gated manual path."""
+
+    if payload.confirmed is not True:
+        raise HTTPException(status_code=400, detail="confirmed=True is required for manual sync ingest")
+    try:
+        request = ManualSyncIngestRequest(
+            sync_profile_id=payload.sync_profile_id,
+            requested_by=payload.requested_by,
+            params_override=payload.params_override,
+            confirmed=True,
+            dry_run=True,
+            preview_only=False,
+            create_analysis_cases=False,
+            run_initial_analysis=False,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Manual sync ingest request rejected unsafe params_override") from exc
+
+    result = await ingest_sync_profile_run(
+        request,
+        adapter_registry=create_default_adapter_registry(include_fake=True),
+    )
+    if result.status == "not_found":
+        raise HTTPException(status_code=404, detail="Sync profile not found")
+    if result.status in {"validation_failed", "rejected", "confirmation_required"}:
         raise HTTPException(status_code=400, detail=result.model_dump(mode="json"))
     return result
 

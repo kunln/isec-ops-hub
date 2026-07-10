@@ -43,6 +43,7 @@ from flocks.security.integrations.sync_profile_store import SyncProfileStore, de
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
 from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, ManualSyncPreviewResult, preview_sync_profile_run
+from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ManualSyncIngestResult, ingest_sync_profile_run
 from flocks.security.integrations.instances import (
     IntegrationInstance,
     IntegrationInstanceCreate,
@@ -125,6 +126,9 @@ __all__ = [
     "ManualSyncPreviewRequest",
     "ManualSyncPreviewResult",
     "preview_sync_profile_run",
+    "ManualSyncIngestRequest",
+    "ManualSyncIngestResult",
+    "ingest_sync_profile_run",
     "IntegrationInstance",
     "IntegrationInstanceCreate",
     "IntegrationInstanceUpdate",
