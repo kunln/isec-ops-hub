@@ -2,6 +2,14 @@
 
 from flocks.security.integrations.builtin import get_builtin_integration_packages
 from flocks.security.integrations.builtin_mappings import MINGYU_RISK_MAPPING, TDA_ALERT_MAPPING
+from flocks.security.integrations.credential_profiles import (
+    CredentialProfile,
+    CredentialProfileCreate,
+    CredentialProfileStore,
+    CredentialProfileUpdate,
+    default_credential_profile_store,
+    resolve_credential_profile_ref,
+)
 from flocks.security.integrations.evidence_dispatcher import (
     EvidenceDispatchRequest,
     EvidenceDispatchResult,
@@ -43,6 +51,10 @@ from flocks.security.integrations.runtime import (
 )
 
 __all__ = [
+    "CredentialProfile",
+    "CredentialProfileCreate",
+    "CredentialProfileStore",
+    "CredentialProfileUpdate",
     "EvidenceDispatchRequest",
     "EvidenceDispatchResult",
     "EvidenceEventMappingResult",
@@ -74,6 +86,8 @@ __all__ = [
     "build_capability_run_request_from_instance",
     "create_default_integration_registry",
     "default_integration_instance_store",
+    "resolve_credential_profile_ref",
+    "default_credential_profile_store",
     "get_builtin_integration_packages",
     "is_destructive_capability",
     "sanitize_run_params",
