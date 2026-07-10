@@ -224,6 +224,29 @@ export interface SyncProfile {
 export type SyncProfileCreate = Omit<SyncProfile, 'sync_profile_id' | 'package_id' | 'last_run_id' | 'last_status' | 'last_synced_at' | 'created_at' | 'updated_at'>;
 export type SyncProfileUpdate = Partial<Omit<SyncProfileCreate, 'instance_id'>> & { last_run_id?: string | null; last_status?: string | null; last_synced_at?: string | null };
 
+
+export interface SyncEnginePlanRequest {
+  sync_profile_id: string;
+  requested_by?: string | null;
+  params_override?: Record<string, any>;
+  dry_run?: boolean;
+}
+
+export interface SyncEnginePlanResult {
+  status: string;
+  dry_run: boolean;
+  sync_profile_id: string;
+  run_id?: string | null;
+  package_id?: string | null;
+  instance_id?: string | null;
+  capability?: string | null;
+  request_summary: Record<string, any>;
+  plan_summary: Record<string, any>;
+  safety_summary: Record<string, any>;
+  limitations: string[];
+  errors: string[];
+}
+
 export interface IntegrationRun {
   run_id: string;
   run_type: string;
@@ -1386,6 +1409,12 @@ export const securityAPI = {
     client.patch<SyncProfile>(`/api/security/integrations/sync-profiles/${id}`, payload),
   deleteSyncProfile: (id: string) =>
     client.delete(`/api/security/integrations/sync-profiles/${id}`),
+  planSyncEngine: (payload: SyncEnginePlanRequest) =>
+    client.post<SyncEnginePlanResult>('/api/security/integrations/sync-engine/plan', {
+      ...payload,
+      params_override: payload.params_override || {},
+      dry_run: true,
+    }),
   listIntegrationRuns: (params?: { package_id?: string; instance_id?: string; sync_profile_id?: string; capability?: string; status?: string; limit?: number }) =>
     client.get<IntegrationRun[]>('/api/security/integrations/runs', { params }),
   getIntegrationRun: (id: string) =>
