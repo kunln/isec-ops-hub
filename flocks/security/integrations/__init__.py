@@ -14,6 +14,12 @@ from flocks.security.integrations.mapping import (
     get_path,
     normalize_severity,
 )
+from flocks.security.integrations.evidence_dispatcher import (
+    EvidenceDispatchRequest,
+    EvidenceDispatchResult,
+    dispatch_evidence_events,
+    preview_evidence_events,
+)
 from flocks.security.integrations.credential_store import CredentialProfileStore, default_credential_profile_store, resolve_credential_profile_ref
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
@@ -51,6 +57,10 @@ __all__ = [
     "first_of",
     "get_path",
     "normalize_severity",
+    "EvidenceDispatchRequest",
+    "EvidenceDispatchResult",
+    "dispatch_evidence_events",
+    "preview_evidence_events",
     "CredentialProfile",
     "CredentialProfileCreate",
     "CredentialProfileStore",

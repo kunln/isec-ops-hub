@@ -20,7 +20,7 @@ from flocks.security.connector_runs import (
 from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.fact_ledger import summarize_fact_ledger
-from flocks.security.integrations import create_default_integration_registry
+from flocks.security.integrations import EvidenceDispatchRequest, create_default_integration_registry, preview_evidence_events as preview_dispatch_evidence_events
 from flocks.security.integrations.credential_store import default_credential_profile_store
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import default_integration_instance_store
@@ -108,6 +108,15 @@ class TdaTestRequest(BaseModel):
     api_key: str
     secret: str
     verify_ssl: bool = False
+
+
+class EvidenceDispatchPreviewRequest(BaseModel):
+    connector_context: dict[str, Any] | None = None
+    events: list[dict[str, Any]]
+    create_analysis_cases: bool = False
+    run_initial_analysis: bool = False
+    deduplicate: bool = True
+    preview_only: bool = True
 
 
 class EvidenceIngestionRequest(BaseModel):
@@ -1562,6 +1571,22 @@ async def ingest_evidence_events(payload: EvidenceIngestionRequest):
 )
 async def preview_evidence_events(payload: EvidenceIngestionRequest):
     return {"summaries": [summarize_external_event(event, connector_context=payload.connector_context) for event in payload.events]}
+
+
+@router.post(
+    "/integrations/evidence-dispatch/preview",
+    dependencies=[Depends(require_capability("security.ops.read"))],
+)
+async def preview_integration_evidence_dispatch(payload: EvidenceDispatchPreviewRequest):
+    request = EvidenceDispatchRequest(
+        events=payload.events,
+        connector_context=payload.connector_context,
+        create_analysis_cases=False,
+        run_initial_analysis=False,
+        deduplicate=payload.deduplicate,
+        preview_only=True,
+    )
+    return preview_dispatch_evidence_events(request.events, connector_context=request.connector_context)
 
 @router.get("/alerts")
 async def list_alerts(filters: SecurityListFilters = Depends(_filters)):
