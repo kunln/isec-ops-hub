@@ -78,7 +78,7 @@ async def seed_fake_profile(*, instance_id: str = "intinst_fake", sync_profile_i
 
 
 @pytest.mark.asyncio
-async def test_ingest_sync_profile_run_success_records_run_and_preserves_profile(client: AsyncClient) -> None:
+async def test_ingest_sync_profile_run_success_records_run_and_updates_profile_state(client: AsyncClient) -> None:
     from flocks.security.integrations.adapter import FakeIntegrationAdapter
     from flocks.security.integrations.adapter_registry import AdapterRegistry
     from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
@@ -134,9 +134,11 @@ async def test_ingest_sync_profile_run_success_records_run_and_preserves_profile
     assert run["result_summary"]["created_alerts"] == 1
     assert run["result_summary"]["created_analysis_cases"] == 0
 
-    unchanged = await default_sync_profile_store.get_profile(profile.sync_profile_id)
-    assert unchanged.cursor == {"page": "old"}
-    assert unchanged.last_run_id is None
+    updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
+    assert updated.cursor == {"page": "old"}
+    assert updated.last_run_id == result.run_id
+    assert updated.last_status == "ingested"
+    assert updated.last_synced_at
 
 
 @pytest.mark.asyncio
@@ -248,7 +250,9 @@ async def test_dispatch_flags_and_no_forbidden_side_effects(client: AsyncClient,
     assert result.safety_summary["credentials_read"] is False
     assert result.safety_summary["secret_ref_resolved"] is False
     assert result.safety_summary["cursor_updated"] is False
-    assert result.safety_summary["last_run_id_updated"] is False
+    assert result.safety_summary["last_run_id_updated"] is True
+    assert result.safety_summary["last_status_updated"] is True
+    assert result.safety_summary["last_synced_at_updated"] is True
 
 
 def test_init_exports_preserved() -> None:
@@ -261,3 +265,108 @@ def test_init_exports_preserved() -> None:
         "ManualSyncIngestRequest", "ManualSyncIngestResult", "ingest_sync_profile_run",
     ]:
         assert hasattr(integrations, name)
+
+
+@pytest.mark.asyncio
+async def test_ingest_success_updates_cursor_only_when_adapter_returns_safe_cursor(client: AsyncClient) -> None:
+    from flocks.security.integrations.adapter import FakeIntegrationAdapter
+    from flocks.security.integrations.adapter_registry import AdapterRegistry
+    from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+
+    _, profile = await seed_fake_profile(sync_profile_id="syncprof_cursor_success")
+    registry = AdapterRegistry()
+    registry.register_adapter_factory(
+        "fake.integration",
+        "alert.search",
+        lambda: FakeIntegrationAdapter(
+            "fake.integration",
+            {"alert.search"},
+            fake_items=[{"id": "a1"}],
+            cursor={"page": "new", "raw_response": {"x": 1}, "token": "secret", "note": "Bearer abc"},
+        ),
+    )
+
+    result = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
+
+    assert result.status == "ingested"
+    assert result.safety_summary["cursor_updated"] is True
+    assert result.dispatch_summary["cursor_updated"] is True
+    assert updated.last_run_id == result.run_id
+    assert updated.last_status == "ingested"
+    assert updated.last_synced_at
+    assert updated.cursor == {"page": "new", "note": "[REDACTED]"}
+
+
+@pytest.mark.asyncio
+async def test_ingest_success_without_cursor_keeps_existing_cursor(client: AsyncClient) -> None:
+    from flocks.security.integrations.adapter import FakeIntegrationAdapter
+    from flocks.security.integrations.adapter_registry import AdapterRegistry
+    from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+
+    _, profile = await seed_fake_profile(sync_profile_id="syncprof_cursor_empty")
+    registry = AdapterRegistry()
+    registry.register_adapter_factory("fake.integration", "alert.search", lambda: FakeIntegrationAdapter("fake.integration", {"alert.search"}, fake_items=[{"id": "a1"}], cursor={}))
+
+    result = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
+
+    assert result.status == "ingested"
+    assert result.safety_summary["cursor_updated"] is False
+    assert updated.cursor == {"page": "old"}
+    assert updated.last_run_id == result.run_id
+
+
+@pytest.mark.asyncio
+async def test_ingest_non_success_paths_do_not_update_cursor(client: AsyncClient) -> None:
+    from flocks.security.integrations.adapter import FakeIntegrationAdapter, IntegrationAdapterResult
+    from flocks.security.integrations.adapter_registry import AdapterRegistry
+    from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+
+    _, profile = await seed_fake_profile(sync_profile_id="syncprof_no_update")
+    confirmation = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=False))
+    assert confirmation.status == "confirmation_required"
+    assert (await default_sync_profile_store.get_profile(profile.sync_profile_id)).cursor == {"page": "old"}
+
+
+    not_found = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id="missing", confirmed=True))
+    assert not_found.status == "not_found"
+
+    class FailingAdapter(FakeIntegrationAdapter):
+        async def run_capability(self, request):
+            return IntegrationAdapterResult(status="error", package_id=request.package_id, instance_id=request.instance_id, capability=request.capability, cursor={"page": "bad"})
+
+    registry = AdapterRegistry()
+    registry.register_adapter_factory("fake.integration", "alert.search", lambda: FailingAdapter("fake.integration", {"alert.search"}))
+    failed = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
+    assert failed.status == "validation_failed"
+    assert updated.cursor == {"page": "old"}
+    assert updated.last_run_id is None
+
+
+@pytest.mark.asyncio
+async def test_plan_and_preview_do_not_update_cursor(client: AsyncClient) -> None:
+    from flocks.security.integrations.adapter import FakeIntegrationAdapter
+    from flocks.security.integrations.adapter_registry import AdapterRegistry
+    from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, plan_sync_profile_run
+    from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, preview_sync_profile_run
+    from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+
+    _, profile = await seed_fake_profile(sync_profile_id="syncprof_plan_preview")
+    plan = await plan_sync_profile_run(SyncEnginePlanRequest(sync_profile_id=profile.sync_profile_id))
+    assert plan.status in {"planned", "validation_failed"}
+    after_plan = await default_sync_profile_store.get_profile(profile.sync_profile_id)
+    assert after_plan.cursor == {"page": "old"}
+    assert after_plan.last_run_id is None
+
+    registry = AdapterRegistry()
+    registry.register_adapter_factory("fake.integration", "alert.search", lambda: FakeIntegrationAdapter("fake.integration", {"alert.search"}, fake_items=[{"id": "a1"}], cursor={"page": "preview"}))
+    preview = await preview_sync_profile_run(ManualSyncPreviewRequest(sync_profile_id=profile.sync_profile_id), adapter_registry=registry)
+    after_preview = await default_sync_profile_store.get_profile(profile.sync_profile_id)
+    assert preview.status == "previewed"
+    assert after_preview.cursor == {"page": "old"}
+    assert after_preview.last_run_id is None
