@@ -27,6 +27,20 @@ SENSITIVE_PARAM_KEYWORDS = (
     "authorization",
     "cookie",
 )
+
+SECRET_LIKE_VALUE_HINTS = (
+    "api_key=",
+    "apikey=",
+    "secret=",
+    "token=",
+    "password=",
+    "authorization:",
+    "bearer ",
+    "cookie:",
+    "session=",
+    "x-api-key",
+    "x-flocks-api-token",
+)
 DESTRUCTIVE_CAPABILITY_KEYWORDS = (
     "block",
     "unblock",
@@ -91,6 +105,11 @@ def _is_sensitive_key(key: str) -> bool:
     return any(keyword in lowered for keyword in SENSITIVE_PARAM_KEYWORDS)
 
 
+def _is_secret_like_value(value: str) -> bool:
+    lowered = value.lower()
+    return any(hint in lowered for hint in SECRET_LIKE_VALUE_HINTS)
+
+
 def sanitize_run_params(params: dict[str, Any]) -> dict[str, Any]:
     """Return a sanitized parameter summary safe for request summaries."""
 
@@ -107,7 +126,14 @@ def sanitize_run_params(params: dict[str, Any]) -> dict[str, Any]:
             if len(value) > MAX_SUMMARY_SEQUENCE_ITEMS:
                 summarized.append({"type": "tuple_truncated", "length": len(value)})
             return summarized
-        if isinstance(value, (str, bytes)):
+        if isinstance(value, bytes):
+            length = len(value)
+            if length > MAX_SUMMARY_STRING_LENGTH:
+                return {"type": type(value).__name__, "length": length}
+            return value
+        if isinstance(value, str):
+            if _is_secret_like_value(value):
+                return REDACTED_VALUE
             length = len(value)
             if length > MAX_SUMMARY_STRING_LENGTH:
                 return {"type": type(value).__name__, "length": length}

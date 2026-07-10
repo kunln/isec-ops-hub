@@ -20,6 +20,7 @@ import {
   type SecurityConnectorCustomerSchedule,
   type SecurityConnectorCustomerSummary,
   type IntegrationPackageSummary,
+  type IntegrationCapabilityPlanResponse,
 } from '@/api/security';
 import type { APIServiceSummary, APIServiceCredentialField, Tool, MCPCatalogEntry } from '@/types';
 import { toolAPI } from '@/api/tool';
@@ -2470,6 +2471,29 @@ function groupIntegrationPackages(packages: IntegrationPackageSummary[]) {
 function BuiltInIntegrationPackagesSection({ packages }: { packages: IntegrationPackageSummary[] }) {
   const grouped = useMemo(() => groupIntegrationPackages(packages), [packages]);
   const groups = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+  const [planningKey, setPlanningKey] = useState<string | null>(null);
+  const [planResult, setPlanResult] = useState<IntegrationCapabilityPlanResponse | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  const handleDryRunPlan = async (pkg: IntegrationPackageSummary, capability: string) => {
+    const key = `${pkg.package_id}:${capability}`;
+    setPlanningKey(key);
+    setPlanError(null);
+    try {
+      const response = await securityAPI.planIntegrationCapability({
+        package_id: pkg.package_id,
+        capability,
+        mode: 'manual',
+        params: {},
+        dry_run: true,
+      });
+      setPlanResult(response.data);
+    } catch (error) {
+      setPlanError(apiErrorMessage(error, '生成 dry-run plan 失败'));
+    } finally {
+      setPlanningKey(null);
+    }
+  };
 
   return (
     <section className="mt-6">
@@ -2480,9 +2504,41 @@ function BuiltInIntegrationPackagesSection({ packages }: { packages: Integration
         <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">{packages.length}</span>
       </div>
       <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-        This is package metadata only. Configure credentials and sync profiles in later phases.<br />
-        当前仅展示集成包元数据，凭据配置和同步配置将在后续阶段提供。
+        This is package metadata only. Dry-run Plan only generates an execution plan; it does not connect to devices, sync data, create alerts, or read credentials.<br />
+        当前仅展示集成包元数据。“生成计划”只生成执行计划，不连接设备、不同步、不创建告警、不读取凭据。
       </div>
+      {planError && (
+        <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
+          {planError}
+        </div>
+      )}
+      {planResult && (
+        <div className="mb-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="font-semibold">Dry-run Plan / 生成计划：{planResult.package_id} · {planResult.capability}</div>
+            <button onClick={() => setPlanResult(null)} className="rounded-md p-1 text-emerald-700 hover:bg-emerald-100" title="关闭">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div><span className="font-medium">Status:</span> {planResult.status}</div>
+            <div><span className="font-medium">Mode:</span> {String(planResult.mode || 'manual')} · <span className="font-medium">Dry-run:</span> {String(planResult.dry_run ?? planResult.request_summary?.dry_run ?? true)}</div>
+          </div>
+          <div className="mt-2 grid gap-2 lg:grid-cols-2">
+            {[
+              ['request_summary', planResult.request_summary],
+              ['capability_summary', planResult.capability_summary],
+              ['safety_summary', planResult.safety_summary],
+              ['limitations', planResult.limitations],
+            ].map(([label, value]) => (
+              <div key={label as string} className="rounded-lg bg-white/70 p-2">
+                <div className="mb-1 font-medium text-emerald-800">{label as string}</div>
+                <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-700">{JSON.stringify(value || {}, null, 2)}</pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-200 bg-white p-4 text-sm text-zinc-500">
           暂无内置集成包元数据。
@@ -2512,11 +2568,23 @@ function BuiltInIntegrationPackagesSection({ packages }: { packages: Integration
                       <div><span className="text-zinc-400">Version:</span> {pkg.version}</div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {pkg.capabilities.map((capability) => (
-                        <span key={capability} className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
-                          {capability}
-                        </span>
-                      ))}
+                      {pkg.capabilities.map((capability) => {
+                        const key = `${pkg.package_id}:${capability}`;
+                        return (
+                          <span key={capability} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+                            <span>{capability}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDryRunPlan(pkg, capability)}
+                              disabled={planningKey === key}
+                              className="ml-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              title="只生成执行计划，不连接设备、不同步、不创建告警、不读取凭据。"
+                            >
+                              {planningKey === key ? 'Planning...' : 'Dry-run Plan / 生成计划'}
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                     <div className="mt-3 space-y-1 text-xs text-zinc-600">
                       <div className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700">

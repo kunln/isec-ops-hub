@@ -125,6 +125,29 @@ export interface IntegrationPackageSummary {
 
 export type IntegrationPackageManifest = IntegrationPackageSummary;
 
+
+export interface IntegrationCapabilityPlanRequest {
+  package_id?: string;
+  instance_id?: string;
+  capability: string;
+  mode?: string;
+  params?: Record<string, unknown>;
+  dry_run?: boolean;
+}
+
+export interface IntegrationCapabilityPlanResponse {
+  status: string;
+  plan?: Record<string, unknown>;
+  package_id: string;
+  capability: string;
+  mode?: string;
+  dry_run?: boolean;
+  request_summary?: Record<string, unknown>;
+  capability_summary?: Record<string, unknown>;
+  safety_summary?: Record<string, unknown>;
+  limitations?: string[];
+}
+
 export interface IntegrationCapability {
   package_id: string;
   capability: string;
@@ -1240,6 +1263,12 @@ export const securityAPI = {
     client.get<IntegrationPackageManifest>(`/api/security/integrations/packages/${packageId}`),
   listIntegrationCapabilities: () =>
     client.get<IntegrationCapability[]>('/api/security/integrations/capabilities'),
+  planIntegrationCapability: (payload: IntegrationCapabilityPlanRequest) =>
+    client.post<IntegrationCapabilityPlanResponse>('/api/security/integrations/capability-runtime/plan', {
+      ...payload,
+      params: payload.params || {},
+      dry_run: true,
+    }),
 
   health: () => client.get('/api/security/health'),
   getEvidenceGraph: () => client.get<SecurityEvidenceGraph>('/api/security/evidence-graph'),
