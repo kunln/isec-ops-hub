@@ -21,6 +21,10 @@ from flocks.security.connectors import connector_registry
 from flocks.security.evidence_ingestion import ingest_external_events, summarize_external_event
 from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.integrations import create_default_integration_registry
+from flocks.security.integrations.evidence_dispatcher import (
+    EvidenceDispatchRequest,
+    dispatch_evidence_events as dispatch_integration_evidence_events,
+)
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
@@ -114,6 +118,15 @@ class EvidenceIngestionRequest(BaseModel):
     create_analysis_cases: bool = True
     run_initial_analysis: bool = True
     deduplicate: bool = True
+
+
+class EvidenceDispatchAPIRequest(BaseModel):
+    events: list[dict[str, Any]]
+    connector_context: dict[str, Any] | None = None
+    create_analysis_cases: bool = False
+    run_initial_analysis: bool = False
+    deduplicate: bool = True
+    preview_only: bool = True
 
 
 def _analysis_case_incident_severity(severity: str) -> IncidentSeverity:
@@ -1476,6 +1489,24 @@ async def update_vulnerability(vuln_id: str, payload: VulnerabilityUpdate):
 async def delete_vulnerability(vuln_id: str):
     return {"deleted": await default_store.delete_vulnerability(vuln_id)}
 
+
+
+
+
+@router.post(
+    "/integrations/evidence-dispatch/preview",
+    dependencies=[Depends(require_capability("security.ops.read"))],
+)
+async def preview_integration_evidence_dispatch(payload: EvidenceDispatchAPIRequest):
+    request = EvidenceDispatchRequest(
+        events=payload.events,
+        connector_context=payload.connector_context,
+        create_analysis_cases=False,
+        run_initial_analysis=False,
+        deduplicate=payload.deduplicate,
+        preview_only=True,
+    )
+    return await dispatch_integration_evidence_events(request)
 
 
 @router.post(
