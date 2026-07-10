@@ -450,7 +450,7 @@ def _instance_validation_error(exc: ValueError) -> HTTPException:
 async def list_integration_instances(package_id: str | None = None, enabled: bool | None = None):
     """List Integration Instance metadata without connector side effects."""
 
-    return default_integration_instance_store.list_instances(package_id=package_id, enabled=enabled)
+    return await default_integration_instance_store.list_instances(package_id=package_id, enabled=enabled)
 
 
 @router.post(
@@ -466,14 +466,14 @@ async def create_integration_instance(payload: IntegrationInstanceCreate):
     """
 
     try:
-        return default_integration_instance_store.create_instance(payload)
+        return await default_integration_instance_store.create_instance(payload)
     except ValueError as exc:
         raise _instance_validation_error(exc) from exc
 
 
 @router.get("/integrations/instances/{instance_id}", response_model=IntegrationInstance)
 async def get_integration_instance(instance_id: str):
-    instance = default_integration_instance_store.get_instance(instance_id)
+    instance = await default_integration_instance_store.get_instance(instance_id)
     if instance is None:
         raise HTTPException(status_code=404, detail="Integration instance not found")
     return instance
@@ -486,7 +486,7 @@ async def get_integration_instance(instance_id: str):
 )
 async def update_integration_instance(instance_id: str, payload: IntegrationInstanceUpdate):
     try:
-        instance = default_integration_instance_store.update_instance(instance_id, payload)
+        instance = await default_integration_instance_store.update_instance(instance_id, payload)
     except ValueError as exc:
         raise _instance_validation_error(exc) from exc
     if instance is None:
@@ -496,7 +496,7 @@ async def update_integration_instance(instance_id: str, payload: IntegrationInst
 
 @router.delete("/integrations/instances/{instance_id}", dependencies=[Depends(require_capability("security.ops.write"))])
 async def delete_integration_instance(instance_id: str):
-    if not default_integration_instance_store.delete_instance(instance_id):
+    if not await default_integration_instance_store.delete_instance(instance_id):
         raise HTTPException(status_code=404, detail="Integration instance not found")
     return {"status": "deleted", "instance_id": instance_id}
 
