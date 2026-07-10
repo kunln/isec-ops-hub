@@ -9,6 +9,13 @@ from flocks.security.integrations.adapter import (
     build_adapter_item_refs,
     sanitize_adapter_mapping,
 )
+from flocks.security.integrations.adapter_registry import (
+    AdapterFactory,
+    AdapterRegistry,
+    AdapterRegistryEntry,
+    create_default_adapter_registry,
+    default_adapter_registry,
+)
 from flocks.security.integrations.builtin import get_builtin_integration_packages
 from flocks.security.integrations.builtin_mappings import MINGYU_RISK_MAPPING, TDA_ALERT_MAPPING
 from flocks.security.integrations.mapping import (
@@ -82,6 +89,11 @@ __all__ = [
     "IntegrationAdapter",
     "FakeIntegrationAdapter",
     "AdapterItemRef",
+    "AdapterFactory",
+    "AdapterRegistryEntry",
+    "AdapterRegistry",
+    "default_adapter_registry",
+    "create_default_adapter_registry",
     "EvidenceEventMappingResult",
     "MappingRule",
     "MINGYU_RISK_MAPPING",

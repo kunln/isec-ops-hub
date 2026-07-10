@@ -256,6 +256,10 @@ The Sync Engine handles manual sync, future scheduled sync, incremental cursors,
 
 The Adapter Interface defines the execution boundary between Sync Engine planning and future connector-backed fetches. This skeleton only introduces request/result contracts and a fake adapter for tests. It does not call connectors, perform HTTP, read credentials, dispatch evidence, create security objects, or store raw responses. `AdapterResult` may contain lightweight normalized items, item refs, cursor, summary, warnings, and errors, all safe-exported.
 
+### Adapter Registry
+
+The Adapter Registry maps `package_id + capability` to an `IntegrationAdapter` factory. This registry is metadata-only and resolver-only in this skeleton. It may instantiate an adapter factory but does not run adapter capabilities, call connectors, perform HTTP, read credentials, execute mappings, dispatch evidence, create security objects, or store raw responses. The default registry may include a fake adapter for tests only; real vendor adapters are intentionally not registered in this PR.
+
 ### Evidence Dispatcher
 
 The Evidence Dispatcher sends Evidence Events to `evidence_ingestion`, creates normalized Alerts/EvidenceItems, and may optionally create an Analysis Case and initial analysis. It must never auto-create an Incident unless an explicit human-driven path says so.
