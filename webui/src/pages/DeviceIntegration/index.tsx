@@ -23,6 +23,7 @@ import {
   type IntegrationCapabilityPlanResponse,
   type SyncEnginePlanResult,
   type ManualSyncPreviewResult,
+  type ManualSyncIngestResult,
   type IntegrationInstance,
   type CredentialProfile,
   type SyncProfile,
@@ -198,6 +199,46 @@ function syncPreviewResultFromError(error: unknown): ManualSyncPreviewResult | n
     fetched_count: Number(payload.fetched_count || 0),
     mapped_count: Number(payload.mapped_count || 0),
     preview_count: Number(payload.preview_count || 0),
+    item_refs: Array.isArray(payload.item_refs) ? payload.item_refs : [],
+    event_summaries: Array.isArray(payload.event_summaries) ? payload.event_summaries : [],
+    request_summary: payload.request_summary || {},
+    adapter_summary: payload.adapter_summary || {},
+    mapping_summary: payload.mapping_summary || {},
+    dispatch_summary: payload.dispatch_summary || {},
+    safety_summary: payload.safety_summary || {},
+    limitations: Array.isArray(payload.limitations) ? payload.limitations : [],
+    warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+    errors: Array.isArray(payload.errors) ? payload.errors : [],
+  };
+}
+
+function syncIngestResultFromError(error: unknown): ManualSyncIngestResult | null {
+  if (!error || typeof error !== 'object') return null;
+  const err = error as { response?: { data?: unknown } };
+  const data = err.response?.data;
+  const detail = data && typeof data === 'object' && 'detail' in data
+    ? (data as { detail?: unknown }).detail
+    : data;
+  if (!detail || typeof detail !== 'object') return null;
+  const payload = detail as Partial<ManualSyncIngestResult>;
+  if (!payload.status && !payload.sync_profile_id && !payload.errors && !payload.limitations) return null;
+  return {
+    status: String(payload.status || 'validation_failed'),
+    dry_run: payload.dry_run ?? true,
+    preview_only: payload.preview_only ?? false,
+    confirmed: payload.confirmed ?? false,
+    sync_profile_id: String(payload.sync_profile_id || ''),
+    run_id: payload.run_id ?? null,
+    package_id: payload.package_id ?? null,
+    instance_id: payload.instance_id ?? null,
+    capability: payload.capability ?? null,
+    adapter_id: payload.adapter_id ?? null,
+    fetched_count: Number(payload.fetched_count || 0),
+    mapped_count: Number(payload.mapped_count || 0),
+    ingested_count: Number(payload.ingested_count || 0),
+    created_alerts: Number(payload.created_alerts || 0),
+    created_analysis_cases: Number(payload.created_analysis_cases || 0),
+    skipped_duplicates: Number(payload.skipped_duplicates || 0),
     item_refs: Array.isArray(payload.item_refs) ? payload.item_refs : [],
     event_summaries: Array.isArray(payload.event_summaries) ? payload.event_summaries : [],
     request_summary: payload.request_summary || {},
@@ -2870,6 +2911,35 @@ function SyncPreviewResultCard({ result, onClose }: { result: ManualSyncPreviewR
   );
 }
 
+function SyncIngestResultCard({ result, onClose }: { result: ManualSyncIngestResult; onClose: () => void }) {
+  const summaryBlocks: Array<[string, unknown]> = [
+    ['item_refs', result.item_refs],
+    ['event_summaries', result.event_summaries],
+    ['request_summary', result.request_summary],
+    ['adapter_summary', result.adapter_summary],
+    ['mapping_summary', result.mapping_summary],
+    ['dispatch_summary', result.dispatch_summary],
+    ['safety_summary', result.safety_summary],
+  ];
+  return (
+    <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="font-semibold">Latest Ingest Result / 最近入库结果：{result.sync_profile_id}</div>
+        <button type="button" onClick={onClose} className="rounded-md p-1 text-amber-700 hover:bg-amber-100" title="关闭"><X className="h-3.5 w-3.5" /></button>
+      </div>
+      <div className="grid gap-2 md:grid-cols-4">
+        <div><span className="font-medium">status:</span> {result.status}</div><div><span className="font-medium">run_id:</span> {valueOrDash(result.run_id)}</div><div><span className="font-medium">dry_run:</span> {String(result.dry_run)}</div><div><span className="font-medium">preview_only:</span> {String(result.preview_only)}</div><div><span className="font-medium">confirmed:</span> {String(result.confirmed)}</div><div><span className="font-medium">package_id:</span> {valueOrDash(result.package_id)}</div><div><span className="font-medium">instance_id:</span> {valueOrDash(result.instance_id)}</div><div><span className="font-medium">capability:</span> {valueOrDash(result.capability)}</div><div><span className="font-medium">adapter_id:</span> {valueOrDash(result.adapter_id)}</div><div><span className="font-medium">fetched_count:</span> {result.fetched_count}</div><div><span className="font-medium">mapped_count:</span> {result.mapped_count}</div><div><span className="font-medium">ingested_count:</span> {result.ingested_count}</div><div><span className="font-medium">created_alerts:</span> {result.created_alerts}</div><div><span className="font-medium">created_analysis_cases:</span> {result.created_analysis_cases}</div><div><span className="font-medium">skipped_duplicates:</span> {result.skipped_duplicates}</div>
+      </div>
+      <div className="mt-2 grid gap-2 md:grid-cols-3">
+        <div className="rounded-lg bg-white/70 p-2"><div className="mb-1 font-medium">limitations</div><ul className="list-disc pl-4 text-zinc-700">{result.limitations.length ? result.limitations.map((item, idx) => <li key={idx}>{item}</li>) : <li>-</li>}</ul></div>
+        <div className="rounded-lg bg-white/70 p-2"><div className="mb-1 font-medium">warnings</div><ul className="list-disc pl-4 text-zinc-700">{result.warnings.length ? result.warnings.map((item, idx) => <li key={idx}>{item}</li>) : <li>-</li>}</ul></div>
+        <div className="rounded-lg bg-white/70 p-2"><div className="mb-1 font-medium">errors</div><ul className="list-disc pl-4 text-zinc-700">{result.errors.length ? result.errors.map((item, idx) => <li key={idx}>{item}</li>) : <li>-</li>}</ul></div>
+      </div>
+      <div className="mt-2 grid gap-2 lg:grid-cols-2">{summaryBlocks.map(([label, value]) => (<details key={label} className="rounded-lg bg-white/70 p-2"><summary className="cursor-pointer font-medium text-amber-800">{label}</summary><pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-700">{JSON.stringify(value || (Array.isArray(value) ? [] : {}), null, 2)}</pre></details>))}</div>
+    </div>
+  );
+}
+
 function SyncProfilesSection({
   profiles,
   error,
@@ -2879,10 +2949,15 @@ function SyncProfilesSection({
   syncPreviewLoadingId,
   syncPreviewResult,
   syncPreviewError,
+  syncIngestLoadingId,
+  syncIngestResult,
+  syncIngestError,
   onGeneratePlan,
   onClearPlanResult,
   onPreviewSync,
   onClearPreviewResult,
+  onConfirmIngest,
+  onClearIngestResult,
 }: {
   profiles: SyncProfile[];
   error?: string | null;
@@ -2892,22 +2967,29 @@ function SyncProfilesSection({
   syncPreviewLoadingId: string | null;
   syncPreviewResult: ManualSyncPreviewResult | null;
   syncPreviewError: string | null;
+  syncIngestLoadingId: string | null;
+  syncIngestResult: ManualSyncIngestResult | null;
+  syncIngestError: string | null;
   onGeneratePlan: (profile: SyncProfile) => void;
   onClearPlanResult: () => void;
   onPreviewSync: (profile: SyncProfile) => void;
   onClearPreviewResult: () => void;
+  onConfirmIngest: (profile: SyncProfile) => void;
+  onClearIngestResult: () => void;
 }) {
   return (
-    <SectionCard title="Sync Profiles / 同步策略" subtitle="同步策略当前仅表示同步意图和元数据；本页面不会执行同步。Generate Plan / 生成计划 仅调用 Sync Engine dry-run plan API，记录一次 planned/validation_failed IntegrationRun，不更新 cursor，不更新 last_run_id，不执行同步。Preview Sync / 预览同步 仅调用 Manual Sync Preview API，返回 preview-only 事件摘要和 IntegrationRun 引用，不创建 Evidence/Alert/Case/Incident，不更新 cursor，不更新 last_run_id。" count={error ? '-' : profiles.length}>
+    <SectionCard title="Sync Profiles / 同步策略" subtitle="同步策略当前仅表示同步意图和元数据；本页面不会执行同步。Generate Plan / 生成计划 仅调用 Sync Engine dry-run plan API，记录一次 planned/validation_failed IntegrationRun，不更新 cursor，不更新 last_run_id，不执行同步。Preview Sync / 预览同步 仅调用 Manual Sync Preview API，返回 preview-only 事件摘要和 IntegrationRun 引用，不创建 Evidence/Alert/Case/Incident，不更新 cursor，不更新 last_run_id。Confirm Ingest / 确认入库 仅在人工二次确认后调用 Manual Sync Ingest API，强制 dry-run 安全标志，不创建 Analysis Case/Incident，不执行处置。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
       <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-        Generate Plan / 生成计划仅生成 dry-run 执行计划，不连接设备、不同步、不读取凭据、不创建告警/事件。Preview Sync / 预览同步仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。
+        Generate Plan / 生成计划仅生成 dry-run 执行计划，不连接设备、不同步、不读取凭据、不创建告警/事件。Preview Sync / 预览同步仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。Ingest：人工确认后受控入库 Evidence/Alert，不创建 Analysis Case，不创建 Incident，不处置。
       </div>
       {syncPlanError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPlanError}</div>}
       {syncPreviewError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPreviewError}</div>}
+      {syncIngestError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncIngestError}</div>}
       {syncPlanResult && <SyncPlanResultCard result={syncPlanResult} onClose={onClearPlanResult} />}
       {syncPreviewResult && <SyncPreviewResultCard result={syncPreviewResult} onClose={onClearPreviewResult} />}
-      {profiles.length === 0 ? <EmptyState text="暂无同步策略元数据。" /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-400"><tr>{['display_name','sync_profile_id','instance_id','package_id','capability','mode','enabled','schedule','last_status','last_run_id','last_synced_at','deduplicate','create_analysis_cases','run_initial_analysis','plan','preview'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-zinc-100">{profiles.map((p) => <tr key={p.sync_profile_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{p.display_name}</td><td className="px-2 py-2">{p.sync_profile_id}</td><td className="px-2 py-2">{p.instance_id}</td><td className="px-2 py-2">{p.package_id}</td><td className="px-2 py-2">{p.capability}</td><td className="px-2 py-2">{p.mode}</td><td className="px-2 py-2">{String(p.enabled)}</td><td className="px-2 py-2">{valueOrDash(p.schedule)}</td><td className="px-2 py-2">{p.last_status}</td><td className="px-2 py-2">{valueOrDash(p.last_run_id)}</td><td className="px-2 py-2">{valueOrDash(p.last_synced_at)}</td><td className="px-2 py-2">{String(p.deduplicate)}</td><td className="px-2 py-2">{String(p.create_analysis_cases)}</td><td className="px-2 py-2">{String(p.run_initial_analysis)}</td><td className="px-2 py-2"><button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" title="只生成执行计划；不连接设备、不同步、不读取凭据、不创建告警/事件。">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划：只生成执行计划</button></td><td className="px-2 py-2"><button type="button" onClick={() => onPreviewSync(p)} disabled={syncPreviewLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60" title="仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。">{syncPreviewLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步：仅预览同步结果</button></td></tr>)}</tbody></table></div>}
+      {syncIngestResult && <SyncIngestResultCard result={syncIngestResult} onClose={onClearIngestResult} />}
+      {profiles.length === 0 ? <EmptyState text="暂无同步策略元数据。" /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-400"><tr>{['display_name','sync_profile_id','instance_id','package_id','capability','mode','enabled','schedule','last_status','last_run_id','last_synced_at','deduplicate','create_analysis_cases','run_initial_analysis','plan','preview','ingest'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-zinc-100">{profiles.map((p) => <tr key={p.sync_profile_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{p.display_name}</td><td className="px-2 py-2">{p.sync_profile_id}</td><td className="px-2 py-2">{p.instance_id}</td><td className="px-2 py-2">{p.package_id}</td><td className="px-2 py-2">{p.capability}</td><td className="px-2 py-2">{p.mode}</td><td className="px-2 py-2">{String(p.enabled)}</td><td className="px-2 py-2">{valueOrDash(p.schedule)}</td><td className="px-2 py-2">{p.last_status}</td><td className="px-2 py-2">{valueOrDash(p.last_run_id)}</td><td className="px-2 py-2">{valueOrDash(p.last_synced_at)}</td><td className="px-2 py-2">{String(p.deduplicate)}</td><td className="px-2 py-2">{String(p.create_analysis_cases)}</td><td className="px-2 py-2">{String(p.run_initial_analysis)}</td><td className="px-2 py-2"><button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" title="只生成执行计划；不连接设备、不同步、不读取凭据、不创建告警/事件。">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划：只生成执行计划</button></td><td className="px-2 py-2"><button type="button" onClick={() => onPreviewSync(p)} disabled={syncPreviewLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60" title="仅预览同步结果，不连接真实厂商、不读取凭据、不创建告警/事件、不执行处置。">{syncPreviewLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步：仅预览同步结果</button></td><td className="px-2 py-2"><button type="button" onClick={() => onConfirmIngest(p)} disabled={syncIngestLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60" title="人工确认后将创建 Evidence/Alert，但不会创建 Analysis Case、Incident，也不会执行处置。">{syncIngestLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Confirm Ingest / 确认入库</button><div className="mt-1 max-w-48 text-[10px] text-zinc-500">人工确认后将创建 Evidence/Alert，但不会创建 Analysis Case、Incident，也不会执行处置。</div></td></tr>)}</tbody></table></div>}
     </SectionCard>
   );
 }
@@ -2926,7 +3008,7 @@ type IntegrationCenterTab = 'setup' | 'sync' | 'runs' | 'legacy';
 
 const INTEGRATION_CENTER_TABS: Array<{ id: IntegrationCenterTab; label: string; description: string }> = [
   { id: 'setup', label: 'Access Setup / 接入配置', description: '集成包、实例、凭据引用' },
-  { id: 'sync', label: 'Sync Policies / 同步策略', description: '策略、Plan 与 Preview' },
+  { id: 'sync', label: 'Sync Policies / 同步策略', description: '策略、Plan、Preview 与 Confirm Ingest' },
   { id: 'runs', label: 'Run History / 运行记录', description: 'Runtime v2 操作审计' },
   { id: 'legacy', label: 'Legacy Connector / 旧版接入', description: '历史设备接入与旧同步' },
 ];
@@ -2939,25 +3021,26 @@ function IntegrationFlow() {
     '配置同步策略',
     '生成计划',
     '预览结果',
-    '人工确认入库（后续）',
+    '人工确认入库',
   ];
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-zinc-900">Integration flow / 集成流程</h2>
-          <p className="text-xs text-zinc-500">前六步用于安全预览；第 7 步为 disabled roadmap，不提供入口。</p>
+          <p className="text-xs text-zinc-500">前六步用于安全预览；第 7 步为受控人工确认动作（requires confirmation），不会自动执行。</p>
         </div>
         <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-500">Safe preview mode</span>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
         {steps.map((step, index) => {
-          const disabled = index === steps.length - 1;
+          const disabled = false;
+          const confirmationStep = index === steps.length - 1;
           return (
             <div key={step} className={`rounded-xl border p-3 text-xs ${disabled ? 'border-dashed border-zinc-200 bg-zinc-50 text-zinc-400' : 'border-indigo-100 bg-indigo-50 text-indigo-900'}`}>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${disabled ? 'bg-zinc-200 text-zinc-500' : 'bg-indigo-600 text-white'}`}>{index + 1}</span>
-                {disabled && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-zinc-400">Roadmap</span>}
+                {confirmationStep && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-amber-700">受控 / requires confirmation</span>}
               </div>
               <div className="font-medium">{step}</div>
             </div>
@@ -3022,6 +3105,9 @@ export default function DeviceIntegrationPage() {
   const [syncPreviewLoadingId, setSyncPreviewLoadingId] = useState<string | null>(null);
   const [syncPreviewResult, setSyncPreviewResult] = useState<ManualSyncPreviewResult | null>(null);
   const [syncPreviewError, setSyncPreviewError] = useState<string | null>(null);
+  const [syncIngestLoadingId, setSyncIngestLoadingId] = useState<string | null>(null);
+  const [syncIngestResult, setSyncIngestResult] = useState<ManualSyncIngestResult | null>(null);
+  const [syncIngestError, setSyncIngestError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [panel, setPanel] = useState<PanelMode>(null);
@@ -3129,6 +3215,38 @@ export default function DeviceIntegrationPage() {
       setSyncPreviewError(apiErrorMessage(error, '生成预览失败'));
     } finally {
       setSyncPreviewLoadingId(null);
+    }
+  };
+
+  const handleConfirmIngest = async (profile: SyncProfile) => {
+    const ok = await confirm({
+      title: '确认入库同步预览结果？',
+      description: '本操作会通过受控 Manual Sync Ingest 路径创建 Evidence/Alert 记录，但不会创建 Analysis Case、不会创建 Incident、不会发送通知、不会执行处置、不会更新 cursor 或 last_run_id。请确认这是一次人工确认入库操作。',
+      confirmText: '确认入库',
+      variant: 'warning',
+    });
+    if (!ok) return;
+    setSyncIngestLoadingId(profile.sync_profile_id);
+    setSyncIngestError(null);
+    try {
+      const response = await securityAPI.ingestSyncEngine({
+        sync_profile_id: profile.sync_profile_id,
+        params_override: {},
+        confirmed: true,
+        dry_run: true,
+        preview_only: false,
+        create_analysis_cases: false,
+        run_initial_analysis: false,
+      });
+      setSyncIngestResult(response.data);
+      toast.success('确认入库已完成');
+      await fetchData(true);
+    } catch (error) {
+      const detailResult = syncIngestResultFromError(error);
+      if (detailResult) setSyncIngestResult(detailResult);
+      setSyncIngestError(apiErrorMessage(error, '确认入库失败'));
+    } finally {
+      setSyncIngestLoadingId(null);
     }
   };
 
@@ -3518,7 +3636,7 @@ export default function DeviceIntegrationPage() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-900 shadow-sm">
               <div className="font-semibold">安全边界 / Safety boundary</div>
-              <p className="mt-1 text-xs text-indigo-800">当前默认采用安全预览模式：生成计划与预览结果均不会连接真实厂商、不会读取明文凭据、不会自动创建事件、不会执行处置。Ingest 仅作为后续人工确认入库能力展示，不提供入口。</p>
+              <p className="mt-1 text-xs text-indigo-800">当前默认采用安全预览模式：生成计划与预览结果均不会连接真实厂商、不会读取明文凭据、不会自动创建事件、不会执行处置。Confirm Ingest 为受控人工确认动作，强制安全标志；不会自动创建事件、Incident 或执行处置。</p>
             </div>
 
             <IntegrationFlow />
@@ -3543,7 +3661,7 @@ export default function DeviceIntegrationPage() {
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     <li><span className="font-medium">Plan：</span>只生成执行计划，不取数、不入库；</li>
                     <li><span className="font-medium">Preview：</span>只生成同步结果预览，不创建 Evidence/Alert/Case/Incident；</li>
-                    <li><span className="font-medium">Ingest：</span>人工确认入库能力已在后端受控提供，但当前 UI 暂不开放，避免误操作。</li>
+                    <li><span className="font-medium">Ingest：</span>人工确认后受控入库 Evidence/Alert，不创建 Case/Incident，不执行处置。</li>
                   </ul>
                 </div>
                 <SyncProfilesSection
@@ -3555,10 +3673,15 @@ export default function DeviceIntegrationPage() {
                   syncPreviewLoadingId={syncPreviewLoadingId}
                   syncPreviewResult={syncPreviewResult}
                   syncPreviewError={syncPreviewError}
+                  syncIngestLoadingId={syncIngestLoadingId}
+                  syncIngestResult={syncIngestResult}
+                  syncIngestError={syncIngestError}
                   onGeneratePlan={(profile) => void handleGenerateSyncPlan(profile)}
                   onClearPlanResult={() => setSyncPlanResult(null)}
                   onPreviewSync={(profile) => void handlePreviewSync(profile)}
                   onClearPreviewResult={() => setSyncPreviewResult(null)}
+                  onConfirmIngest={(profile) => void handleConfirmIngest(profile)}
+                  onClearIngestResult={() => setSyncIngestResult(null)}
                 />
               </div>
             )}
