@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -40,8 +42,8 @@ class IntegrationCapability(_IntegrationBaseModel):
     description: str | None = None
     method: str | None = None
     path: str | None = None
-    pagination: str | None = None
-    mapping: str | None = None
+    pagination: dict[str, Any] | str | None = None
+    mapping: dict[str, Any] | str | None = None
 
 
 class IntegrationPackage(_IntegrationBaseModel):

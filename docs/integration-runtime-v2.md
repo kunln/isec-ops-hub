@@ -203,6 +203,35 @@ Integration Center
 
 The Integration Registry handles package discovery, manifest loading, capability indexing, version compatibility, package status, and validation. It is also the future home of Capability Registry behavior, where declared capabilities are indexed and made available to the Runtime.
 
+
+#### Manifest Loader Skeleton
+
+The first Manifest Loader supports loading declarative Integration Package manifests into the registry with validation. It does not execute connectors, scan directories automatically, read credentials, call vendor APIs, run sync, execute mappings, create Security objects, or store raw responses. Mapping and pagination declarations are retained as package capability metadata only.
+
+Minimal JSON example:
+
+```json
+{
+  "package_id": "example.product",
+  "name": "Example Product",
+  "vendor": "Example",
+  "product": "Product",
+  "version": "manifest-skeleton-v1",
+  "category": "security_monitoring",
+  "capabilities": [
+    {
+      "capability": "alert.search",
+      "display_name": "Search alerts",
+      "method": "GET",
+      "path": "/api/alerts",
+      "mapping": {"event_type": "alert"}
+    }
+  ]
+}
+```
+
+If omitted, `auth_type` defaults to `none`, `sensitive_fields` defaults to an empty list, `raw_response_policy` defaults to `transient_only`, and `raw_log_storage` defaults to `forbidden`. Raw response persistence policies such as `persist_full_response` and raw log storage policies such as `store_raw` are rejected.
+
 ### Auth Engine
 
 The Auth Engine handles API key authentication, bearer tokens, basic auth, HMAC, cookie/session flows, future OAuth2 support, secret redaction, and header injection.

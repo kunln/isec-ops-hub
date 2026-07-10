@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
+from pathlib import Path
 
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackage
 
@@ -109,3 +110,23 @@ def create_default_integration_registry() -> IntegrationRegistry:
     for package in get_builtin_integration_packages():
         registry.register_package(package)
     return registry
+
+
+def register_manifest_dict(registry: IntegrationRegistry, data: dict[str, object]) -> IntegrationPackage:
+    """Load a manifest dictionary and register the resulting package."""
+
+    from flocks.security.integrations.manifest_loader import load_package_from_manifest_dict
+
+    package = load_package_from_manifest_dict(data)
+    registry.register_package(package)
+    return package
+
+
+def register_manifest_file(registry: IntegrationRegistry, path: str | Path) -> IntegrationPackage:
+    """Load a manifest file and register the resulting package."""
+
+    from flocks.security.integrations.manifest_loader import load_package_from_manifest_file
+
+    package = load_package_from_manifest_file(path)
+    registry.register_package(package)
+    return package
