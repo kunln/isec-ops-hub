@@ -11,13 +11,8 @@ from flocks.security.integrations import (
     IntegrationInstanceCreate,
     build_capability_run_request_from_instance,
 )
-from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
+from flocks.security.integrations.instance_store import IntegrationInstanceStore
 from flocks.storage.storage import Storage
-
-
-@pytest.fixture(autouse=True)
-def clear_instance_store() -> None:
-    default_integration_instance_store._instances.clear()
 
 
 @pytest.fixture
@@ -65,7 +60,6 @@ async def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     Config._cached_config = None
     secrets_module._secret_manager = None
     connector_registry.reset_for_tests()
-    default_integration_instance_store._instances.clear()
 
 
 async def create_instance(client: AsyncClient, package_id: str = "asiainfo.tda", **extra: object) -> dict[str, object]:
