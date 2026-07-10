@@ -256,6 +256,46 @@ export interface ManualSyncPreviewRequest {
   preview_only?: boolean;
 }
 
+export interface ManualSyncIngestRequest {
+  sync_profile_id: string;
+  requested_by?: string | null;
+  params_override?: Record<string, any>;
+  confirmed: boolean;
+  dry_run?: boolean;
+  preview_only?: boolean;
+  create_analysis_cases?: boolean;
+  run_initial_analysis?: boolean;
+}
+
+export interface ManualSyncIngestResult {
+  status: string;
+  dry_run: boolean;
+  preview_only: boolean;
+  confirmed: boolean;
+  sync_profile_id: string;
+  run_id?: string | null;
+  package_id?: string | null;
+  instance_id?: string | null;
+  capability?: string | null;
+  adapter_id?: string | null;
+  fetched_count: number;
+  mapped_count: number;
+  ingested_count: number;
+  created_alerts: number;
+  created_analysis_cases: number;
+  skipped_duplicates: number;
+  item_refs: Record<string, any>[];
+  event_summaries: Record<string, any>[];
+  request_summary: Record<string, any>;
+  adapter_summary: Record<string, any>;
+  mapping_summary: Record<string, any>;
+  dispatch_summary: Record<string, any>;
+  safety_summary: Record<string, any>;
+  limitations: string[];
+  warnings: string[];
+  errors: string[];
+}
+
 export interface ManualSyncPreviewResult {
   status: string;
   dry_run: boolean;
@@ -1455,6 +1495,16 @@ export const securityAPI = {
       params_override: payload.params_override || {},
       dry_run: true,
       preview_only: true,
+    }),
+  ingestSyncEngine: (payload: ManualSyncIngestRequest) =>
+    client.post<ManualSyncIngestResult>('/api/security/integrations/sync-engine/ingest', {
+      ...payload,
+      params_override: payload.params_override || {},
+      confirmed: true,
+      dry_run: true,
+      preview_only: false,
+      create_analysis_cases: false,
+      run_initial_analysis: false,
     }),
   listIntegrationRuns: (params?: { package_id?: string; instance_id?: string; sync_profile_id?: string; capability?: string; status?: string; limit?: number }) =>
     client.get<IntegrationRun[]>('/api/security/integrations/runs', { params }),
