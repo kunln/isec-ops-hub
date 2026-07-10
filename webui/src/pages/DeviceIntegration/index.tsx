@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import {
   Shield, CheckCircle, XCircle, AlertTriangle, RefreshCw,
   Plug, PlugZap, WifiOff, Plus, Settings, Loader2,
@@ -21,6 +21,10 @@ import {
   type SecurityConnectorCustomerSummary,
   type IntegrationPackageSummary,
   type IntegrationCapabilityPlanResponse,
+  type IntegrationInstance,
+  type CredentialProfile,
+  type SyncProfile,
+  type IntegrationRun,
 } from '@/api/security';
 import type { APIServiceSummary, APIServiceCredentialField, Tool, MCPCatalogEntry } from '@/types';
 import { toolAPI } from '@/api/tool';
@@ -2605,6 +2609,130 @@ function BuiltInIntegrationPackagesSection({ packages }: { packages: Integration
   );
 }
 
+
+function maskSecretRef(ref?: string | null) {
+  if (!ref) return '-';
+  if (ref.startsWith('credprof_')) return ref;
+  const parts = ref.split('/').filter(Boolean);
+  if (parts.length >= 3) return `${parts[0]}/.../${parts[parts.length - 1]}`;
+  return 'configured reference';
+}
+
+function valueOrDash(value?: string | number | boolean | null) {
+  if (value === undefined || value === null || value === '') return '-';
+  return String(value);
+}
+
+function SectionCard({
+  title,
+  subtitle,
+  count,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  count?: number | string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+          <p className="mt-1 text-xs text-zinc-500">{subtitle}</p>
+        </div>
+        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">{count ?? '-'}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-500">{text}</div>;
+}
+
+function LoadHint({ error }: { error?: string | null }) {
+  if (!error) return null;
+  return <div className="mb-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>;
+}
+
+function IntegrationCenterOverview({
+  counts,
+}: {
+  counts: Record<string, number | null>;
+}) {
+  const cards = [
+    ['Integration Packages', '集成包', counts.packages],
+    ['Integration Instances', '集成实例', counts.instances],
+    ['Credential Profiles', '凭据配置引用', counts.credentials],
+    ['Sync Profiles', '同步策略', counts.syncProfiles],
+    ['Integration Runs', '运行记录', counts.runs],
+  ];
+  return (
+    <SectionCard title="Overview / 概览" subtitle="只读汇总当前 Integration Center 元数据范围。" count="readonly">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {cards.map(([label, cn, value]) => (
+          <div key={label as string} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
+            <div className="text-xs text-zinc-500">{label as string}</div>
+            <div className="mt-1 text-2xl font-semibold text-zinc-900">{value === null ? '-' : value}</div>
+            <div className="mt-1 text-[11px] text-zinc-400">{cn as string}</div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function IntegrationInstancesSection({ instances, packages, error }: { instances: IntegrationInstance[]; packages: IntegrationPackageSummary[]; error?: string | null }) {
+  const packageById = useMemo(() => Object.fromEntries(packages.map((pkg) => [pkg.package_id, pkg])), [packages]);
+  return (
+    <SectionCard title="Integration Instances / 集成实例" subtitle="集成实例仅保存连接目标和元数据，不保存凭据值，不执行连接测试。" count={error ? '-' : instances.length}>
+      <LoadHint error={error} />
+      {instances.length === 0 ? <EmptyState text="暂无集成实例元数据。" /> : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead className="text-zinc-400"><tr>{['display_name','package_id','vendor/product','base_url','enabled','health_status','credential_profile_id','environment','updated_at / created_at'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-zinc-100">
+              {instances.map((item) => {
+                const pkg = packageById[item.package_id];
+                return <tr key={item.instance_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{item.display_name}</td><td className="px-2 py-2">{item.package_id}</td><td className="px-2 py-2">{item.vendor || pkg?.vendor || '-'} / {item.product || pkg?.product || '-'}</td><td className="px-2 py-2">{valueOrDash(item.base_url)}</td><td className="px-2 py-2">{String(item.enabled)}</td><td className="px-2 py-2">{item.health_status}</td><td className="px-2 py-2">{valueOrDash(item.credential_profile_id)}</td><td className="px-2 py-2">{item.environment}</td><td className="px-2 py-2">{valueOrDash(item.updated_at)} / {valueOrDash(item.created_at)}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function CredentialProfilesSection({ profiles, error }: { profiles: CredentialProfile[]; error?: string | null }) {
+  return (
+    <SectionCard title="Credential Profiles / 凭据配置引用" subtitle="仅展示凭据配置引用和字段名；不展示明文 secret，不读取 credential value。" count={error ? '-' : profiles.length}>
+      <LoadHint error={error} />
+      {profiles.length === 0 ? <EmptyState text="暂无凭据配置引用。" /> : <div className="grid gap-3 lg:grid-cols-2">{profiles.map((p) => <div key={p.credential_profile_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="font-semibold text-zinc-900">{p.display_name}</div><div className="mt-2 grid gap-1 sm:grid-cols-2"><div>profile_type: {p.profile_type}</div><div>status: {p.status}</div><div>package_id: {valueOrDash(p.package_id)}</div><div>instance_id: {valueOrDash(p.instance_id)}</div><div>configured_fields: {(p.configured_fields || []).join(', ') || '-'}</div><div>required_fields: {(p.required_fields || []).join(', ') || '-'}</div><div>secret_ref: {maskSecretRef(p.secret_ref)}</div><div>updated_at / created_at: {valueOrDash(p.updated_at)} / {valueOrDash(p.created_at)}</div></div></div>)}</div>}
+    </SectionCard>
+  );
+}
+
+function SyncProfilesSection({ profiles, error }: { profiles: SyncProfile[]; error?: string | null }) {
+  return (
+    <SectionCard title="Sync Profiles / 同步策略" subtitle="同步策略当前仅表示同步意图和元数据；本页面不会执行同步。" count={error ? '-' : profiles.length}>
+      <LoadHint error={error} />
+      {profiles.length === 0 ? <EmptyState text="暂无同步策略元数据。" /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-400"><tr>{['display_name','sync_profile_id','instance_id','package_id','capability','mode','enabled','schedule','last_status','last_run_id','last_synced_at','deduplicate','create_analysis_cases','run_initial_analysis'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-zinc-100">{profiles.map((p) => <tr key={p.sync_profile_id} className="align-top text-zinc-700"><td className="px-2 py-2 font-medium">{p.display_name}</td><td className="px-2 py-2">{p.sync_profile_id}</td><td className="px-2 py-2">{p.instance_id}</td><td className="px-2 py-2">{p.package_id}</td><td className="px-2 py-2">{p.capability}</td><td className="px-2 py-2">{p.mode}</td><td className="px-2 py-2">{String(p.enabled)}</td><td className="px-2 py-2">{valueOrDash(p.schedule)}</td><td className="px-2 py-2">{p.last_status}</td><td className="px-2 py-2">{valueOrDash(p.last_run_id)}</td><td className="px-2 py-2">{valueOrDash(p.last_synced_at)}</td><td className="px-2 py-2">{String(p.deduplicate)}</td><td className="px-2 py-2">{String(p.create_analysis_cases)}</td><td className="px-2 py-2">{String(p.run_initial_analysis)}</td></tr>)}</tbody></table></div>}
+    </SectionCard>
+  );
+}
+
+function IntegrationRunsSection({ runs, error }: { runs: IntegrationRun[]; error?: string | null }) {
+  return (
+    <SectionCard title="Integration Runs / 运行记录" subtitle="只读运行历史；摘要使用安全导出，不展示 raw payload，不提供重跑入口。" count={error ? '-' : runs.length}>
+      <LoadHint error={error} />
+      {runs.length === 0 ? <EmptyState text="暂无运行记录。" /> : <div className="space-y-3">{runs.map((r) => <div key={r.run_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div className="font-semibold text-zinc-900">{r.run_id}</div><span className="rounded-full bg-white px-2 py-0.5 text-zinc-600">{r.status}</span></div><div className="mt-2 grid gap-1 md:grid-cols-3"><div>run_type: {r.run_type}</div><div>package_id: {valueOrDash(r.package_id)}</div><div>instance_id: {valueOrDash(r.instance_id)}</div><div>sync_profile_id: {valueOrDash(r.sync_profile_id)}</div><div>capability: {valueOrDash(r.capability)}</div><div>connector: {valueOrDash(r.connector_id)} / {valueOrDash(r.connector_name)}</div><div>mode: {r.mode}</div><div>started_at: {valueOrDash(r.started_at)}</div><div>finished_at: {valueOrDash(r.finished_at)}</div><div>requested_by: {valueOrDash(r.requested_by)}</div></div><details className="mt-2"><summary className="cursor-pointer text-zinc-500">request_summary / result_summary</summary><pre className="mt-2 max-h-56 overflow-auto rounded-lg bg-white p-2 text-[11px] text-zinc-600">{JSON.stringify({ request_summary: r.request_summary, result_summary: r.result_summary }, null, 2)}</pre></details></div>)}</div>}
+    </SectionCard>
+  );
+}
+
 // ============================================================================
 // Main page
 // ============================================================================
@@ -2625,6 +2753,11 @@ export default function DeviceIntegrationPage() {
   const [groups, setGroups] = useState<DeviceGroup[]>([]);
   const [connectorSummary, setConnectorSummary] = useState<SecurityConnectorCustomerSummary | null>(null);
   const [integrationPackages, setIntegrationPackages] = useState<IntegrationPackageSummary[]>([]);
+  const [integrationInstances, setIntegrationInstances] = useState<IntegrationInstance[]>([]);
+  const [credentialProfiles, setCredentialProfiles] = useState<CredentialProfile[]>([]);
+  const [syncProfiles, setSyncProfiles] = useState<SyncProfile[]>([]);
+  const [integrationRuns, setIntegrationRuns] = useState<IntegrationRun[]>([]);
+  const [integrationCenterErrors, setIntegrationCenterErrors] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [panel, setPanel] = useState<PanelMode>(null);
@@ -2638,7 +2771,7 @@ export default function DeviceIntegrationPage() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes, packageRes] = await Promise.allSettled([
+      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes, packageRes, instanceRes, credentialProfileRes, syncProfileRes, integrationRunRes] = await Promise.allSettled([
         deviceAPI.list(),
         providerAPI.listApiServices(),
         deviceAPI.listGroups(),
@@ -2647,6 +2780,10 @@ export default function DeviceIntegrationPage() {
         mcpAPI.catalogConfigured(),
         mcpAPI.list(),
         securityAPI.listIntegrationPackages(),
+        securityAPI.listIntegrationInstances(),
+        securityAPI.listCredentialProfiles(),
+        securityAPI.listSyncProfiles(),
+        securityAPI.listIntegrationRuns({ limit: 50 }),
       ]);
       if (devRes.status !== 'fulfilled' || tplRes.status !== 'fulfilled' || grpRes.status !== 'fulfilled') {
         throw new Error('device integration load failed');
@@ -2666,6 +2803,17 @@ export default function DeviceIntegrationPage() {
       setGroups(grpRes.value.data || []);
       setConnectorSummary(diagnosticsRes.status === 'fulfilled' ? diagnosticsRes.value.data : null);
       setIntegrationPackages(packageRes.status === 'fulfilled' ? packageRes.value.data || [] : []);
+      setIntegrationInstances(instanceRes.status === 'fulfilled' ? instanceRes.value.data || [] : []);
+      setCredentialProfiles(credentialProfileRes.status === 'fulfilled' ? credentialProfileRes.value.data || [] : []);
+      setSyncProfiles(syncProfileRes.status === 'fulfilled' ? syncProfileRes.value.data || [] : []);
+      setIntegrationRuns(integrationRunRes.status === 'fulfilled' ? integrationRunRes.value.data || [] : []);
+      setIntegrationCenterErrors({
+        packages: packageRes.status === 'fulfilled' ? null : '集成包暂不可用。',
+        instances: instanceRes.status === 'fulfilled' ? null : '集成实例暂不可用。',
+        credentials: credentialProfileRes.status === 'fulfilled' ? null : '凭据配置引用暂不可用。',
+        syncProfiles: syncProfileRes.status === 'fulfilled' ? null : '同步策略暂不可用。',
+        runs: integrationRunRes.status === 'fulfilled' ? null : '运行记录暂不可用。',
+      });
     } catch {
       toast.error('加载失败');
     } finally {
@@ -3036,8 +3184,8 @@ export default function DeviceIntegrationPage() {
   return (
     <div className="h-full flex flex-col">
       <PageHeader
-        title="Device Integration"
-        description="统一管理安全产品连接、工具调用与数据同步"
+        title="Integration Center / 集成中心"
+        description="统一收口集成包、实例、凭据引用、同步策略、运行记录与 dry-run plan"
         icon={<Shield className="w-5 h-5" />}
         action={
           <div className="flex items-center gap-2">
@@ -3066,8 +3214,21 @@ export default function DeviceIntegrationPage() {
         <div className="flex-1 flex items-center justify-center"><LoadingSpinner /></div>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-900 shadow-sm">
+            <div className="font-semibold">Integration Center 当前处于 Integration Runtime v2 骨架阶段。</div>
+            <p className="mt-1 text-xs text-indigo-800">所有能力以元数据管理、只读预览和 dry-run plan 为主，不连接设备、不读取明文凭据、不执行同步、不创建告警/事件、不自动处置。</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl bg-white/70 p-3"><div className="mb-1 font-medium">当前阶段仅支持：</div><ul className="list-disc space-y-1 pl-5 text-xs"><li>查看集成包元数据</li><li>管理集成实例元数据</li><li>管理凭据引用</li><li>管理同步策略元数据</li><li>查看运行记录</li><li>生成 dry-run 执行计划</li></ul></div>
+              <div className="rounded-xl bg-white/70 p-3"><div className="mb-1 font-medium">当前阶段不会：</div><ul className="list-disc space-y-1 pl-5 text-xs"><li>连接设备</li><li>读取明文凭据</li><li>执行同步</li><li>创建告警</li><li>创建事件</li><li>自动处置</li></ul></div>
+            </div>
+          </div>
+          <IntegrationCenterOverview counts={{ packages: integrationCenterErrors.packages ? null : integrationPackages.length, instances: integrationCenterErrors.instances ? null : integrationInstances.length, credentials: integrationCenterErrors.credentials ? null : credentialProfiles.length, syncProfiles: integrationCenterErrors.syncProfiles ? null : syncProfiles.length, runs: integrationCenterErrors.runs ? null : integrationRuns.length }} />
           <IntegrationHealthPanel integrations={customerIntegrations} connectorSummary={connectorSummary} />
           <BuiltInIntegrationPackagesSection packages={integrationPackages} />
+          <IntegrationInstancesSection instances={integrationInstances} packages={integrationPackages} error={integrationCenterErrors.instances} />
+          <CredentialProfilesSection profiles={credentialProfiles} error={integrationCenterErrors.credentials} />
+          <SyncProfilesSection profiles={syncProfiles} error={integrationCenterErrors.syncProfiles} />
+          <IntegrationRunsSection runs={integrationRuns} error={integrationCenterErrors.runs} />
 
           {activeProductCount === 0 ? (
             /* Empty state */

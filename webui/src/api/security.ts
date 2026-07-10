@@ -159,6 +159,97 @@ export interface IntegrationCapability {
   mapping?: string | null;
 }
 
+
+export interface IntegrationInstance {
+  instance_id: string;
+  package_id: string;
+  vendor?: string | null;
+  product?: string | null;
+  display_name: string;
+  environment: string;
+  base_url?: string | null;
+  credential_profile_id?: string | null;
+  verify_ssl: boolean;
+  enabled: boolean;
+  health_status: string;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, any>;
+}
+
+export type IntegrationInstanceCreate = Omit<IntegrationInstance, 'instance_id' | 'vendor' | 'product' | 'health_status' | 'created_at' | 'updated_at'>;
+export type IntegrationInstanceUpdate = Partial<Omit<IntegrationInstanceCreate, 'package_id'>> & { health_status?: string | null };
+
+export interface CredentialProfile {
+  credential_profile_id: string;
+  display_name: string;
+  profile_type: string;
+  package_id?: string | null;
+  instance_id?: string | null;
+  secret_ref?: string | null;
+  required_fields: string[];
+  configured_fields: string[];
+  expires_at?: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, any>;
+}
+
+export type CredentialProfileCreate = Omit<CredentialProfile, 'credential_profile_id' | 'status' | 'created_at' | 'updated_at'>;
+export type CredentialProfileUpdate = Partial<Omit<CredentialProfileCreate, never>> & { status?: string | null };
+
+export interface SyncProfile {
+  sync_profile_id: string;
+  display_name: string;
+  instance_id: string;
+  package_id: string;
+  capability: string;
+  mode: string;
+  enabled: boolean;
+  schedule?: string | null;
+  cursor: Record<string, any>;
+  params: Record<string, any>;
+  deduplicate: boolean;
+  create_analysis_cases: boolean;
+  run_initial_analysis: boolean;
+  last_run_id?: string | null;
+  last_status: string;
+  last_synced_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, any>;
+}
+
+export type SyncProfileCreate = Omit<SyncProfile, 'sync_profile_id' | 'package_id' | 'last_run_id' | 'last_status' | 'last_synced_at' | 'created_at' | 'updated_at'>;
+export type SyncProfileUpdate = Partial<Omit<SyncProfileCreate, 'instance_id'>> & { last_run_id?: string | null; last_status?: string | null; last_synced_at?: string | null };
+
+export interface IntegrationRun {
+  run_id: string;
+  run_type: string;
+  package_id?: string | null;
+  instance_id?: string | null;
+  sync_profile_id?: string | null;
+  capability?: string | null;
+  connector_id?: string | null;
+  connector_name?: string | null;
+  vendor?: string | null;
+  product?: string | null;
+  mode: string;
+  status: string;
+  started_at: string;
+  finished_at?: string | null;
+  requested_by?: string | null;
+  request_summary: Record<string, any>;
+  plan_summary: Record<string, any>;
+  result_summary: Record<string, any>;
+  error_message?: string | null;
+  item_refs: Record<string, any>[];
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, any>;
+}
+
 export interface SecurityAlert {
   id: string;
   asset_id?: string | null;
@@ -1269,6 +1360,36 @@ export const securityAPI = {
       params: payload.params || {},
       dry_run: true,
     }),
+
+
+  listIntegrationInstances: (params?: { package_id?: string; enabled?: boolean }) =>
+    client.get<IntegrationInstance[]>('/api/security/integrations/instances', { params }),
+  createIntegrationInstance: (payload: IntegrationInstanceCreate) =>
+    client.post<IntegrationInstance>('/api/security/integrations/instances', payload),
+  updateIntegrationInstance: (id: string, payload: IntegrationInstanceUpdate) =>
+    client.patch<IntegrationInstance>(`/api/security/integrations/instances/${id}`, payload),
+  deleteIntegrationInstance: (id: string) =>
+    client.delete(`/api/security/integrations/instances/${id}`),
+  listCredentialProfiles: (params?: { package_id?: string; instance_id?: string; status?: string }) =>
+    client.get<CredentialProfile[]>('/api/security/integrations/credential-profiles', { params }),
+  createCredentialProfile: (payload: CredentialProfileCreate) =>
+    client.post<CredentialProfile>('/api/security/integrations/credential-profiles', payload),
+  updateCredentialProfile: (id: string, payload: CredentialProfileUpdate) =>
+    client.patch<CredentialProfile>(`/api/security/integrations/credential-profiles/${id}`, payload),
+  deleteCredentialProfile: (id: string) =>
+    client.delete(`/api/security/integrations/credential-profiles/${id}`),
+  listSyncProfiles: (params?: { instance_id?: string; package_id?: string; capability?: string; enabled?: boolean }) =>
+    client.get<SyncProfile[]>('/api/security/integrations/sync-profiles', { params }),
+  createSyncProfile: (payload: SyncProfileCreate) =>
+    client.post<SyncProfile>('/api/security/integrations/sync-profiles', payload),
+  updateSyncProfile: (id: string, payload: SyncProfileUpdate) =>
+    client.patch<SyncProfile>(`/api/security/integrations/sync-profiles/${id}`, payload),
+  deleteSyncProfile: (id: string) =>
+    client.delete(`/api/security/integrations/sync-profiles/${id}`),
+  listIntegrationRuns: (params?: { package_id?: string; instance_id?: string; sync_profile_id?: string; capability?: string; status?: string; limit?: number }) =>
+    client.get<IntegrationRun[]>('/api/security/integrations/runs', { params }),
+  getIntegrationRun: (id: string) =>
+    client.get<IntegrationRun>(`/api/security/integrations/runs/${id}`),
 
   health: () => client.get('/api/security/health'),
   getEvidenceGraph: () => client.get<SecurityEvidenceGraph>('/api/security/evidence-graph'),
