@@ -25,6 +25,8 @@ from flocks.security.integrations.credential_store import default_credential_pro
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
+from flocks.security.integrations.run_store import default_integration_run_store
+from flocks.security.integrations.runs import build_integration_run_from_connector_sync_run
 from flocks.security.integrations.models import IntegrationCapability, IntegrationPackageManifest
 from flocks.security.integrations.runtime import IntegrationCapabilityRunRequest, IntegrationCapabilityRuntime
 from flocks.security.connectors.mingyu_apt import MingyuAptClient, ingest_mingyu_apt_risks
@@ -1445,6 +1447,46 @@ async def ingest_tda_connector(payload: TdaIngestRequest, request: Request):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="TDA ingestion failed") from exc
     await record_connector_run(default_store, run.id, result=result)
     return {"run_id": run.id, **result}
+
+
+@router.get("/integrations/runs", dependencies=[Depends(require_capability("security.ops.read"))])
+async def list_integration_runs(
+    package_id: str | None = None,
+    instance_id: str | None = None,
+    sync_profile_id: str | None = None,
+    capability: str | None = None,
+    status_filter: str | None = Query(None, alias="status"),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Return Integration Run v2 history, including ConnectorSyncRun compatibility views."""
+
+    runs = await default_integration_run_store.list_runs(
+        package_id=package_id,
+        instance_id=instance_id,
+        sync_profile_id=sync_profile_id,
+        capability=capability,
+        status=status_filter,
+        limit=limit,
+    )
+    if package_id is None and instance_id is None and sync_profile_id is None and capability is None:
+        connector_runs = await default_store.list_connector_sync_runs(status=status_filter, limit=limit)
+        runs.extend(build_integration_run_from_connector_sync_run(run) for run in connector_runs)
+    runs.sort(key=lambda run: run.started_at or run.created_at or run.updated_at, reverse=True)
+    return runs[:limit]
+
+
+@router.get("/integrations/runs/{run_id}", dependencies=[Depends(require_capability("security.ops.read"))])
+async def get_integration_run(run_id: str):
+    """Return a stored IntegrationRun or a ConnectorSyncRun compatibility view."""
+
+    run = await default_integration_run_store.get_run(run_id)
+    if run is not None:
+        return run
+    if run_id.startswith("intrun_"):
+        connector_run = await default_store.get_connector_sync_run(run_id.removeprefix("intrun_"))
+        if connector_run is not None:
+            return build_integration_run_from_connector_sync_run(connector_run)
+    raise _not_found("Integration run", run_id)
 
 
 @router.get("/connector-runs", dependencies=[Depends(require_capability("security.ops.read"))])

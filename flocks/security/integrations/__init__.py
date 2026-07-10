@@ -35,6 +35,19 @@ from flocks.security.integrations.models import (
     IntegrationPackageManifest,
 )
 from flocks.security.integrations.registry import IntegrationRegistry, create_default_integration_registry
+from flocks.security.integrations.run_store import (
+    IntegrationRunStore,
+    default_integration_run_store,
+    finish_integration_run,
+    record_integration_run,
+)
+from flocks.security.integrations.runs import (
+    IntegrationRun,
+    IntegrationRunCreate,
+    IntegrationRunUpdate,
+    build_integration_run_from_connector_sync_run,
+    integration_run_from_connector_run,
+)
 from flocks.security.integrations.runtime import (
     IntegrationCapabilityRunPlan,
     IntegrationCapabilityRunRequest,
@@ -73,6 +86,15 @@ __all__ = [
     "IntegrationPackage",
     "IntegrationPackageManifest",
     "IntegrationRegistry",
+    "IntegrationRun",
+    "IntegrationRunCreate",
+    "IntegrationRunStore",
+    "IntegrationRunUpdate",
+    "build_integration_run_from_connector_sync_run",
+    "default_integration_run_store",
+    "finish_integration_run",
+    "integration_run_from_connector_run",
+    "record_integration_run",
     "IntegrationCapabilityRunPlan",
     "IntegrationCapabilityRunRequest",
     "IntegrationCapabilityRunResult",

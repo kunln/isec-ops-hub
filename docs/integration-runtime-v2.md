@@ -481,6 +481,12 @@ The first Capability Runtime skeleton validates package/capability requests, bui
 
 The first Capability Runtime API exposes dry-run planning only. It validates packages, instances, and capabilities and returns sanitized plan details without executing connectors, performing HTTP, reading credentials, syncing data, dispatching evidence, or creating security objects.
 
+### Phase 4 Integration Run v2 Alignment
+
+`IntegrationRun` is the v2 run-history terminology and safe upper-layer record for future Sync Profile, Capability Runtime, and Evidence Dispatcher activity. It aligns with existing `ConnectorSyncRun` history through a compatibility helper and read-only `/api/security/integrations/runs` APIs, while keeping the legacy `/api/security/connector-runs` APIs and v1 TDA/Mingyu connector run behavior intact.
+
+Integration Run v2 stores only bounded, safe-exported request, plan, result, metadata, and lightweight item-reference summaries. Credential-like fields and raw payload containers are redacted or omitted, and this alignment layer does not execute connectors, perform HTTP requests, read credentials, sync data, dispatch evidence, or create Alert/Evidence/Analysis Case/Incident records. Future Sync Profile, Capability Runtime execution, and Dispatcher flows can gradually call the Integration Run helpers after their own layer boundaries are finalized.
+
 ### Phase 4 Mapping Engine
 
 Move mapping to declarative/adapter package definitions and add fixture validation.
