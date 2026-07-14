@@ -4,7 +4,7 @@ import {
   Plug, PlugZap, WifiOff, Plus, Settings, Loader2,
   Eye, EyeOff, Save, Trash2, Activity, X, Server, Pencil, Check,
   Wrench, ChevronRight, ChevronLeft, Database, KeyRound, PauseCircle,
-  PlayCircle, Clock, BarChart3,
+  PlayCircle, Clock, BarChart3, Search,
 } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -3630,11 +3630,410 @@ function ActionStep({ number, title, description, children }: { number: string; 
   );
 }
 
-function IntegrationRunsSection({ runs, error }: { runs: IntegrationRun[]; error?: string | null }) {
+type RunStageFilter = 'all' | 'manual_plan' | 'preview' | 'ingest' | 'scheduled' | 'legacy_other';
+type RunStatusFilter = 'all' | 'planned' | 'previewed' | 'ingested' | 'failed' | 'inactive';
+
+interface RunHistoryFilters {
+  stage: RunStageFilter;
+  status: RunStatusFilter;
+  syncProfileId: string;
+  capability: string;
+  searchQuery: string;
+}
+
+const SENSITIVE_RUN_KEYWORDS = [
+  'token', 'api_key', 'apikey', 'password', 'passwd', 'secret', 'authorization', 'credential', 'bearer',
+];
+
+function safeJsonPreview(value: unknown): unknown {
+  if (typeof value === 'string') {
+    if (/^\s*Bearer\s+\S+/i.test(value)) return 'Bearer ****';
+    if (value.length > 80) return `${value.slice(0, 24)}…${value.slice(-8)}`;
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((item) => safeJsonPreview(item));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+      const normalizedKey = key.toLowerCase();
+      const sensitive = SENSITIVE_RUN_KEYWORDS.some((keyword) => normalizedKey.includes(keyword));
+      return [key, sensitive ? '****' : safeJsonPreview(item)];
+    }));
+  }
+  return value;
+}
+
+function runTypePresentation(run: IntegrationRun) {
+  const presentations: Record<string, { label: string; technicalLabel: string; description: string; className: string; stage: RunStageFilter }> = {
+    sync_profile_plan: {
+      label: '人工计划', technicalLabel: 'Sync Plan', stage: 'manual_plan', className: 'bg-blue-50 text-blue-700',
+      description: '只生成本次同步计划，不拉取数据，不入库。',
+    },
+    sync_profile_preview: {
+      label: '预览同步', technicalLabel: 'Preview Sync', stage: 'preview', className: 'bg-sky-50 text-sky-700',
+      description: '调用 Adapter 获取并标准化预览事件，不创建正式安全对象。',
+    },
+    sync_profile_ingest: {
+      label: '确认入库', technicalLabel: 'Confirm Ingest', stage: 'ingest', className: 'bg-amber-50 text-amber-700',
+      description: '人工确认后入库标准对象；当前不自动创建 Incident、不自动处置。',
+    },
+    scheduled_sync_plan: {
+      label: '调度计划', technicalLabel: 'Scheduled Plan', stage: 'scheduled', className: 'bg-violet-50 text-violet-700',
+      description: '只判断到期并创建调度计划，不执行同步、不预览、不入库。',
+    },
+    capability_plan: {
+      label: '能力计划', technicalLabel: 'Capability Plan', stage: 'legacy_other', className: 'bg-indigo-50 text-indigo-700',
+      description: '能力级计划记录；保留用于 Runtime 兼容和排查。',
+    },
+    capability_runtime: {
+      label: '能力运行', technicalLabel: 'Capability Runtime', stage: 'legacy_other', className: 'bg-indigo-50 text-indigo-700',
+      description: '能力级运行记录；保留用于 Runtime 兼容和排查。',
+    },
+    connector_sync: {
+      label: '连接器运行', technicalLabel: 'Connector Run', stage: 'legacy_other', className: 'bg-zinc-100 text-zinc-700',
+      description: '兼容现有 ConnectorSyncRun 的旧版运行记录。',
+    },
+    connector_sync_run: {
+      label: '连接器运行', technicalLabel: 'Connector Run', stage: 'legacy_other', className: 'bg-zinc-100 text-zinc-700',
+      description: '兼容现有 ConnectorSyncRun 的旧版运行记录。',
+    },
+    legacy_connector_run: {
+      label: '旧版运行', technicalLabel: 'Legacy Run', stage: 'legacy_other', className: 'bg-zinc-100 text-zinc-700',
+      description: '旧版连接器运行记录；保留用于兼容和审计。',
+    },
+  };
+  return presentations[run.run_type] || {
+    label: '其他运行',
+    technicalLabel: run.run_type || 'unknown',
+    description: '保留原始运行类型，供兼容和排查使用。',
+    className: 'bg-zinc-100 text-zinc-700',
+    stage: 'legacy_other' as RunStageFilter,
+  };
+}
+
+function runStatusPresentation(status?: string | null) {
+  const normalized = status?.trim() || 'unknown';
+  const presentations: Record<string, { label: string; className: string }> = {
+    planned: { label: '已生成计划', className: 'bg-blue-50 text-blue-700' },
+    previewed: { label: '已预览', className: 'bg-sky-50 text-sky-700' },
+    ingested: { label: '已入库', className: 'bg-emerald-50 text-emerald-700' },
+    skipped: { label: '已跳过', className: 'bg-zinc-100 text-zinc-600' },
+    not_due: { label: '未到期', className: 'bg-zinc-100 text-zinc-600' },
+    manual_only: { label: '手动模式', className: 'bg-amber-50 text-amber-700' },
+    disabled: { label: '已禁用', className: 'bg-zinc-100 text-zinc-600' },
+    failed: { label: '失败', className: 'bg-rose-50 text-rose-700' },
+    validation_failed: { label: '校验失败', className: 'bg-rose-50 text-rose-700' },
+    confirmation_required: { label: '等待人工确认', className: 'bg-amber-50 text-amber-700' },
+    running: { label: '运行中', className: 'bg-indigo-50 text-indigo-700' },
+    completed: { label: '完成', className: 'bg-emerald-50 text-emerald-700' },
+    unknown: { label: '未知', className: 'bg-zinc-100 text-zinc-600' },
+  };
+  return presentations[normalized] || { label: normalized, className: 'bg-zinc-100 text-zinc-600' };
+}
+
+function getRunSyncProfileId(run: IntegrationRun) {
+  const summaryProfileId = run.request_summary?.sync_profile_id;
+  return run.sync_profile_id || (typeof summaryProfileId === 'string' ? summaryProfileId : null);
+}
+
+function getRunRelatedProfile(run: IntegrationRun, syncProfiles: SyncProfile[]) {
+  const syncProfileId = getRunSyncProfileId(run);
+  return syncProfiles.find((profile) => profile.sync_profile_id === syncProfileId) || null;
+}
+
+function getRunDeviceName(run: IntegrationRun, syncProfiles: SyncProfile[]) {
+  const metadataName = run.metadata?.device_name;
+  if (typeof metadataName === 'string' || typeof metadataName === 'number') return String(metadataName);
+  const profile = getRunRelatedProfile(run, syncProfiles);
+  return profile ? syncProfileMetadataValue(profile, 'device_name') : null;
+}
+
+function getRunDeviceId(run: IntegrationRun, syncProfiles: SyncProfile[]) {
+  const metadataId = run.metadata?.device_id;
+  if (typeof metadataId === 'string' || typeof metadataId === 'number') return String(metadataId);
+  const profile = getRunRelatedProfile(run, syncProfiles);
+  return profile ? syncProfileMetadataValue(profile, 'device_id') : null;
+}
+
+function runStatusMatchesFilter(status: string, filter: RunStatusFilter) {
+  if (filter === 'all') return true;
+  if (filter === 'failed') return ['failed', 'validation_failed'].includes(status);
+  if (filter === 'inactive') return ['skipped', 'not_due', 'manual_only', 'disabled'].includes(status);
+  if (filter === 'ingested') return ['ingested', 'completed'].includes(status);
+  return status === filter;
+}
+
+function runMatchesFilters(run: IntegrationRun, filters: RunHistoryFilters, syncProfiles: SyncProfile[]) {
+  const presentation = runTypePresentation(run);
+  const relatedProfile = getRunRelatedProfile(run, syncProfiles);
+  const syncProfileId = getRunSyncProfileId(run);
+  const capability = run.capability || relatedProfile?.capability || '';
+  if (filters.stage !== 'all' && presentation.stage !== filters.stage) return false;
+  if (!runStatusMatchesFilter(run.status?.trim() || 'unknown', filters.status)) return false;
+  if (filters.syncProfileId !== 'all' && syncProfileId !== filters.syncProfileId) return false;
+  if (filters.capability !== 'all' && capability !== filters.capability) return false;
+
+  const query = filters.searchQuery.trim().toLowerCase();
+  if (!query) return true;
+  const searchableValues = [
+    run.run_id,
+    syncProfileId,
+    run.instance_id,
+    run.package_id,
+    capability,
+    run.run_type,
+    run.status,
+    run.metadata?.device_name,
+    run.metadata?.device_id,
+    run.request_summary?.sync_profile_id,
+    run.plan_summary?.schedule_kind,
+    relatedProfile?.display_name,
+    getRunDeviceName(run, syncProfiles),
+    getRunDeviceId(run, syncProfiles),
+  ];
+  return searchableValues.some((value) => value !== undefined && value !== null && String(value).toLowerCase().includes(query));
+}
+
+function firstRunValue(...values: unknown[]) {
+  return values.find((value) => value !== undefined && value !== null && value !== '');
+}
+
+function runDetailValues(...values: unknown[]) {
+  return values.flatMap((value) => {
+    if (value === undefined || value === null || value === '') return [];
+    return Array.isArray(value) ? value : [value];
+  });
+}
+
+function runTechnicalDetails(run: IntegrationRun) {
+  const extendedRun = run as IntegrationRun & { errors?: unknown; limitations?: unknown };
+  const errors = runDetailValues(
+    extendedRun.errors,
+    run.error_message,
+    run.result_summary?.errors,
+    run.result_summary?.error,
+  );
+  const limitations = runDetailValues(
+    extendedRun.limitations,
+    run.metadata?.limitations,
+    run.plan_summary?.limitations,
+    run.result_summary?.limitations,
+  );
+  return {
+    request_summary: run.request_summary,
+    plan_summary: run.plan_summary,
+    result_summary: run.result_summary,
+    metadata: run.metadata,
+    errors,
+    limitations,
+  };
+}
+
+function RunStageDetails({ run }: { run: IntegrationRun }) {
+  if (run.run_type === 'scheduled_sync_plan') {
+    return (
+      <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50 p-3">
+        <div className="font-medium text-violet-800">只生成计划，未执行同步。</div>
+        <div className="mt-2 grid gap-1.5 text-violet-700 sm:grid-cols-2 lg:grid-cols-5">
+          <div>schedule_kind：{valueOrDash(firstRunValue(run.plan_summary?.schedule_kind, run.metadata?.schedule_kind) as string | number | boolean | null)}</div>
+          <div>evaluated_reason：{valueOrDash(run.plan_summary?.evaluated_reason as string | number | boolean | null)}</div>
+          <div>due：{valueOrDash(run.plan_summary?.due as string | number | boolean | null)}</div>
+          <div>force：{valueOrDash(firstRunValue(run.plan_summary?.force, run.request_summary?.force) as string | number | boolean | null)}</div>
+          <div>planned_action：{valueOrDash(run.plan_summary?.planned_action as string | number | boolean | null)}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (run.run_type === 'sync_profile_preview') {
+    const itemCount = firstRunValue(run.result_summary?.item_count, run.result_summary?.fetched_count);
+    const eventCount = firstRunValue(run.result_summary?.event_count, run.result_summary?.preview_count, run.result_summary?.mapped_count);
+    return (
+      <div className="mt-3 grid gap-1.5 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sky-700 sm:grid-cols-3">
+        <div>preview_only：{valueOrDash(firstRunValue(run.metadata?.preview_only, run.request_summary?.preview_only) as string | number | boolean | null)}</div>
+        {itemCount !== undefined && <div>item_count：{valueOrDash(itemCount as string | number | boolean | null)}</div>}
+        {eventCount !== undefined && <div>event_count：{valueOrDash(eventCount as string | number | boolean | null)}</div>}
+      </div>
+    );
+  }
+
+  if (run.run_type === 'sync_profile_ingest') {
+    const createdCount = firstRunValue(run.result_summary?.created_count, run.result_summary?.created_alerts);
+    const ingestedCount = firstRunValue(run.result_summary?.ingested_count, createdCount);
+    return (
+      <div className="mt-3 grid gap-1.5 rounded-xl border border-amber-100 bg-amber-50 p-3 text-amber-800 sm:grid-cols-2 lg:grid-cols-6">
+        <div>confirmed：{valueOrDash(firstRunValue(run.metadata?.confirmed, run.request_summary?.confirmed) as string | number | boolean | null)}</div>
+        <div>preview_only：{valueOrDash(firstRunValue(run.metadata?.preview_only, run.request_summary?.preview_only, false) as string | number | boolean | null)}</div>
+        <div>create_analysis_cases：{valueOrDash(firstRunValue(run.metadata?.create_analysis_cases, run.request_summary?.create_analysis_cases, false) as string | number | boolean | null)}</div>
+        <div>run_initial_analysis：{valueOrDash(firstRunValue(run.metadata?.run_initial_analysis, run.request_summary?.run_initial_analysis, false) as string | number | boolean | null)}</div>
+        {createdCount !== undefined && <div>created_count：{valueOrDash(createdCount as string | number | boolean | null)}</div>}
+        {ingestedCount !== undefined && <div>ingested_count：{valueOrDash(ingestedCount as string | number | boolean | null)}</div>}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function IntegrationRunsSection({
+  runs,
+  syncProfiles,
+  error,
+  refreshing,
+  onRefresh,
+  onNavigateSyncIngest,
+}: {
+  runs: IntegrationRun[];
+  syncProfiles: SyncProfile[];
+  error?: string | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onNavigateSyncIngest: () => void;
+}) {
+  const [runTypeFilter, setRunTypeFilter] = useState<RunStageFilter>('all');
+  const [runStatusFilter, setRunStatusFilter] = useState<RunStatusFilter>('all');
+  const [runSyncProfileFilter, setRunSyncProfileFilter] = useState('all');
+  const [runCapabilityFilter, setRunCapabilityFilter] = useState('all');
+  const [runSearchQuery, setRunSearchQuery] = useState('');
+
+  const capabilityOptions = useMemo(() => {
+    const values = new Set<string>(['alert.search']);
+    runs.forEach((run) => { if (run.capability) values.add(run.capability); });
+    syncProfiles.forEach((profile) => { if (profile.capability) values.add(profile.capability); });
+    return [...values].sort((left, right) => {
+      if (left === 'alert.search') return -1;
+      if (right === 'alert.search') return 1;
+      return left.localeCompare(right);
+    });
+  }, [runs, syncProfiles]);
+
+  const filters = useMemo<RunHistoryFilters>(() => ({
+    stage: runTypeFilter,
+    status: runStatusFilter,
+    syncProfileId: runSyncProfileFilter,
+    capability: runCapabilityFilter,
+    searchQuery: runSearchQuery,
+  }), [runTypeFilter, runStatusFilter, runSyncProfileFilter, runCapabilityFilter, runSearchQuery]);
+  const filteredRuns = useMemo(
+    () => runs.filter((run) => runMatchesFilters(run, filters, syncProfiles)),
+    [runs, filters, syncProfiles],
+  );
+  const hasActiveFilters = runTypeFilter !== 'all' || runStatusFilter !== 'all' || runSyncProfileFilter !== 'all' || runCapabilityFilter !== 'all' || runSearchQuery.trim() !== '';
+  const clearFilters = () => {
+    setRunTypeFilter('all');
+    setRunStatusFilter('all');
+    setRunSyncProfileFilter('all');
+    setRunCapabilityFilter('all');
+    setRunSearchQuery('');
+  };
+
   return (
-    <SectionCard title="运行记录" subtitle="这里记录每次生成计划、预览和确认入库动作，便于审计和排查。" count={error ? '-' : runs.length}>
+    <SectionCard title="运行记录 / Run History" subtitle="按来源和阶段查看 Runtime v2 计划、预览、入库与调度计划。" count={error ? '-' : hasActiveFilters ? `${filteredRuns.length}/${runs.length}` : runs.length}>
       <LoadHint error={error} />
-      {runs.length === 0 ? <EmptyState text="还没有运行记录。生成计划、预览同步或确认入库后，这里会出现记录。" /> : <div className="space-y-3">{runs.map((r) => <div key={r.run_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div className="font-semibold text-zinc-900">{r.run_id}</div><span className="rounded-full bg-white px-2 py-0.5 text-zinc-600">{r.status}</span></div><div className="mt-2 grid gap-1 md:grid-cols-3"><div>run_type: {r.run_type}</div><div>package_id: {valueOrDash(r.package_id)}</div><div>capability: {valueOrDash(r.capability)}</div><div>started_at: {valueOrDash(r.started_at)}</div><div>finished_at: {valueOrDash(r.finished_at)}</div><div>sync_profile_id: {valueOrDash(r.sync_profile_id)}</div></div><details className="mt-2"><summary className="cursor-pointer text-zinc-500">request_summary / result_summary</summary><pre className="mt-2 max-h-56 overflow-auto rounded-lg bg-white p-2 text-[11px] text-zinc-600">{JSON.stringify({ request_summary: r.request_summary, result_summary: r.result_summary }, null, 2)}</pre></details></div>)}</div>}
+      <div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          <select value={runTypeFilter} onChange={(event) => setRunTypeFilter(event.target.value as RunStageFilter)} aria-label="Runtime 阶段筛选" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+            <option value="all">全部阶段</option>
+            <option value="manual_plan">人工计划</option>
+            <option value="preview">预览同步</option>
+            <option value="ingest">确认入库</option>
+            <option value="scheduled">调度计划</option>
+            <option value="legacy_other">旧版 / 其他</option>
+          </select>
+          <select value={runStatusFilter} onChange={(event) => setRunStatusFilter(event.target.value as RunStatusFilter)} aria-label="运行状态筛选" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+            <option value="all">全部状态</option>
+            <option value="planned">已生成计划</option>
+            <option value="previewed">已预览</option>
+            <option value="ingested">已入库</option>
+            <option value="failed">失败 / 校验失败</option>
+            <option value="inactive">未到期 / 手动模式 / 跳过</option>
+          </select>
+          <select value={runSyncProfileFilter} onChange={(event) => setRunSyncProfileFilter(event.target.value)} aria-label="Sync Profile 筛选" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+            <option value="all">全部 Sync Profile</option>
+            {syncProfiles.map((profile) => <option key={profile.sync_profile_id} value={profile.sync_profile_id}>{profile.display_name}</option>)}
+          </select>
+          <select value={runCapabilityFilter} onChange={(event) => setRunCapabilityFilter(event.target.value)} aria-label="Capability 筛选" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+            <option value="all">全部能力</option>
+            {capabilityOptions.map((capability) => <option key={capability} value={capability}>{capability}</option>)}
+          </select>
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+            <input value={runSearchQuery} onChange={(event) => setRunSearchQuery(event.target.value)} placeholder="搜索运行、产品或配置" aria-label="搜索运行记录" className="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-3 text-xs text-zinc-700 placeholder:text-zinc-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-zinc-500">接入测试数据后，可在此查看 Plan / Preview / Ingest / Scheduled Plan 的运行记录。</p>
+          <div className="flex items-center gap-2">
+            {hasActiveFilters && <button type="button" onClick={clearFilters} className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-white">清空筛选</button>}
+            <button type="button" onClick={onRefresh} disabled={refreshing} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60">
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />刷新运行记录
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {runs.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center">
+          <div className="text-sm font-semibold text-zinc-800">暂无运行记录</div>
+          <p className="mx-auto mt-2 max-w-2xl text-xs leading-relaxed text-zinc-500">请先在“同步与入库”中选择 Sync Profile，依次执行 Generate Plan、Preview Sync、Confirm Ingest，或生成调度计划。</p>
+          <button type="button" onClick={onNavigateSyncIngest} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">前往同步与入库<ChevronRight className="h-3.5 w-3.5" /></button>
+        </div>
+      ) : filteredRuns.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center">
+          <div className="text-sm font-semibold text-zinc-800">没有符合筛选条件的运行记录</div>
+          <button type="button" onClick={clearFilters} className="mt-3 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100">清空筛选</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredRuns.map((run) => {
+            const type = runTypePresentation(run);
+            const status = runStatusPresentation(run.status);
+            const profile = getRunRelatedProfile(run, syncProfiles);
+            const syncProfileId = getRunSyncProfileId(run);
+            const deviceName = getRunDeviceName(run, syncProfiles);
+            const deviceId = getRunDeviceId(run, syncProfiles);
+            const extendedRun = run as IntegrationRun & { dry_run?: unknown };
+            const dryRun = firstRunValue(extendedRun.dry_run, run.request_summary?.dry_run, run.metadata?.dry_run);
+            return (
+              <article key={run.run_id} className="rounded-2xl border border-zinc-200 bg-white p-4 text-xs text-zinc-700 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${type.className}`}>{type.label} · {type.technicalLabel}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}>{status.label}</span>
+                      <span title={run.run_id} className="font-mono text-[11px] text-zinc-500">{shortIdentifier(run.run_id)}</span>
+                    </div>
+                    <p className="mt-2 text-zinc-500">{type.description}</p>
+                  </div>
+                  <div className="shrink-0 text-right text-[11px] leading-5 text-zinc-500">
+                    <div>创建：{formatDateTime(run.created_at || run.started_at)}</div>
+                    <div>更新：{formatDateTime(run.updated_at || run.finished_at)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-x-5 gap-y-2 rounded-xl bg-zinc-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="min-w-0"><span className="text-zinc-400">Sync Profile：</span><span title={syncProfileId || undefined}>{profile?.display_name || valueOrDash(syncProfileId)}{profile && syncProfileId ? ` · ${shortIdentifier(syncProfileId)}` : ''}</span></div>
+                  <div><span className="text-zinc-400">来源产品：</span>{valueOrDash(deviceName)}</div>
+                  <div className="break-all"><span className="text-zinc-400">产品 ID：</span>{valueOrDash(deviceId)}</div>
+                  <div className="break-all"><span className="text-zinc-400">Package：</span>{valueOrDash(run.package_id)}</div>
+                  <div className="break-all"><span className="text-zinc-400">Instance：</span>{valueOrDash(run.instance_id)}</div>
+                  <div><span className="text-zinc-400">Capability：</span>{valueOrDash(run.capability || profile?.capability)}</div>
+                  <div><span className="text-zinc-400">Mode：</span>{valueOrDash(run.mode)}</div>
+                  <div><span className="text-zinc-400">Requested By：</span>{valueOrDash(run.requested_by)}</div>
+                  <div><span className="text-zinc-400">Dry Run：</span>{valueOrDash(dryRun as string | number | boolean | null)}</div>
+                  <div><span className="text-zinc-400">Plan Only：</span>{valueOrDash(run.metadata?.plan_only as string | number | boolean | null)}</div>
+                </div>
+
+                <RunStageDetails run={run} />
+
+                <details className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
+                  <summary className="cursor-pointer font-medium text-zinc-600">技术详情（安全脱敏）</summary>
+                  <pre className="mt-2 max-h-80 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] leading-relaxed text-zinc-200">{JSON.stringify(safeJsonPreview(runTechnicalDetails(run)), null, 2)}</pre>
+                </details>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </SectionCard>
   );
 }
@@ -3708,6 +4107,7 @@ export default function DeviceIntegrationPage() {
   const [focusedSyncDeviceId, setFocusedSyncDeviceId] = useState<string | null>(null);
   const [syncProfilesRefreshing, setSyncProfilesRefreshing] = useState(false);
   const [integrationRuns, setIntegrationRuns] = useState<IntegrationRun[]>([]);
+  const [integrationRunsRefreshing, setIntegrationRunsRefreshing] = useState(false);
   const [integrationCenterErrors, setIntegrationCenterErrors] = useState<Record<string, string | null>>({});
   const [syncPlanLoadingId, setSyncPlanLoadingId] = useState<string | null>(null);
   const [syncPlanResult, setSyncPlanResult] = useState<SyncEnginePlanResult | null>(null);
@@ -3800,6 +4200,19 @@ export default function DeviceIntegrationPage() {
       setIntegrationCenterErrors((previous) => ({ ...previous, syncProfiles: '同步策略暂不可用。' }));
     } finally {
       setSyncProfilesRefreshing(false);
+    }
+  }, []);
+
+  const refreshIntegrationRuns = useCallback(async () => {
+    setIntegrationRunsRefreshing(true);
+    try {
+      const response = await securityAPI.listIntegrationRuns({ limit: 50 });
+      setIntegrationRuns(response.data || []);
+      setIntegrationCenterErrors((previous) => ({ ...previous, runs: null }));
+    } catch {
+      setIntegrationCenterErrors((previous) => ({ ...previous, runs: '运行记录暂不可用。' }));
+    } finally {
+      setIntegrationRunsRefreshing(false);
     }
   }, []);
 
@@ -4477,7 +4890,14 @@ export default function DeviceIntegrationPage() {
             )}
 
             {activeIntegrationTab === 'runs' && (
-              <IntegrationRunsSection runs={integrationRuns} error={integrationCenterErrors.runs} />
+              <IntegrationRunsSection
+                runs={integrationRuns}
+                syncProfiles={syncProfiles}
+                error={integrationCenterErrors.runs}
+                refreshing={integrationRunsRefreshing}
+                onRefresh={() => void refreshIntegrationRuns()}
+                onNavigateSyncIngest={() => setActiveIntegrationTab('syncIngest')}
+              />
             )}
 
             {activeIntegrationTab === 'advanced' && (
