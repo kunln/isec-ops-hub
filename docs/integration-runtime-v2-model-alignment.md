@@ -150,6 +150,31 @@ The first bridge skeleton must not:
 
 The skeleton should establish object identity and safe references first. Real connector-backed execution, scheduling, and broader capability support should remain separate, reviewable steps.
 
+### Bridge Skeleton Implementation Notes
+
+The first Device Integration bridge implementation is intentionally limited to
+safe Runtime v2 reference creation:
+
+- It reads a credential-free identity projection of a `DeviceIntegration`; the
+  device credential/configuration fields are not selected, resolved, masked,
+  copied, logged, or returned by the bridge.
+- It maps supported TDA Device Integration identifiers to the existing
+  `asiainfo.tda` Integration Package and exposes the initial
+  `alert.search` capability association.
+- The plan endpoint is always a dry run and does not modify Device Integration,
+  Integration Instance, Credential Profile, Sync Profile, or Integration Run
+  storage.
+- Confirmed bridge creation writes an idempotent Integration Instance and a
+  Credential Profile whose `secret_ref` points back to the existing Device
+  Integration credential source. It does not migrate plaintext credentials.
+- The bridge does not call a vendor API, connector, Adapter Registry, or
+  Evidence Dispatcher. It performs no sync, preview, confirm ingest, Evidence
+  or Alert creation, Analysis Case or Incident creation, notification, or
+  remediation.
+- No raw payload or full API response is retained, and bridge actions are not
+  recorded as Integration Runs in this skeleton.
+- Creating a Sync Profile from the connected product remains a later PR.
+
 ## 8. Prohibited Design and Behavior
 
 - The Analysis Layer must not call vendor APIs directly; it consumes Evidence and Facts with source references.

@@ -11,7 +11,7 @@ import re
 import threading
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 import aiosqlite
 
@@ -27,6 +27,18 @@ from .models import (
 from .secrets import mask_for_display, resolve_for_runtime
 
 log = Log.create(service="tool.device.store")
+
+
+class DeviceIntegrationIdentity(TypedDict):
+    """Credential-free Device Integration projection for reference linking."""
+
+    id: str
+    name: str
+    storage_key: str
+    service_id: str
+    enabled: bool
+    verify_ssl: bool
+    status: str
 
 # ---------------------------------------------------------------------------
 # Device revision counter – incremented on every write so callers (e.g. the
@@ -260,6 +272,53 @@ async def list_devices(group_id: Optional[str] = None) -> List[DeviceIntegration
         async with db.execute(sql, params) as cur:
             rows = await cur.fetchall()
     return [row_to_device(r) for r in rows]
+
+
+async def list_device_identities(device_id: Optional[str] = None) -> List[DeviceIntegrationIdentity]:
+    """Return only fields needed to establish safe cross-store references.
+
+    This deliberately excludes the ``fields`` column so callers such as the
+    Runtime v2 device bridge cannot read, resolve, mask, or accidentally export
+    Device Integration credential material.
+    """
+
+    sql = """
+        SELECT id, name, storage_key, service_id, enabled, verify_ssl, status
+        FROM device_integrations
+    """
+    params: tuple[str, ...] = ()
+    if device_id is not None:
+        sql += " WHERE id = ?"
+        params = (device_id,)
+    sql += " ORDER BY created_at DESC"
+
+    async with Storage.connect(Storage.get_db_path()) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(sql, params) as cur:
+            rows = await cur.fetchall()
+
+    identities: List[DeviceIntegrationIdentity] = []
+    for row in rows:
+        storage_key = str(row["storage_key"] or "")
+        identities.append(
+            DeviceIntegrationIdentity(
+                id=str(row["id"]),
+                name=str(row["name"] or ""),
+                storage_key=storage_key,
+                service_id=storage_key_to_service_id(storage_key) or str(row["service_id"] or ""),
+                enabled=bool(row["enabled"]),
+                verify_ssl=bool(row["verify_ssl"]),
+                status=str(row["status"] or "unknown"),
+            )
+        )
+    return identities
+
+
+async def get_device_identity(device_id: str) -> Optional[DeviceIntegrationIdentity]:
+    """Return one credential-free Device Integration identity projection."""
+
+    identities = await list_device_identities(device_id=device_id)
+    return identities[0] if identities else None
 
 
 async def fetch_device(device_id: str) -> Optional[aiosqlite.Row]:
