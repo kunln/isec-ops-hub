@@ -42,6 +42,14 @@ from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileC
 from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, ManualSyncPreviewResult, preview_sync_profile_run
 from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ManualSyncIngestResult, ingest_sync_profile_run
+from flocks.security.integrations.scheduled_sync import (
+    ScheduledSyncPlanRequest,
+    ScheduledSyncPlanResult,
+    ScheduledSyncStatus,
+    list_due_scheduled_sync,
+    list_scheduled_sync_status,
+    plan_scheduled_sync,
+)
 from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate, IntegrationInstanceUpdate, build_capability_run_request_from_instance
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.runs import build_integration_run_from_connector_sync_run
@@ -719,6 +727,39 @@ async def delete_sync_profile(sync_profile_id: str):
     if not await default_sync_profile_store.delete_profile(sync_profile_id):
         raise HTTPException(status_code=404, detail="Sync profile not found")
     return {"status": "deleted", "sync_profile_id": sync_profile_id}
+
+
+@router.get(
+    "/integrations/scheduled-sync/status",
+    response_model=list[ScheduledSyncStatus],
+    dependencies=[Depends(require_capability("security.ops.read"))],
+)
+async def get_scheduled_sync_status(sync_profile_id: str | None = None):
+    """Evaluate Sync Profile due state without executing synchronization."""
+
+    return await list_scheduled_sync_status(sync_profile_id=sync_profile_id)
+
+
+@router.get(
+    "/integrations/scheduled-sync/due",
+    response_model=list[ScheduledSyncStatus],
+    dependencies=[Depends(require_capability("security.ops.read"))],
+)
+async def get_due_scheduled_sync(due_only: bool = True):
+    """List due Sync Profiles, or all status rows when due_only is false."""
+
+    return await list_due_scheduled_sync(due_only=due_only)
+
+
+@router.post(
+    "/integrations/scheduled-sync/plan",
+    response_model=ScheduledSyncPlanResult,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def create_scheduled_sync_plan(payload: ScheduledSyncPlanRequest):
+    """Create an auditable scheduled plan only; never fetch, preview, or ingest."""
+
+    return await plan_scheduled_sync(payload.model_copy(update={"dry_run": True}))
 
 
 @router.post(

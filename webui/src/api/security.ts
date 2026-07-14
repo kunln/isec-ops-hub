@@ -207,7 +207,7 @@ export interface SyncProfile {
   capability: string;
   mode: string;
   enabled: boolean;
-  schedule?: string | null;
+  schedule?: string | Record<string, any> | null;
   cursor: Record<string, any>;
   params: Record<string, any>;
   deduplicate: boolean;
@@ -311,6 +311,46 @@ export interface SyncEnginePlanResult {
   instance_id?: string | null;
   capability?: string | null;
   request_summary: Record<string, any>;
+  plan_summary: Record<string, any>;
+  safety_summary: Record<string, any>;
+  limitations: string[];
+  errors: string[];
+}
+
+
+export interface ScheduledSyncStatus {
+  sync_profile_id: string;
+  display_name?: string | null;
+  package_id?: string | null;
+  instance_id?: string | null;
+  capability?: string | null;
+  mode?: string | null;
+  enabled: boolean;
+  schedule_kind: 'manual' | 'hourly' | 'daily' | 'weekly' | 'interval' | 'unsupported' | string;
+  due: boolean;
+  reason: 'disabled' | 'manual_only' | 'never_synced' | 'due' | 'not_due' | 'unsupported_schedule' | 'invalid_interval' | 'missing_profile' | 'validation_failed' | string;
+  last_status?: string | null;
+  last_synced_at?: string | null;
+  last_run_id?: string | null;
+  next_action: string;
+  limitations: string[];
+  safety_summary: Record<string, any>;
+}
+
+export interface ScheduledSyncPlanRequest {
+  sync_profile_id: string;
+  requested_by?: string | null;
+  dry_run?: boolean;
+  force?: boolean;
+}
+
+export interface ScheduledSyncPlanResult {
+  status: 'planned' | 'skipped' | 'not_due' | 'manual_only' | 'disabled' | 'unsupported_schedule' | 'not_found' | 'validation_failed' | string;
+  sync_profile_id: string;
+  due: boolean;
+  reason: string;
+  run_id?: string | null;
+  planned_action: string;
   plan_summary: Record<string, any>;
   safety_summary: Record<string, any>;
   limitations: string[];
@@ -1580,6 +1620,20 @@ export const securityAPI = {
       params_override: payload.params_override || {},
       dry_run: true,
     }),
+  getScheduledSyncStatus: (syncProfileId?: string) =>
+    client.get<ScheduledSyncStatus[]>('/api/security/integrations/scheduled-sync/status', {
+      params: syncProfileId ? { sync_profile_id: syncProfileId } : undefined,
+    }),
+  getDueScheduledSync: (dueOnly = true) =>
+    client.get<ScheduledSyncStatus[]>('/api/security/integrations/scheduled-sync/due', {
+      params: { due_only: dueOnly },
+    }),
+  planScheduledSync: (syncProfileId: string, force = false) =>
+    client.post<ScheduledSyncPlanResult>('/api/security/integrations/scheduled-sync/plan', {
+      sync_profile_id: syncProfileId,
+      dry_run: true,
+      force,
+    } satisfies ScheduledSyncPlanRequest),
   previewSyncEngine: (payload: ManualSyncPreviewRequest) =>
     client.post<ManualSyncPreviewResult>('/api/security/integrations/sync-engine/preview', {
       ...payload,

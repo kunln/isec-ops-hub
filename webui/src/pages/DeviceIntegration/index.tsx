@@ -21,6 +21,8 @@ import {
   type SecurityConnectorCustomerSummary,
   type IntegrationPackageSummary,
   type SyncEnginePlanResult,
+  type ScheduledSyncStatus,
+  type ScheduledSyncPlanResult,
   type ManualSyncPreviewResult,
   type ManualSyncIngestResult,
   type IntegrationInstance,
@@ -2999,6 +3001,25 @@ function syncProfileStatusPresentation(status?: string | null) {
   };
 }
 
+function scheduledSyncStatusPresentation(reason?: string | null) {
+  const normalized = reason?.trim() || '';
+  const presentations: Record<string, { label: string; className: string }> = {
+    disabled: { label: '已禁用', className: 'bg-zinc-100 text-zinc-600' },
+    manual_only: { label: '手动模式', className: 'bg-amber-50 text-amber-700' },
+    never_synced: { label: '从未同步，已到期', className: 'bg-orange-50 text-orange-700' },
+    due: { label: '已到期', className: 'bg-orange-50 text-orange-700' },
+    not_due: { label: '未到期', className: 'bg-emerald-50 text-emerald-700' },
+    unsupported_schedule: { label: '不支持的调度配置', className: 'bg-rose-50 text-rose-700' },
+    invalid_interval: { label: '无效间隔', className: 'bg-rose-50 text-rose-700' },
+    missing_profile: { label: '同步配置不存在', className: 'bg-rose-50 text-rose-700' },
+    validation_failed: { label: '校验失败', className: 'bg-rose-50 text-rose-700' },
+  };
+  return presentations[normalized] || {
+    label: normalized || '尚未检查',
+    className: 'bg-zinc-100 text-zinc-600',
+  };
+}
+
 function syncProfileCapabilityLabel(capability: string) {
   return capability === 'alert.search' ? '告警同步 alert.search' : capability;
 }
@@ -3266,7 +3287,7 @@ function SyncSetupSection({ profiles, error, onReturnIntegrations }: { profiles:
                 <summary className="cursor-pointer font-medium text-zinc-700">技术详情</summary>
                 <div className="mt-2 grid gap-1 sm:grid-cols-2">
                   <div>sync_profile_id: {p.sync_profile_id}</div>
-                  <div>schedule: {valueOrDash(p.schedule)}</div>
+                  <div>schedule: {typeof p.schedule === 'object' && p.schedule !== null ? JSON.stringify(p.schedule) : valueOrDash(p.schedule)}</div>
                   <div>deduplicate: {String(p.deduplicate)}</div>
                   <div>create_analysis_cases: {String(p.create_analysis_cases)}</div>
                   <div>run_initial_analysis: {String(p.run_initial_analysis)}</div>
@@ -3282,6 +3303,95 @@ function SyncSetupSection({ profiles, error, onReturnIntegrations }: { profiles:
   );
 }
 
+function ScheduledSyncStatusPanel({
+  status,
+  planResult,
+  statusLoading,
+  planLoading,
+  error,
+  onRefresh,
+  onPlan,
+}: {
+  status: ScheduledSyncStatus | null;
+  planResult: ScheduledSyncPlanResult | null;
+  statusLoading: boolean;
+  planLoading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  onPlan: () => void;
+}) {
+  const presentation = scheduledSyncStatusPresentation(status?.reason);
+  return (
+    <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-violet-600" />
+            <h4 className="text-sm font-semibold text-violet-950">调度状态</h4>
+            {status && (
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${presentation.className}`}>
+                {presentation.label}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-violet-700">只评估是否到期并生成调度计划，不拉取数据，不预览，不入库。</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={statusLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${statusLoading ? 'animate-spin' : ''}`} />
+            检查调度状态
+          </button>
+          <button
+            type="button"
+            onClick={onPlan}
+            disabled={planLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {planLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
+            生成调度计划
+          </button>
+        </div>
+      </div>
+
+      {statusLoading && !status ? (
+        <div className="mt-3 text-xs text-violet-700">正在检查调度状态…</div>
+      ) : status ? (
+        <>
+          <div className="mt-3 grid gap-2 text-xs text-zinc-700 sm:grid-cols-2 lg:grid-cols-4">
+            <div><span className="text-zinc-400">调度模式：</span>{status.schedule_kind}</div>
+            <div><span className="text-zinc-400">当前状态：</span>{presentation.label}</div>
+            <div><span className="text-zinc-400">最近同步：</span>{formatDateTime(status.last_synced_at)}</div>
+            <div><span className="text-zinc-400">最近运行状态：</span>{valueOrDash(status.last_status)}</div>
+          </div>
+          <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-xs leading-relaxed text-violet-900">
+            <span className="font-medium">下一步建议：</span>{status.next_action}
+          </div>
+        </>
+      ) : (
+        <div className="mt-3 text-xs text-zinc-500">尚未取得当前同步配置的调度状态。</div>
+      )}
+
+      {error && <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+      {planResult && (
+        <div className="mt-3 rounded-lg border border-violet-100 bg-white px-3 py-2 text-xs text-zinc-700">
+          <div className="font-medium text-violet-900">最近调度计划结果</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div><span className="text-zinc-400">status：</span>{planResult.status}</div>
+            <div><span className="text-zinc-400">reason：</span>{scheduledSyncStatusPresentation(planResult.reason).label}</div>
+            <div><span className="text-zinc-400">run_id：</span>{valueOrDash(planResult.run_id)}</div>
+          </div>
+          <div className="mt-2 text-[11px] text-violet-700">{planResult.planned_action === 'scheduled_sync_plan_only' ? '已生成只读调度计划；未执行同步、预览或入库。' : '本次未生成计划，也未执行任何同步动作。'}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PreviewIngestSection({
   profiles,
   error,
@@ -3290,6 +3400,11 @@ function PreviewIngestSection({
   syncPlanLoadingId,
   syncPlanResult,
   syncPlanError,
+  scheduledSyncStatus,
+  scheduledSyncStatusLoadingId,
+  scheduledSyncPlanLoadingId,
+  scheduledSyncPlanResult,
+  scheduledSyncError,
   syncPreviewLoadingId,
   syncPreviewResult,
   syncPreviewError,
@@ -3301,6 +3416,8 @@ function PreviewIngestSection({
   onReturnIntegrations,
   onGeneratePlan,
   onClearPlanResult,
+  onCheckScheduledSync,
+  onPlanScheduledSync,
   onPreviewSync,
   onClearPreviewResult,
   onConfirmIngest,
@@ -3313,6 +3430,11 @@ function PreviewIngestSection({
   syncPlanLoadingId: string | null;
   syncPlanResult: SyncEnginePlanResult | null;
   syncPlanError: string | null;
+  scheduledSyncStatus: ScheduledSyncStatus | null;
+  scheduledSyncStatusLoadingId: string | null;
+  scheduledSyncPlanLoadingId: string | null;
+  scheduledSyncPlanResult: ScheduledSyncPlanResult | null;
+  scheduledSyncError: string | null;
   syncPreviewLoadingId: string | null;
   syncPreviewResult: ManualSyncPreviewResult | null;
   syncPreviewError: string | null;
@@ -3324,6 +3446,8 @@ function PreviewIngestSection({
   onReturnIntegrations: () => void;
   onGeneratePlan: (profile: SyncProfile) => void;
   onClearPlanResult: () => void;
+  onCheckScheduledSync: (profile: SyncProfile) => void;
+  onPlanScheduledSync: (profile: SyncProfile) => void;
   onPreviewSync: (profile: SyncProfile) => void;
   onClearPreviewResult: () => void;
   onConfirmIngest: (profile: SyncProfile) => void;
@@ -3332,6 +3456,12 @@ function PreviewIngestSection({
   const selectedProfile = profiles.find((profile) => profile.sync_profile_id === selectedSyncProfileId) || null;
   const hasPlanForSelected = Boolean(selectedProfile && syncPlanResult?.sync_profile_id === selectedProfile.sync_profile_id);
   const planResultForSelected = hasPlanForSelected ? syncPlanResult : null;
+  const scheduledStatusForSelected = selectedProfile && scheduledSyncStatus?.sync_profile_id === selectedProfile.sync_profile_id
+    ? scheduledSyncStatus
+    : null;
+  const scheduledPlanResultForSelected = selectedProfile && scheduledSyncPlanResult?.sync_profile_id === selectedProfile.sync_profile_id
+    ? scheduledSyncPlanResult
+    : null;
   const previewResultForSelected = selectedProfile && syncPreviewResult?.sync_profile_id === selectedProfile.sync_profile_id
     ? syncPreviewResult
     : null;
@@ -3396,6 +3526,15 @@ function PreviewIngestSection({
                 </div>
                 <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">人工操作</span>
               </div>
+              <ScheduledSyncStatusPanel
+                status={scheduledStatusForSelected}
+                planResult={scheduledPlanResultForSelected}
+                statusLoading={scheduledSyncStatusLoadingId === selectedProfile.sync_profile_id}
+                planLoading={scheduledSyncPlanLoadingId === selectedProfile.sync_profile_id}
+                error={scheduledSyncError}
+                onRefresh={() => onCheckScheduledSync(selectedProfile)}
+                onPlan={() => onPlanScheduledSync(selectedProfile)}
+              />
               <div className="mt-4 grid gap-3 lg:grid-cols-3">
                 <ActionStep number="1" title="生成计划" description="只生成本次同步计划，不拉取数据，不入库。">
                   <button type="button" onClick={() => onGeneratePlan(selectedProfile)} disabled={syncPlanLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPlanLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划</button>
@@ -3573,6 +3712,11 @@ export default function DeviceIntegrationPage() {
   const [syncPlanLoadingId, setSyncPlanLoadingId] = useState<string | null>(null);
   const [syncPlanResult, setSyncPlanResult] = useState<SyncEnginePlanResult | null>(null);
   const [syncPlanError, setSyncPlanError] = useState<string | null>(null);
+  const [scheduledSyncStatus, setScheduledSyncStatus] = useState<ScheduledSyncStatus | null>(null);
+  const [scheduledSyncStatusLoadingId, setScheduledSyncStatusLoadingId] = useState<string | null>(null);
+  const [scheduledSyncPlanLoadingId, setScheduledSyncPlanLoadingId] = useState<string | null>(null);
+  const [scheduledSyncPlanResult, setScheduledSyncPlanResult] = useState<ScheduledSyncPlanResult | null>(null);
+  const [scheduledSyncError, setScheduledSyncError] = useState<string | null>(null);
   const [syncPreviewLoadingId, setSyncPreviewLoadingId] = useState<string | null>(null);
   const [syncPreviewResult, setSyncPreviewResult] = useState<ManualSyncPreviewResult | null>(null);
   const [syncPreviewError, setSyncPreviewError] = useState<string | null>(null);
@@ -3659,6 +3803,20 @@ export default function DeviceIntegrationPage() {
     }
   }, []);
 
+  const refreshScheduledSyncStatus = useCallback(async (syncProfileId: string) => {
+    setScheduledSyncStatusLoadingId(syncProfileId);
+    setScheduledSyncError(null);
+    try {
+      const response = await securityAPI.getScheduledSyncStatus(syncProfileId);
+      setScheduledSyncStatus(response.data?.[0] || null);
+    } catch (error) {
+      setScheduledSyncStatus(null);
+      setScheduledSyncError(apiErrorMessage(error, '检查调度状态失败'));
+    } finally {
+      setScheduledSyncStatusLoadingId((current) => current === syncProfileId ? null : current);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeIntegrationTab === 'syncIngest') void refreshSyncProfiles();
   }, [activeIntegrationTab, refreshSyncProfiles]);
@@ -3675,6 +3833,32 @@ export default function DeviceIntegrationPage() {
       }
     }
   }, [activeIntegrationTab, focusedSyncDeviceId, selectedSyncProfileId, syncProfiles]);
+
+  useEffect(() => {
+    if (activeIntegrationTab !== 'syncIngest' || !selectedSyncProfileId) {
+      setScheduledSyncStatus(null);
+      setScheduledSyncError(null);
+      return;
+    }
+    void refreshScheduledSyncStatus(selectedSyncProfileId);
+  }, [activeIntegrationTab, refreshScheduledSyncStatus, selectedSyncProfileId]);
+
+  const handleGenerateScheduledSyncPlan = async (profile: SyncProfile) => {
+    setScheduledSyncPlanLoadingId(profile.sync_profile_id);
+    setScheduledSyncError(null);
+    try {
+      const response = await securityAPI.planScheduledSync(profile.sync_profile_id, false);
+      setScheduledSyncPlanResult(response.data);
+      if (response.data.status === 'planned') toast.success('调度计划已生成');
+      else toast.warning('本次未生成调度计划', response.data.reason);
+      await refreshScheduledSyncStatus(profile.sync_profile_id);
+      if (response.data.status === 'planned') await fetchData(true);
+    } catch (error) {
+      setScheduledSyncError(apiErrorMessage(error, '生成调度计划失败'));
+    } finally {
+      setScheduledSyncPlanLoadingId(null);
+    }
+  };
 
   const handleGenerateSyncPlan = async (profile: SyncProfile) => {
     setSyncPlanLoadingId(profile.sync_profile_id);
@@ -4263,6 +4447,11 @@ export default function DeviceIntegrationPage() {
                   syncPlanLoadingId={syncPlanLoadingId}
                   syncPlanResult={syncPlanResult}
                   syncPlanError={syncPlanError}
+                  scheduledSyncStatus={scheduledSyncStatus}
+                  scheduledSyncStatusLoadingId={scheduledSyncStatusLoadingId}
+                  scheduledSyncPlanLoadingId={scheduledSyncPlanLoadingId}
+                  scheduledSyncPlanResult={scheduledSyncPlanResult}
+                  scheduledSyncError={scheduledSyncError}
                   syncPreviewLoadingId={syncPreviewLoadingId}
                   syncPreviewResult={syncPreviewResult}
                   syncPreviewError={syncPreviewError}
@@ -4277,6 +4466,8 @@ export default function DeviceIntegrationPage() {
                   onReturnIntegrations={() => setActiveIntegrationTab('integrations')}
                   onGeneratePlan={(profile) => void handleGenerateSyncPlan(profile)}
                   onClearPlanResult={() => setSyncPlanResult(null)}
+                  onCheckScheduledSync={(profile) => void refreshScheduledSyncStatus(profile.sync_profile_id)}
+                  onPlanScheduledSync={(profile) => void handleGenerateScheduledSyncPlan(profile)}
                   onPreviewSync={(profile) => void handlePreviewSync(profile)}
                   onClearPreviewResult={() => setSyncPreviewResult(null)}
                   onConfirmIngest={(profile) => void handleConfirmIngest(profile)}

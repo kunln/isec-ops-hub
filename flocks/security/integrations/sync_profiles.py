@@ -10,11 +10,29 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+ScheduleValue = str | dict[str, Any] | None
+_SCHEDULE_KEYS = frozenset({"kind", "type", "seconds", "interval_seconds"})
 
 
 class _SyncProfileBaseModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="allow")
+
+    @field_validator("schedule", mode="before", check_fields=False)
+    @classmethod
+    def _validate_schedule_shape(cls, value: Any) -> ScheduleValue:
+        if value is None or isinstance(value, str):
+            return value
+        if not isinstance(value, dict):
+            raise ValueError("schedule must be a string, object, or null")
+        unknown_keys = {str(key) for key in value} - _SCHEDULE_KEYS
+        if unknown_keys:
+            raise ValueError(
+                f"schedule contains unsupported fields: {', '.join(sorted(unknown_keys))}"
+            )
+        return dict(value)
 
 
 class SyncProfile(_SyncProfileBaseModel):
@@ -27,7 +45,7 @@ class SyncProfile(_SyncProfileBaseModel):
     capability: str
     mode: str = "manual"
     enabled: bool = True
-    schedule: str | None = None
+    schedule: ScheduleValue = None
     cursor: dict[str, Any] = Field(default_factory=dict)
     params: dict[str, Any] = Field(default_factory=dict)
     deduplicate: bool = True
@@ -53,7 +71,7 @@ class SyncProfileCreate(_SyncProfileBaseModel):
     capability: str
     mode: str = "manual"
     enabled: bool = True
-    schedule: str | None = None
+    schedule: ScheduleValue = None
     cursor: dict[str, Any] = Field(default_factory=dict)
     params: dict[str, Any] = Field(default_factory=dict)
     deduplicate: bool = True
@@ -69,7 +87,7 @@ class SyncProfileUpdate(_SyncProfileBaseModel):
     capability: str | None = None
     mode: str | None = None
     enabled: bool | None = None
-    schedule: str | None = None
+    schedule: ScheduleValue = None
     cursor: dict[str, Any] | None = None
     params: dict[str, Any] | None = None
     deduplicate: bool | None = None
