@@ -23,6 +23,12 @@ from flocks.security.fact_ledger import summarize_fact_ledger
 from flocks.security.integrations import EvidenceDispatchRequest, create_default_adapter_registry, create_default_integration_registry, preview_evidence_events as preview_dispatch_evidence_events
 from flocks.security.integrations.credential_store import default_credential_profile_store
 from flocks.security.integrations.credentials import CredentialProfile, CredentialProfileCreate, CredentialProfileUpdate
+from flocks.security.integrations.device_bridge import (
+    DeviceBridgeRequest,
+    DeviceBridgeResult,
+    DeviceBridgeStatus,
+    default_device_integration_bridge,
+)
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
@@ -167,6 +173,14 @@ class IntegrationCapabilityPlanRequest(BaseModel):
     mode: str = "manual"
     params: dict[str, Any] = Field(default_factory=dict)
     dry_run: bool = True
+
+
+class DeviceBridgeConfirmAPIRequest(BaseModel):
+    device_id: str
+    requested_by: str | None = None
+    dry_run: bool = False
+    force: bool = False
+    confirmed: bool = False
 
 
 
@@ -492,6 +506,42 @@ async def get_integration_package(package_id: str):
     """Return one built-in Integration Package manifest by id."""
 
     return _integration_package_manifest(package_id)
+
+
+@router.get("/integrations/device-bridge/status", response_model=list[DeviceBridgeStatus])
+async def get_device_bridge_status(device_id: str | None = None):
+    """Return safe Device Integration to Runtime v2 linkage state."""
+
+    return await default_device_integration_bridge.list_status(device_id=device_id)
+
+
+@router.post("/integrations/device-bridge/plan", response_model=DeviceBridgeResult)
+async def plan_device_bridge(payload: DeviceBridgeRequest):
+    """Plan bridge references without creating or modifying Runtime objects."""
+
+    return await default_device_integration_bridge.bridge_device_integration(
+        payload.model_copy(update={"dry_run": True})
+    )
+
+
+@router.post(
+    "/integrations/device-bridge/confirm",
+    response_model=DeviceBridgeResult,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def confirm_device_bridge(payload: DeviceBridgeConfirmAPIRequest):
+    """Create reference-only Runtime objects after explicit confirmation."""
+
+    if payload.confirmed is not True:
+        raise HTTPException(status_code=400, detail="confirmed=True is required for device bridge creation")
+    return await default_device_integration_bridge.bridge_device_integration(
+        DeviceBridgeRequest(
+            device_id=payload.device_id,
+            requested_by=payload.requested_by,
+            dry_run=False,
+            force=payload.force,
+        )
+    )
 
 
 
