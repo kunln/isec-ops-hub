@@ -45,6 +45,16 @@ from flocks.security.integrations.device_bridge import (
     DeviceIntegrationBridge,
     default_device_integration_bridge,
 )
+from flocks.security.integrations.device_sync_profile import (
+    DeviceSyncCapability,
+    DeviceSyncProfileConfirmRequest,
+    DeviceSyncProfileCreateRequest,
+    DeviceSyncProfileCreateResult,
+    DeviceSyncProfileService,
+    DeviceSyncProfileStatus,
+    DeviceSyncProfileSummary,
+    default_device_sync_profile_service,
+)
 from flocks.security.integrations.instance_store import IntegrationInstanceStore, default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import SyncProfileStore, default_sync_profile_store
 from flocks.security.integrations.sync_state import SyncStateUpdateRequest, SyncStateUpdateResult, update_sync_profile_run_state
@@ -128,6 +138,13 @@ __all__ = [
     "DeviceBridgeResult",
     "DeviceBridgeStatus",
     "DeviceIntegrationBridge",
+    "DeviceSyncCapability",
+    "DeviceSyncProfileConfirmRequest",
+    "DeviceSyncProfileCreateRequest",
+    "DeviceSyncProfileCreateResult",
+    "DeviceSyncProfileService",
+    "DeviceSyncProfileStatus",
+    "DeviceSyncProfileSummary",
     "SyncProfile",
     "SyncProfileCreate",
     "SyncProfileStore",
@@ -171,6 +188,7 @@ __all__ = [
     "create_default_integration_registry",
     "default_credential_profile_store",
     "default_device_integration_bridge",
+    "default_device_sync_profile_service",
     "default_integration_instance_store",
     "default_sync_profile_store",
     "get_builtin_integration_packages",

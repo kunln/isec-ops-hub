@@ -173,7 +173,27 @@ safe Runtime v2 reference creation:
   remediation.
 - No raw payload or full API response is retained, and bridge actions are not
   recorded as Integration Runs in this skeleton.
-- Creating a Sync Profile from the connected product remains a later PR.
+- Sync Profile creation from a connected product is implemented by the bounded
+  metadata-only flow described below.
+
+### Sync Profile from Connected Product Notes
+
+- This flow creates Runtime v2 Sync Profile metadata only and requires an
+  existing Device Integration bridge.
+- It does not auto-bridge a product, execute synchronization, preview data,
+  confirm ingest, call a vendor API, resolve an Adapter, or dispatch evidence.
+- Manual mode is the default and only enabled mode in this phase. A schedule
+  request is not started or persisted as an active schedule; scheduled
+  execution remains a later step.
+- Sync Profile identity is idempotent for the source Device Integration,
+  bridged Runtime v2 Integration Instance, and capability.
+- Params and generated metadata are validated against plaintext credential and
+  authorization material. The Sync Profile references the bridged Instance and
+  never reads or copies Device Integration fields or Credential Profile
+  secrets.
+- Plan is read-only. Confirmed creation does not create an Integration Run,
+  Evidence, Alert, Analysis Case, Incident, Notification, or remediation.
+- Preview and explicit Confirm Ingest remain later, separate Runtime actions.
 
 ## 8. Prohibited Design and Behavior
 
