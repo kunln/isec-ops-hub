@@ -374,8 +374,8 @@ function IntegrationHealthPanel({
     <section className="mb-6">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-800">数据接入健康</h2>
-          <p className="text-xs text-zinc-400">按安全产品统一展示设备 API、工具调用与数据同步状态</p>
+          <h2 className="text-sm font-semibold text-zinc-800">连接健康状态 / Health</h2>
+          <p className="text-xs text-zinc-400">统一查看已接入产品的连接、工具调用与数据同步状态</p>
         </div>
         <div className="font-mono text-[11px] text-zinc-400">
           {connectorSummary?.checked_at || '数据接入健康数据暂不可用'}
@@ -1244,6 +1244,143 @@ function McpActiveCard({ mcp, selected, onClick }: {
   );
 }
 
+function PrimaryIntegrationOverview({
+  activeCount,
+  availableCount,
+  connectedCount,
+  attentionCount,
+}: {
+  activeCount: number;
+  availableCount: number;
+  connectedCount: number;
+  attentionCount: number;
+}) {
+  const cards = [
+    {
+      label: '已接入产品',
+      english: 'Active Integrations',
+      value: activeCount,
+      detail: activeCount === 0 ? '点击“添加产品”开始接入安全产品' : `${connectedCount} 个连接健康`,
+      icon: PlugZap,
+      tone: 'border-blue-100 bg-blue-50 text-blue-900',
+    },
+    {
+      label: '可接入产品',
+      english: 'Available Products',
+      value: availableCount,
+      detail: '按厂商选择产品并填写连接配置',
+      icon: Database,
+      tone: 'border-indigo-100 bg-indigo-50 text-indigo-900',
+    },
+    {
+      label: '连接健康状态',
+      english: 'Health',
+      value: activeCount === 0 ? '-' : `${connectedCount}/${activeCount}`,
+      detail: attentionCount > 0 ? `${attentionCount} 个产品需要关注` : '当前没有需要关注的连接',
+      icon: Activity,
+      tone: attentionCount > 0
+        ? 'border-amber-100 bg-amber-50 text-amber-900'
+        : 'border-emerald-100 bg-emerald-50 text-emerald-900',
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <div key={card.label} className={`rounded-xl border px-4 py-3 ${card.tone}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold">{card.label}</div>
+                <div className="mt-0.5 text-[11px] opacity-65">{card.english}</div>
+              </div>
+              <Icon className="h-4 w-4 opacity-70" />
+            </div>
+            <div className="mt-3 text-2xl font-semibold leading-none">{card.value}</div>
+            <div className="mt-2 text-[11px] opacity-75">{card.detail}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AvailableProductsSection({
+  templates,
+  instanceCounts,
+  onBrowse,
+  onSelectVendor,
+}: {
+  templates: IntegrationTemplate[];
+  instanceCounts: Record<string, number>;
+  onBrowse: () => void;
+  onSelectVendor: (vendor: DeviceVendor) => void;
+}) {
+  const vendors = useMemo(() => {
+    const groups = new Map<string, IntegrationTemplate[]>();
+    templates.forEach((template) => {
+      const vendorKey = template.vendor || '__unspecified__';
+      groups.set(vendorKey, [...(groups.get(vendorKey) || []), template]);
+    });
+    return Array.from(groups.entries())
+      .map(([vendorKey, products]) => ({
+        vendor: vendorKey === '__unspecified__'
+          ? { id: '__unspecified__', nameCn: '未指定厂商', nameEn: 'Unspecified', color: 'bg-zinc-100 text-zinc-600' }
+          : vendorPresentation(vendorKey),
+        products,
+        activeCount: products.reduce((sum, product) => sum + (instanceCounts[product.id] || 0), 0),
+      }))
+      .sort((a, b) => a.vendor.nameCn.localeCompare(b.vendor.nameCn));
+  }, [templates, instanceCounts]);
+
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Database className="h-4 w-4 text-indigo-600" />
+          <h3 className="text-sm font-semibold text-zinc-800">可接入产品 / Available Products</h3>
+          <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-400">{templates.length}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onBrowse}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          浏览全部产品
+        </button>
+      </div>
+      {vendors.length === 0 ? (
+        <EmptyState text="当前没有可接入产品。" />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {vendors.map(({ vendor, products, activeCount: vendorActiveCount }) => (
+            <button
+              key={vendor.id}
+              type="button"
+              onClick={() => onSelectVendor(vendor)}
+              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-blue-300 hover:bg-blue-50/30"
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${vendor.color}`}>
+                {vendor.nameCn[0]}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-zinc-800">{vendor.nameCn}</div>
+                <div className="truncate text-xs text-zinc-400">{vendor.nameEn}</div>
+                <div className="mt-1 text-[11px] text-zinc-500">
+                  {products.length} 款产品{vendorActiveCount > 0 ? ` · 已接入 ${vendorActiveCount}` : ''}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ============================================================================
 // Add integration wizard panel (step 1: vendor, step 2: product)
 // ============================================================================
@@ -1305,7 +1442,7 @@ function AddDeviceWizardPanel({ templates, instanceCounts, initialVendor, onSele
     <div className="fixed inset-0 z-40 pointer-events-none">
       <button
         type="button"
-          aria-label="关闭添加接入面板"
+          aria-label="关闭添加产品面板"
         onClick={onClose}
         className="pointer-events-auto absolute left-0 bottom-0 bg-transparent"
         style={{ top: 64, right: 440 }}
@@ -1327,7 +1464,7 @@ function AddDeviceWizardPanel({ templates, instanceCounts, initialVendor, onSele
             )}
             <div>
               <h3 className="text-sm font-semibold text-zinc-900">
-                {selectedVendor ? `选择 ${selectedVendor.nameCn} 产品` : '添加接入'}
+                {selectedVendor ? `选择 ${selectedVendor.nameCn} 产品` : '添加产品 / Add Integration'}
               </h3>
               <div className="flex items-center gap-1.5 mt-0.5">
                 {/* Breadcrumb */}
@@ -1805,7 +1942,7 @@ function McpConfigPanel({
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
             >
               {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
-              连通测试
+              测试连接
             </button>
             <button
               onClick={handleSave}
@@ -2218,7 +2355,7 @@ function DeviceConfigPanel({
                         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition-colors"
                       >
                         {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
-                        连通测试
+                        测试连接
                       </button>
                     )}
                     <button
@@ -2585,12 +2722,12 @@ function BuiltInIntegrationPackagesSection({ packages }: { packages: Integration
     <section className="mt-6">
       <div className="flex items-center gap-2 mb-3">
         <Database className="w-4 h-4 text-indigo-600" />
-        <h3 className="text-sm font-semibold text-zinc-800">可接入产品</h3>
-        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">Products</span>
+        <h3 className="text-sm font-semibold text-zinc-800">Integration Packages / 集成包</h3>
+        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">Runtime v2</span>
         <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">{packages.length}</span>
       </div>
       {groups.length === 0 ? (
-        <EmptyState text="当前没有可接入产品，请检查内置集成包注册。" />
+        <EmptyState text="当前没有已注册的 Integration Package。" />
       ) : (
         <div className="space-y-4">
           {groups.map(([group, items]) => (
@@ -2683,21 +2820,20 @@ function LoadHint({ error }: { error?: string | null }) {
   return <div className="mb-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">{error}</div>;
 }
 
-function IntegrationCenterOverview({
+function RuntimeMetadataOverview({
   counts,
 }: {
   counts: Record<string, number | null>;
 }) {
   const cards = [
-    ['可接入产品', 'Products', counts.packages],
-    ['已创建实例', 'Instances', counts.instances],
-    ['凭据引用', 'Credential References', counts.credentials],
-    ['同步策略', 'Sync Setup', counts.syncProfiles],
-    ['运行记录', 'Run History', counts.runs],
+    ['Integration Packages', '集成包', counts.packages],
+    ['Integration Instances', '集成实例', counts.instances],
+    ['Credential Profiles', '凭据配置', counts.credentials],
+    ['Sync Profiles', '同步配置', counts.syncProfiles],
   ];
   return (
-    <SectionCard title="接入概览" subtitle="一眼查看可接入产品、实例、凭据引用、同步策略和运行记录数量。" count="readonly">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <SectionCard title="Runtime v2 metadata overview" subtitle="技术对象元数据概览，仅用于高级配置与调试。" count="readonly">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map(([label, cn, value]) => (
           <div key={label as string} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
             <div className="text-xs text-zinc-500">{label as string}</div>
@@ -2713,7 +2849,7 @@ function IntegrationCenterOverview({
 function IntegrationInstancesSection({ instances, packages, error }: { instances: IntegrationInstance[]; packages: IntegrationPackageSummary[]; error?: string | null }) {
   const packageById = useMemo(() => Object.fromEntries(packages.map((pkg) => [pkg.package_id, pkg])), [packages]);
   return (
-    <SectionCard title="已创建实例" subtitle="实例用于描述一个具体安全产品目标；这里只展示配置概览。" count={error ? '-' : instances.length}>
+    <SectionCard title="Integration Instances / 集成实例" subtitle="Runtime v2 中描述具体安全产品目标的技术对象。" count={error ? '-' : instances.length}>
       <LoadHint error={error} />
       {instances.length === 0 ? <EmptyState text="还没有创建集成实例。下一步：选择产品后创建实例。当前 UI 创建入口后续完善，也可以先通过 API 创建测试实例。" /> : (
         <div className="overflow-x-auto">
@@ -2734,7 +2870,7 @@ function IntegrationInstancesSection({ instances, packages, error }: { instances
 
 function CredentialProfilesSection({ profiles, error }: { profiles: CredentialProfile[]; error?: string | null }) {
   return (
-    <SectionCard title="凭据引用" subtitle="当前只展示引用和字段名，不保存或展示明文凭据。" count={error ? '-' : profiles.length}>
+    <SectionCard title="Credential Profiles / 凭据配置" subtitle="只展示引用和字段名，不保存或展示明文凭据。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
       {profiles.length === 0 ? <EmptyState text="还没有凭据引用。当前只展示引用，不保存明文凭据。" /> : <div className="grid gap-3 lg:grid-cols-2">{profiles.map((p) => <div key={p.credential_profile_id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-700"><div className="font-semibold text-zinc-900">{p.display_name}</div><div className="mt-2 grid gap-1 sm:grid-cols-2"><div>profile_type: {p.profile_type}</div><div>status: {p.status}</div><div>package_id: {valueOrDash(p.package_id)}</div><div>instance_id: {valueOrDash(p.instance_id)}</div><div>configured_fields: {(p.configured_fields || []).join(', ') || '-'}</div><div>required_fields: {(p.required_fields || []).join(', ') || '-'}</div><div>凭据引用: {maskSecretRef(p.secret_ref)}</div><div>updated_at / created_at: {valueOrDash(p.updated_at)} / {valueOrDash(p.created_at)}</div></div></div>)}</div>}
     </SectionCard>
@@ -2862,7 +2998,7 @@ function SyncIngestResultCard({ result, onClose }: { result: ManualSyncIngestRes
 
 function SyncSetupSection({ profiles, error }: { profiles: SyncProfile[]; error?: string | null }) {
   return (
-    <SectionCard title="同步策略" subtitle="从哪个实例同步什么数据；配置本身不会执行同步。" count={error ? '-' : profiles.length}>
+    <SectionCard title="同步配置 / Sync Profiles" subtitle="从哪个产品同步什么数据；配置本身不会执行同步。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
       <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
         同步策略用于描述：从哪个集成实例、同步哪类数据、采用什么模式。配置本身不会执行同步。
@@ -3009,49 +3145,24 @@ function IntegrationRunsSection({ runs, error }: { runs: IntegrationRun[]; error
 }
 
 
-type IntegrationCenterTab = 'products' | 'syncSetup' | 'previewIngest' | 'runs' | 'legacy';
+type IntegrationCenterTab = 'integrations' | 'syncIngest' | 'runs' | 'advanced';
 
 const INTEGRATION_CENTER_TABS: Array<{ id: IntegrationCenterTab; label: string; description: string }> = [
-  { id: 'products', label: '产品接入 / Products', description: '选择产品，查看实例和凭据引用' },
-  { id: 'syncSetup', label: '同步配置 / Sync Setup', description: '配置从哪里同步什么数据' },
-  { id: 'previewIngest', label: '预览与入库 / Preview & Ingest', description: '生成计划、预览结果、人工确认入库' },
-  { id: 'runs', label: '运行记录 / Run History', description: '查看计划、预览、入库记录' },
-  { id: 'legacy', label: '旧版接入 / Legacy', description: '历史设备接入与旧同步' },
+  { id: 'integrations', label: '产品接入 / Integrations', description: '添加并管理安全产品接入' },
+  { id: 'syncIngest', label: '同步与入库 / Sync & Ingest', description: '配置同步、预览数据并确认入库' },
+  { id: 'runs', label: '运行记录 / Runs', description: '查看同步与入库运行记录' },
+  { id: 'advanced', label: '高级配置 / Advanced', description: '查看底层技术对象' },
 ];
 
-function IntegrationFlow() {
-  const steps = [
-    ['选择产品', '选择要接入的安全产品'],
-    ['配置实例', '填写目标地址和凭据引用'],
-    ['配置同步', '定义同步能力和参数'],
-    ['预览结果', '先看会产生什么数据'],
-    ['确认入库', '人工确认后创建 Evidence/Alert'],
-    ['查看记录', '审计每次操作'],
-  ];
+function IntegrationFlowHint() {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-900">当前任务步骤</h2>
-          <p className="text-xs text-zinc-500">按任务完成产品接入、同步配置、安全预览、人工确认和审计查看。</p>
-        </div>
-        <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">第 5 步需二次确认</span>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-        {steps.map(([step, description], index) => {
-          const confirmationStep = index === 4;
-          return (
-            <div key={step} className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-semibold text-white">{index + 1}</span>
-                {confirmationStep && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">需二次确认</span>}
-              </div>
-              <div className="font-medium">步骤 {index + 1}：{step}</div>
-              <p className="mt-1 text-[11px] text-indigo-700">{description}</p>
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-500 shadow-sm">
+      <span className="font-medium text-zinc-700">接入流程：</span>
+      <span>添加产品</span><ChevronRight className="h-3 w-3 text-zinc-300" />
+      <span>测试连接</span><ChevronRight className="h-3 w-3 text-zinc-300" />
+      <span>配置同步</span><ChevronRight className="h-3 w-3 text-zinc-300" />
+      <span>预览数据</span><ChevronRight className="h-3 w-3 text-zinc-300" />
+      <span>确认入库</span>
     </div>
   );
 }
@@ -3059,7 +3170,7 @@ function IntegrationFlow() {
 function IntegrationCenterTabs({ active, onChange }: { active: IntegrationCenterTab; onChange: (tab: IntegrationCenterTab) => void }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
-      <div className="grid gap-2 md:grid-cols-5">
+      <div className="grid gap-2 md:grid-cols-4">
         {INTEGRATION_CENTER_TABS.map((tab) => {
           const selected = active === tab.id;
           return (
@@ -3119,7 +3230,7 @@ export default function DeviceIntegrationPage() {
   const [credentialSource, setCredentialSource] = useState<SecurityConnectorCustomerDataSource | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [credentialSaving, setCredentialSaving] = useState(false);
-  const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationCenterTab>('products');
+  const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationCenterTab>('integrations');
 
   const currentGroup: DeviceGroup | undefined = groups[0];
 
@@ -3360,6 +3471,9 @@ export default function DeviceIntegrationPage() {
         : false
   )).length;
   const activeProductCount = customerIntegrations.length;
+  const attentionProductCount = customerIntegrations.filter((row) => (
+    productNeedsAttention(row.device, row.sync, row.mcp)
+  )).length;
   const hasUnboundSyncSources = activeProductCount === 0 && (connectorSummary?.data_sources?.length || 0) > 0;
 
   const panelDeviceId = panel?.kind === 'edit' ? panel.device.id : null;
@@ -3616,10 +3730,18 @@ export default function DeviceIntegrationPage() {
     <div className="h-full flex flex-col">
       <PageHeader
         title="Integration Center / 集成中心"
-        description="集成中心用于把安全产品的数据接入到平台。你可以先选择产品、配置实例和同步策略，再通过计划、预览、确认入库三个步骤安全接入数据。"
+        description="添加并管理安全产品接入，测试连接后可按需配置同步与入库。"
         icon={<Shield className="w-5 h-5" />}
         action={
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void openAddWizard()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              添加产品 / Add Integration
+            </button>
             <button
               onClick={() => void fetchData(true)}
               disabled={refreshing}
@@ -3643,89 +3765,44 @@ export default function DeviceIntegrationPage() {
               默认安全模式：不会读取明文凭据，不会自动创建事件，不会执行处置。
             </div>
 
-            <IntegrationFlow />
+            <IntegrationFlowHint />
             <IntegrationCenterTabs active={activeIntegrationTab} onChange={setActiveIntegrationTab} />
 
-            {activeIntegrationTab === 'products' && (
+            {activeIntegrationTab === 'integrations' && (
               <div className="space-y-6">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-                  我能接什么产品？现在接了几个？这里集中查看可接入产品、已创建实例和凭据引用。
-                </div>
-                <IntegrationCenterOverview counts={{ packages: integrationCenterErrors.packages ? null : integrationPackages.length, instances: integrationCenterErrors.instances ? null : integrationInstances.length, credentials: integrationCenterErrors.credentials ? null : credentialProfiles.length, syncProfiles: integrationCenterErrors.syncProfiles ? null : syncProfiles.length, runs: integrationCenterErrors.runs ? null : integrationRuns.length }} />
-                <BuiltInIntegrationPackagesSection packages={integrationPackages} />
-                <IntegrationInstancesSection instances={integrationInstances} packages={integrationPackages} error={integrationCenterErrors.instances} />
-                <CredentialProfilesSection profiles={credentialProfiles} error={integrationCenterErrors.credentials} />
-              </div>
-            )}
-
-            {activeIntegrationTab === 'syncSetup' && (
-              <div className="space-y-6">
-                <SyncSetupSection profiles={syncProfiles} error={integrationCenterErrors.syncProfiles} />
-              </div>
-            )}
-
-            {activeIntegrationTab === 'previewIngest' && (
-              <div className="space-y-6">
-                <PreviewIngestSection
-                  profiles={syncProfiles}
-                  error={integrationCenterErrors.syncProfiles}
-                  syncPlanLoadingId={syncPlanLoadingId}
-                  syncPlanResult={syncPlanResult}
-                  syncPlanError={syncPlanError}
-                  syncPreviewLoadingId={syncPreviewLoadingId}
-                  syncPreviewResult={syncPreviewResult}
-                  syncPreviewError={syncPreviewError}
-                  syncIngestLoadingId={syncIngestLoadingId}
-                  syncIngestResult={syncIngestResult}
-                  syncIngestError={syncIngestError}
-                  onGeneratePlan={(profile) => void handleGenerateSyncPlan(profile)}
-                  onClearPlanResult={() => setSyncPlanResult(null)}
-                  onPreviewSync={(profile) => void handlePreviewSync(profile)}
-                  onClearPreviewResult={() => setSyncPreviewResult(null)}
-                  onConfirmIngest={(profile) => void handleConfirmIngest(profile)}
-                  onClearIngestResult={() => setSyncIngestResult(null)}
-                />
-              </div>
-            )}
-
-            {activeIntegrationTab === 'runs' && (
-              <div className="space-y-6">
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-700">
-                  这里记录每次生成计划、预览和确认入库动作，便于审计和排查。
-                </div>
-                <IntegrationRunsSection runs={integrationRuns} error={integrationCenterErrors.runs} />
-              </div>
-            )}
-
-            {activeIntegrationTab === 'legacy' && (
-              <div className="space-y-6">
-                <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p>旧版接入用于兼容历史设备集成、连接测试和旧同步调度。新的 Integration Runtime v2 配置请使用前面的产品接入、同步配置、预览与入库。</p>
-                    <button
-                      onClick={() => void openAddWizard()}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      添加旧版接入
-                    </button>
+                <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-blue-900">产品接入 / Integrations</h2>
+                    <p className="mt-1 text-xs text-blue-700">选择厂商和产品，填写连接配置，测试连接后保存。</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void openAddWizard()}
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    添加产品 / Add Integration
+                  </button>
                 </div>
-                <IntegrationHealthPanel integrations={customerIntegrations} connectorSummary={connectorSummary} />
+
+                <PrimaryIntegrationOverview
+                  activeCount={activeProductCount}
+                  availableCount={templates.length}
+                  connectedCount={connectedProductCount}
+                  attentionCount={attentionProductCount}
+                />
 
                 {activeProductCount === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-4 py-24">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100">
-                      <PlugZap className="h-7 w-7 text-zinc-300" />
+                  <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-10">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm">
+                      <PlugZap className="h-5 w-5 text-zinc-300" />
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-semibold text-zinc-700">
-                        {hasUnboundSyncSources ? '暂无设备 API 接入' : '暂无已接入的设备'}
-                      </p>
+                      <p className="text-sm font-semibold text-zinc-700">暂无已接入产品 / No Active Integrations</p>
                       <p className="mt-1.5 text-xs text-zinc-400">
                         {hasUnboundSyncSources
-                          ? '上方展示的是已启用的数据同步源；添加对应设备后可统一管理连接、工具调用和同步绑定'
-                          : '添加后可管理连接、工具调用和标准化数据同步'}
+                          ? '已有同步源等待绑定。点击“添加产品”开始接入安全产品。'
+                          : '点击“添加产品”开始接入安全产品'}
                       </p>
                     </div>
                     <button
@@ -3733,14 +3810,14 @@ export default function DeviceIntegrationPage() {
                       className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      立即添加旧版接入
+                      添加产品
                     </button>
-                  </div>
+                  </section>
                 ) : (
                   <section>
                     <div className="mb-4 flex items-center gap-2">
                       <PlugZap className="h-4 w-4 text-blue-600" />
-                      <h3 className="text-sm font-semibold text-zinc-800">已接入安全产品</h3>
+                      <h3 className="text-sm font-semibold text-zinc-800">已接入产品 / Active Integrations</h3>
                       <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-400">{activeProductCount}</span>
                       {connectedProductCount > 0 && (
                         <span className="text-xs text-green-600">
@@ -3770,6 +3847,60 @@ export default function DeviceIntegrationPage() {
                     </div>
                   </section>
                 )}
+
+                <AvailableProductsSection
+                  templates={templates}
+                  instanceCounts={instanceCounts}
+                  onBrowse={() => void openAddWizard()}
+                  onSelectVendor={(vendor) => setPanel({ kind: 'wizard', initialVendor: vendor })}
+                />
+
+                <IntegrationHealthPanel integrations={customerIntegrations} connectorSummary={connectorSummary} />
+              </div>
+            )}
+
+            {activeIntegrationTab === 'syncIngest' && (
+              <div className="space-y-6">
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                  <h2 className="text-sm font-semibold text-indigo-900">高级同步与入库</h2>
+                  <p className="mt-1 text-xs text-indigo-700">用于测试 Integration Runtime v2 的同步计划、预览和人工确认入库能力。一般添加产品请从产品接入开始。</p>
+                </div>
+                <SyncSetupSection profiles={syncProfiles} error={integrationCenterErrors.syncProfiles} />
+                <PreviewIngestSection
+                  profiles={syncProfiles}
+                  error={integrationCenterErrors.syncProfiles}
+                  syncPlanLoadingId={syncPlanLoadingId}
+                  syncPlanResult={syncPlanResult}
+                  syncPlanError={syncPlanError}
+                  syncPreviewLoadingId={syncPreviewLoadingId}
+                  syncPreviewResult={syncPreviewResult}
+                  syncPreviewError={syncPreviewError}
+                  syncIngestLoadingId={syncIngestLoadingId}
+                  syncIngestResult={syncIngestResult}
+                  syncIngestError={syncIngestError}
+                  onGeneratePlan={(profile) => void handleGenerateSyncPlan(profile)}
+                  onClearPlanResult={() => setSyncPlanResult(null)}
+                  onPreviewSync={(profile) => void handlePreviewSync(profile)}
+                  onClearPreviewResult={() => setSyncPreviewResult(null)}
+                  onConfirmIngest={(profile) => void handleConfirmIngest(profile)}
+                  onClearIngestResult={() => setSyncIngestResult(null)}
+                />
+              </div>
+            )}
+
+            {activeIntegrationTab === 'runs' && (
+              <IntegrationRunsSection runs={integrationRuns} error={integrationCenterErrors.runs} />
+            )}
+
+            {activeIntegrationTab === 'advanced' && (
+              <div className="space-y-6">
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-600">
+                  Integration Runtime v2 技术对象仅用于高级配置与调试；一般添加产品请从“产品接入”开始。
+                </div>
+                <RuntimeMetadataOverview counts={{ packages: integrationCenterErrors.packages ? null : integrationPackages.length, instances: integrationCenterErrors.instances ? null : integrationInstances.length, credentials: integrationCenterErrors.credentials ? null : credentialProfiles.length, syncProfiles: integrationCenterErrors.syncProfiles ? null : syncProfiles.length }} />
+                <BuiltInIntegrationPackagesSection packages={integrationPackages} />
+                <IntegrationInstancesSection instances={integrationInstances} packages={integrationPackages} error={integrationCenterErrors.instances} />
+                <CredentialProfilesSection profiles={credentialProfiles} error={integrationCenterErrors.credentials} />
               </div>
             )}
           </div>        </div>
