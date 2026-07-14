@@ -8,6 +8,7 @@ Security objects.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -21,6 +22,11 @@ from flocks.storage.storage import Storage
 
 SYNC_PROFILE_PREFIX = "security/sync_profiles/"
 SYNC_PROFILE_STORAGE_TYPE = "security.sync_profiles"
+SAFE_REFERENCE_PARAM_KEYS = frozenset({"secret_ref", "credential_profile_id", "has_secret"})
+_SAFE_REFERENCE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,254}$")
+_SAFE_SECRET_REFERENCE_PATTERN = re.compile(
+    r"^[A-Za-z][A-Za-z0-9+.-]*://[A-Za-z0-9][A-Za-z0-9_.:/-]{0,511}$"
+)
 
 
 class SyncProfileStore:
@@ -216,7 +222,21 @@ def _validate_no_secret_like_data(attr: str, data: dict[str, Any]) -> list[str]:
         if isinstance(value, dict):
             for key, item in value.items():
                 lowered = str(key).lower()
-                if any(keyword in lowered for keyword in SENSITIVE_PARAM_KEYWORDS):
+                if lowered == "secret_ref":
+                    if not isinstance(item, str) or not _SAFE_SECRET_REFERENCE_PATTERN.fullmatch(item):
+                        errors.append(f"{attr} contains invalid secret_ref: {path}{key}")
+                    continue
+                if lowered == "credential_profile_id":
+                    if not isinstance(item, str) or not _SAFE_REFERENCE_PATTERN.fullmatch(item):
+                        errors.append(f"{attr} contains invalid credential_profile_id: {path}{key}")
+                    continue
+                if lowered == "has_secret":
+                    if not isinstance(item, bool):
+                        errors.append(f"{attr} contains invalid has_secret flag: {path}{key}")
+                    continue
+                if lowered not in SAFE_REFERENCE_PARAM_KEYS and any(
+                    keyword in lowered for keyword in SENSITIVE_PARAM_KEYWORDS
+                ):
                     errors.append(f"{attr} contains secret-like key: {path}{key}")
                 visit(item, f"{path}{key}.")
         elif isinstance(value, list):

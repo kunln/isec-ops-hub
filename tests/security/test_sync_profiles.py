@@ -190,6 +190,38 @@ async def test_secret_like_key_or_value_returns_400(client: AsyncClient, field: 
 
 
 @pytest.mark.asyncio
+async def test_safe_credential_references_are_allowed_without_accepting_plaintext(client: AsyncClient) -> None:
+    instance = await create_instance(client)
+    safe = await client.post(
+        "/api/security/integrations/sync-profiles",
+        json={
+            "display_name": "Safe References",
+            "instance_id": instance["instance_id"],
+            "capability": "alert.search",
+            "params": {
+                "secret_ref": "device-integration://device-tda-1",
+                "credential_profile_id": "credprof_reference_only",
+                "has_secret": True,
+            },
+        },
+    )
+    unsafe = await client.post(
+        "/api/security/integrations/sync-profiles",
+        json={
+            "display_name": "Unsafe Reference",
+            "instance_id": instance["instance_id"],
+            "capability": "alert.search",
+            "params": {"secret_ref": "REAL_TOKEN_SHOULD_NOT_LEAK"},
+        },
+    )
+
+    assert safe.status_code == 200, safe.text
+    assert safe.json()["params"]["secret_ref"] == "device-integration://device-tda-1"
+    assert unsafe.status_code == 400
+    assert "REAL_TOKEN_SHOULD_NOT_LEAK" not in unsafe.text
+
+
+@pytest.mark.asyncio
 async def test_no_connector_http_credential_read_or_security_object_creation(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_if_called(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("Sync Profile APIs must not perform side effects")

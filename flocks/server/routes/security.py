@@ -29,6 +29,13 @@ from flocks.security.integrations.device_bridge import (
     DeviceBridgeStatus,
     default_device_integration_bridge,
 )
+from flocks.security.integrations.device_sync_profile import (
+    DeviceSyncProfileConfirmRequest,
+    DeviceSyncProfileCreateRequest,
+    DeviceSyncProfileCreateResult,
+    DeviceSyncProfileStatus,
+    default_device_sync_profile_service,
+)
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate, SyncProfileUpdate
@@ -542,6 +549,44 @@ async def confirm_device_bridge(payload: DeviceBridgeConfirmAPIRequest):
             force=payload.force,
         )
     )
+
+
+@router.get(
+    "/integrations/device-sync-profile/status",
+    response_model=list[DeviceSyncProfileStatus],
+)
+async def get_device_sync_profile_status(device_id: str | None = None):
+    """Return safe Sync Profile readiness for connected products."""
+
+    return await default_device_sync_profile_service.list_status(device_id=device_id)
+
+
+@router.post(
+    "/integrations/device-sync-profile/plan",
+    response_model=DeviceSyncProfileCreateResult,
+)
+async def plan_device_sync_profile(payload: DeviceSyncProfileCreateRequest):
+    """Plan Sync Profile metadata creation without modifying Runtime objects."""
+
+    return await default_device_sync_profile_service.plan(
+        payload.model_copy(update={"dry_run": True})
+    )
+
+
+@router.post(
+    "/integrations/device-sync-profile/confirm",
+    response_model=DeviceSyncProfileCreateResult,
+    dependencies=[Depends(require_capability("security.ops.write"))],
+)
+async def confirm_device_sync_profile(payload: DeviceSyncProfileConfirmRequest):
+    """Create Sync Profile metadata after explicit confirmation."""
+
+    if payload.confirmed is not True:
+        raise HTTPException(
+            status_code=400,
+            detail="confirmed=True is required for Sync Profile creation",
+        )
+    return await default_device_sync_profile_service.confirm(payload)
 
 
 
