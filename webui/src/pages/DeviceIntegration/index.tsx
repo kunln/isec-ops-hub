@@ -27,6 +27,8 @@ import {
   type CredentialProfile,
   type SyncProfile,
   type IntegrationRun,
+  type DeviceBridgeStatus,
+  type DeviceSyncProfileStatus,
 } from '@/api/security';
 import type { APIServiceSummary, APIServiceCredentialField, Tool, MCPCatalogEntry } from '@/types';
 import { toolAPI } from '@/api/tool';
@@ -1982,6 +1984,7 @@ function DeviceConfigPanel({
   onUpdateScheduleInterval,
   onUpdateSyncCredentials,
   onOpenSyncIngest,
+  onSyncProfilesChanged,
 }: {
   device?: DeviceIntegration;
   template?: APIServiceSummary;
@@ -2007,6 +2010,7 @@ function DeviceConfigPanel({
   onUpdateScheduleInterval?: (source: SecurityConnectorCustomerDataSource, schedule: SecurityConnectorCustomerSchedule, intervalSeconds: number) => Promise<void>;
   onUpdateSyncCredentials?: (source: SecurityConnectorCustomerDataSource) => void;
   onOpenSyncIngest?: () => void;
+  onSyncProfilesChanged?: () => Promise<void>;
 }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -2026,6 +2030,15 @@ function DeviceConfigPanel({
   const [metadata, setMetadata] = useState<{ name?: string; version?: string; description?: string; description_cn?: string; docs_url?: string } | null>(null);
   const [toolEnabled, setToolEnabled] = useState<Record<string, boolean>>({});
   const originalMasked = useRef<Record<string, string>>({});
+  const runtimeStatusRequest = useRef(0);
+  const previousTab = useRef<PanelTab>('config');
+  const [bridgeStatus, setBridgeStatus] = useState<DeviceBridgeStatus | null>(null);
+  const [syncProfileStatus, setSyncProfileStatus] = useState<DeviceSyncProfileStatus | null>(null);
+  const [bridgeStatusError, setBridgeStatusError] = useState<string | null>(null);
+  const [syncProfileStatusError, setSyncProfileStatusError] = useState<string | null>(null);
+  const [runtimeStatusLoading, setRuntimeStatusLoading] = useState(false);
+  const [bridgeCreating, setBridgeCreating] = useState(false);
+  const [syncProfileCreating, setSyncProfileCreating] = useState(false);
 
   const serviceId = device?.service_id ?? template?.id ?? '';
   // ``storage_key`` is the versioned, unambiguous identifier
@@ -2082,6 +2095,84 @@ function DeviceConfigPanel({
       })
       .catch(() => {});
   }, [device, serviceId, storageKey]);
+
+  const loadRuntimeSyncStatus = useCallback(async () => {
+    const deviceId = device?.id;
+    if (!deviceId) return;
+    const requestId = ++runtimeStatusRequest.current;
+    setRuntimeStatusLoading(true);
+    setBridgeStatusError(null);
+    setSyncProfileStatusError(null);
+    const [bridgeResult, syncProfileResult] = await Promise.allSettled([
+      securityAPI.getDeviceBridgeStatus(deviceId),
+      securityAPI.getDeviceSyncProfileStatus(deviceId),
+    ]);
+    if (runtimeStatusRequest.current !== requestId) return;
+
+    if (bridgeResult.status === 'fulfilled') {
+      const current = (bridgeResult.value.data || []).find((item) => item.device_id === deviceId);
+      setBridgeStatus(current || null);
+      if (!current) setBridgeStatusError('未返回当前产品的 Runtime v2 Bridge 状态。');
+    } else {
+      setBridgeStatusError(apiErrorMessage(bridgeResult.reason, '加载 Runtime v2 Bridge 状态失败'));
+    }
+
+    if (syncProfileResult.status === 'fulfilled') {
+      const current = (syncProfileResult.value.data || []).find((item) => item.device_id === deviceId);
+      setSyncProfileStatus(current || null);
+      if (!current) setSyncProfileStatusError('未返回当前产品的 Sync Profile 状态。');
+    } else {
+      setSyncProfileStatusError(apiErrorMessage(syncProfileResult.reason, '加载 Sync Profile 状态失败'));
+    }
+    setRuntimeStatusLoading(false);
+  }, [device?.id]);
+
+  useEffect(() => {
+    if (!device) return;
+    void loadRuntimeSyncStatus();
+    return () => { runtimeStatusRequest.current += 1; };
+  }, [device?.id, loadRuntimeSyncStatus]);
+
+  useEffect(() => {
+    const switchedToSync = tab === 'sync' && previousTab.current !== 'sync';
+    previousTab.current = tab;
+    if (switchedToSync) void loadRuntimeSyncStatus();
+  }, [tab, loadRuntimeSyncStatus]);
+
+  const handleCreateDeviceBridge = async () => {
+    if (!device) return;
+    setBridgeCreating(true);
+    try {
+      const response = await securityAPI.confirmDeviceBridge(device.id);
+      if (!['bridged', 'already_bridged'].includes(response.data.status)) {
+        throw new Error(response.data.errors[0] || 'Runtime v2 同步实例生成失败');
+      }
+      await loadRuntimeSyncStatus();
+      toast.success(response.data.status === 'already_bridged' ? 'Runtime v2 同步实例已存在' : 'Runtime v2 同步实例已生成');
+    } catch (error) {
+      toast.error('生成 Runtime v2 同步实例失败', apiErrorMessage(error, '请稍后重试'));
+    } finally {
+      setBridgeCreating(false);
+    }
+  };
+
+  const handleCreateDeviceSyncProfile = async () => {
+    if (!device) return;
+    setSyncProfileCreating(true);
+    try {
+      const response = await securityAPI.confirmDeviceSyncProfile(device.id, 'alert.search');
+      if (!['created', 'already_exists'].includes(response.data.status)) {
+        throw new Error(response.data.errors[0] || '告警同步配置创建失败');
+      }
+      await loadRuntimeSyncStatus();
+      await onSyncProfilesChanged?.();
+      toast.success(response.data.status === 'already_exists' ? '告警同步配置已存在' : '告警同步配置已创建');
+    } catch (error) {
+      toast.error('创建告警同步配置失败', apiErrorMessage(error, '请稍后重试'));
+    } finally {
+      setSyncProfileCreating(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error('请填写设备名称'); return; }
@@ -2440,148 +2531,180 @@ function DeviceConfigPanel({
             )}
 
             {/* ── 同步 tab ── */}
-            {tab === 'sync' && device && sync && (
+            {tab === 'sync' && device && (
               <div className="px-5 py-4 space-y-4">
-                {sync.source ? (
-                  <>
-                    <div className="rounded-xl border border-zinc-100 bg-white px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-zinc-900">{sync.source.name}</p>
-                          <p className="mt-1 text-xs text-zinc-500">{sync.message}</p>
-                        </div>
-                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${statusTone(sync.source.sync_status)}`}>
-                          {statusLabel(sync.source.sync_status)}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {sync.capabilities.map((capability) => (
-                          <span key={capability} className="rounded-md bg-zinc-50 px-2 py-1 text-[11px] text-zinc-600">
-                            {capabilityLabel(capability)}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onEnableSync?.(device, sync)}
-                          disabled={actionLoading === `enable-sync:${device.id}:${sync.source.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs text-white hover:bg-zinc-800 disabled:opacity-50"
-                        >
-                          {actionLoading === `enable-sync:${device.id}:${sync.source.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
-                          {sync.state === 'active' ? '重新绑定同步' : '启用数据同步'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onTestSync?.(sync.source!)}
-                          disabled={actionLoading === `test:${sync.source.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-                        >
-                          {actionLoading === `test:${sync.source.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
-                          测试同步连接
-                        </button>
-                        {sync.source.actions.some((action) => action.kind === 'update_credentials') && hasEditableCredentialFields(sync.source) && (
-                          <button
-                            type="button"
-                            onClick={() => onUpdateSyncCredentials?.(sync.source!)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
-                          >
-                            <KeyRound className="h-3.5 w-3.5" />
-                            更新同步凭据
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900">单产品同步配置</h4>
+                    <p className="mt-0.5 text-xs text-zinc-500">按顺序完成 Runtime v2 实例关联与 Sync Profile 创建。</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void loadRuntimeSyncStatus()}
+                    disabled={runtimeStatusLoading || bridgeCreating || syncProfileCreating}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${runtimeStatusLoading ? 'animate-spin' : ''}`} />
+                    刷新状态
+                  </button>
+                </div>
 
-                    {sync.source.schedules.length > 0 ? (
-                      <div className="rounded-xl border border-zinc-100 overflow-hidden">
-                        {sync.source.schedules.map((schedule) => (
-                          <div key={schedule.id} className="flex flex-col gap-2 border-b border-zinc-100 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0">
-                              <div className="text-xs font-medium text-zinc-800">{capabilityLabel(schedule.capability || '')}</div>
-                              <div className="mt-0.5 text-[11px] text-zinc-400">
-                                {(schedule.mode === 'full' ? '全量' : '增量')} · 每 {formatSyncInterval(schedule.interval_seconds)}
-                                {schedule.message ? ` · ${schedule.message}` : ''}
-                              </div>
+                {runtimeStatusLoading && !bridgeStatus && !syncProfileStatus && (
+                  <div className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    正在加载当前产品的 Runtime v2 同步状态...
+                  </div>
+                )}
+
+                <section className="rounded-xl border border-zinc-200 bg-white p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">1</span>
+                    <h4 className="text-sm font-semibold text-zinc-900">产品连接状态</h4>
+                  </div>
+                  <div className="mt-3 rounded-lg bg-zinc-50 px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900">{device.name}</p>
+                        <p className="mt-1 break-all text-[11px] text-zinc-500">device_id / integration id: {device.id}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${statusTone(deviceApiStatus(device))}`}>
+                        {statusLabel(deviceApiStatus(device))}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-600">当前产品已完成连接配置；同步流程不会读取或展示明文凭据。</p>
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-zinc-200 bg-white p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">2</span>
+                    <h4 className="text-sm font-semibold text-zinc-900">Runtime v2 Bridge 状态</h4>
+                  </div>
+                  {bridgeStatusError ? (
+                    <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-xs text-red-700">
+                      <div className="flex items-start gap-2"><XCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{bridgeStatusError}</span></div>
+                    </div>
+                  ) : bridgeStatus?.bridge_state === 'linked' ? (
+                    <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-emerald-900"><CheckCircle className="h-4 w-4" />已关联 Runtime v2 同步实例</div>
+                      <dl className="mt-3 space-y-1 text-[11px] text-emerald-800">
+                        <div className="flex gap-2"><dt className="shrink-0 font-medium">instance_id:</dt><dd className="break-all">{valueOrDash(bridgeStatus.instance_id)}</dd></div>
+                        <div className="flex gap-2"><dt className="shrink-0 font-medium">package_id:</dt><dd className="break-all">{valueOrDash(bridgeStatus.package_id)}</dd></div>
+                        <div className="flex gap-2"><dt className="shrink-0 font-medium">credential_profile_id:</dt><dd className="break-all">{valueOrDash(bridgeStatus.credential_profile_id)}</dd></div>
+                      </dl>
+                    </div>
+                  ) : bridgeStatus && ['unlinked', 'bridge_required'].includes(bridgeStatus.bridge_state) ? (
+                    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3">
+                      <p className="text-sm font-medium text-blue-900">尚未关联 Runtime v2 同步实例</p>
+                      <p className="mt-1 text-xs leading-relaxed text-blue-800">当前产品已完成连接配置，但尚未关联 Runtime v2 同步实例。生成同步实例后，才能创建同步配置。</p>
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateDeviceBridge()}
+                        disabled={bridgeCreating || runtimeStatusLoading}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {bridgeCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Server className="h-3.5 w-3.5" />}
+                        生成 Runtime v2 同步实例
+                      </button>
+                    </div>
+                  ) : bridgeStatus?.bridge_state === 'unsupported' ? (
+                    <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-3 text-xs text-amber-800">
+                      <p className="font-medium text-amber-900">当前产品暂不支持 Runtime v2 同步</p>
+                      <p className="mt-1 leading-relaxed">{bridgeStatus.message}</p>
+                    </div>
+                  ) : bridgeStatus ? (
+                    <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-xs text-red-700">
+                      <p className="font-medium">无法确认 Runtime v2 Bridge 状态</p>
+                      <p className="mt-1 leading-relaxed">{bridgeStatus.message}</p>
+                    </div>
+                  ) : !runtimeStatusLoading ? (
+                    <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-xs text-zinc-500">暂无 Runtime v2 Bridge 状态。</div>
+                  ) : null}
+                </section>
+
+                <section className="rounded-xl border border-zinc-200 bg-white p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">3</span>
+                    <h4 className="text-sm font-semibold text-zinc-900">Sync Profile 状态</h4>
+                  </div>
+                  {syncProfileStatusError ? (
+                    <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-xs text-red-700">
+                      <div className="flex items-start gap-2"><XCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{syncProfileStatusError}</span></div>
+                    </div>
+                  ) : syncProfileStatus?.status === 'ready' && syncProfileStatus.existing_sync_profiles.length > 0 ? (
+                    <div className="mt-3 space-y-3">
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-3 text-xs text-emerald-800">
+                        <p className="font-medium text-emerald-900">当前产品已创建同步配置</p>
+                        <p className="mt-1">后续可在“同步与入库”中执行计划、预览和人工确认入库。</p>
+                      </div>
+                      <div className="space-y-2">
+                        {syncProfileStatus.existing_sync_profiles.map((profile) => (
+                          <div key={profile.sync_profile_id} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-xs font-medium text-zinc-900">{profile.display_name}</p>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${profile.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-200 text-zinc-600'}`}>{profile.enabled ? '已启用' : '未启用'}</span>
                             </div>
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] ${statusTone(schedule.status)}`}>
-                                {statusLabel(schedule.status)}
-                              </span>
-                              <select
-                                aria-label={`${capabilityLabel(schedule.capability || '')} 同步频率`}
-                                value={String(schedule.interval_seconds || 3600)}
-                                onChange={(event) => {
-                                  const next = Number(event.target.value);
-                                  if (Number.isFinite(next) && next > 0) {
-                                    void onUpdateScheduleInterval?.(sync.source!, schedule, next);
-                                  }
-                                }}
-                                disabled={!schedule.capability || actionLoading === `frequency:${schedule.id}`}
-                                className="h-7 rounded-md border border-zinc-200 bg-white px-2 text-[11px] text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-                              >
-                                {scheduleIntervalOptions(schedule.interval_seconds).map((seconds) => (
-                                  <option key={seconds} value={seconds}>每 {formatSyncInterval(seconds)}</option>
-                                ))}
-                              </select>
-                              {schedule.status === 'paused' || !schedule.enabled ? (
-                                <button
-                                  type="button"
-                                  onClick={() => onResumeSchedule?.(sync.source!, schedule)}
-                                  disabled={actionLoading === `resume:${schedule.id}`}
-                                  className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-                                >
-                                  {actionLoading === `resume:${schedule.id}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <PlayCircle className="h-3 w-3" />}
-                                  恢复
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => onPauseSchedule?.(sync.source!, schedule)}
-                                  disabled={actionLoading === `pause:${schedule.id}`}
-                                  className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-                                >
-                                  {actionLoading === `pause:${schedule.id}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <PauseCircle className="h-3 w-3" />}
-                                  暂停
-                                </button>
-                              )}
-                            </div>
+                            <dl className="mt-2 space-y-1 text-[11px] text-zinc-600">
+                              <div className="flex gap-2"><dt className="shrink-0 font-medium">sync_profile_id:</dt><dd className="break-all">{profile.sync_profile_id}</dd></div>
+                              <div className="flex gap-2"><dt className="shrink-0 font-medium">capability:</dt><dd>{profile.capability}</dd></div>
+                              <div className="flex gap-2"><dt className="shrink-0 font-medium">mode:</dt><dd>{profile.mode}</dd></div>
+                              <div className="flex gap-2"><dt className="shrink-0 font-medium">enabled:</dt><dd>{String(profile.enabled)}</dd></div>
+                            </dl>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700">
-                        该安全产品已有标准化同步映射，但还没有创建同步调度。点击“启用数据同步”后会为当前设备创建调度。
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-5">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
-                        <Database className="h-4 w-4 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-blue-900">当前产品尚未配置数据同步</p>
-                        <p className="mt-2 text-xs leading-relaxed text-blue-800">
-                          当前产品已完成连接配置，但尚未配置数据同步。<br />
-                          同步能力用于从安全产品拉取告警、资产、漏洞等数据，并在预览和人工确认后入库。
-                        </p>
-                        <p className="mt-2 text-xs leading-relaxed text-blue-700">
-                          当前产品尚未关联 Runtime v2 同步实例，暂不能生成计划、预览或入库。
-                        </p>
-                        <button
-                          type="button"
-                          onClick={onOpenSyncIngest}
-                          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                        >
-                          前往同步与入库
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={onOpenSyncIngest}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                      >
+                        前往同步与入库
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
                     </div>
+                  ) : syncProfileStatus?.status === 'ready' ? (
+                    <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-3">
+                      <p className="text-sm font-medium text-indigo-900">尚未创建同步配置</p>
+                      <p className="mt-1 text-xs leading-relaxed text-indigo-800">当前产品尚未创建同步配置。同步配置用于描述从该产品同步什么数据，例如告警、资产或漏洞。</p>
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateDeviceSyncProfile()}
+                        disabled={syncProfileCreating || runtimeStatusLoading}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {syncProfileCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
+                        创建告警同步配置
+                      </button>
+                    </div>
+                  ) : syncProfileStatus?.status === 'bridge_required' ? (
+                    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-xs text-blue-800">
+                      <p className="font-medium text-blue-900">请先生成 Runtime v2 同步实例</p>
+                      <p className="mt-1 leading-relaxed">完成 Runtime v2 Bridge 后，才能创建 Sync Profile。</p>
+                    </div>
+                  ) : syncProfileStatus?.status === 'unsupported' ? (
+                    <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-3 text-xs text-amber-800">
+                      <p className="font-medium text-amber-900">当前产品暂不支持 Sync Profile</p>
+                      <p className="mt-1 leading-relaxed">{syncProfileStatus.message}</p>
+                    </div>
+                  ) : syncProfileStatus ? (
+                    <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-xs text-red-700">
+                      <p className="font-medium">无法确认 Sync Profile 状态</p>
+                      <p className="mt-1 leading-relaxed">{syncProfileStatus.message}</p>
+                    </div>
+                  ) : !runtimeStatusLoading ? (
+                    <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-xs text-zinc-500">暂无 Sync Profile 状态。</div>
+                  ) : null}
+                </section>
+
+                <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700">4</span>
+                    <h4 className="text-sm font-semibold text-zinc-900">安全边界</h4>
                   </div>
-                )}
+                  <p className="mt-3 text-xs leading-relaxed text-zinc-600">
+                    当前操作只创建 Runtime v2 同步实例和同步配置；不会拉取数据、执行同步、预览或入库，也不会创建告警、事件或处置动作。预览与入库请前往“同步与入库”。
+                  </p>
+                </section>
               </div>
             )}
 
@@ -3329,6 +3452,16 @@ export default function DeviceIntegrationPage() {
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
+  const refreshSyncProfiles = useCallback(async () => {
+    try {
+      const response = await securityAPI.listSyncProfiles();
+      setSyncProfiles(response.data || []);
+      setIntegrationCenterErrors((previous) => ({ ...previous, syncProfiles: null }));
+    } catch {
+      setIntegrationCenterErrors((previous) => ({ ...previous, syncProfiles: '同步策略暂不可用。' }));
+    }
+  }, []);
+
   const handleGenerateSyncPlan = async (profile: SyncProfile) => {
     setSyncPlanLoadingId(profile.sync_profile_id);
     setSyncPlanError(null);
@@ -4012,6 +4145,7 @@ export default function DeviceIntegrationPage() {
               setPanel(null);
               setActiveIntegrationTab('syncIngest');
             }}
+            onSyncProfilesChanged={refreshSyncProfiles}
             onBack={panel.kind === 'add'
               ? () => setPanel({
                   kind: 'wizard',

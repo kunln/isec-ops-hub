@@ -224,6 +224,76 @@ export interface SyncProfile {
 export type SyncProfileCreate = Omit<SyncProfile, 'sync_profile_id' | 'package_id' | 'last_run_id' | 'last_status' | 'last_synced_at' | 'created_at' | 'updated_at'>;
 export type SyncProfileUpdate = Partial<Omit<SyncProfileCreate, 'instance_id'>> & { last_run_id?: string | null; last_status?: string | null; last_synced_at?: string | null };
 
+export interface DeviceBridgeStatus {
+  device_id: string;
+  device_name?: string | null;
+  bridge_state: 'linked' | 'unlinked' | 'bridge_required' | 'unsupported' | 'unknown';
+  package_id?: string | null;
+  instance_id?: string | null;
+  credential_profile_id?: string | null;
+  supported_capabilities: string[];
+  message: string;
+  limitations: string[];
+}
+
+export interface DeviceBridgeResult {
+  status: 'planned' | 'bridged' | 'already_bridged' | 'unsupported' | 'not_found' | 'validation_failed' | 'unsafe';
+  device_id: string;
+  device_name?: string | null;
+  package_id?: string | null;
+  instance_id?: string | null;
+  credential_profile_id?: string | null;
+  supported_capabilities: string[];
+  limitations: string[];
+  errors: string[];
+}
+
+export interface DeviceSyncCapability {
+  capability: string;
+  display_name: string;
+  description?: string | null;
+  supported: boolean;
+  default_mode: string;
+  limitations: string[];
+}
+
+export interface DeviceSyncProfileSummary {
+  sync_profile_id: string;
+  display_name: string;
+  package_id: string;
+  instance_id: string;
+  capability: string;
+  mode: string;
+  enabled: boolean;
+}
+
+export interface DeviceSyncProfileStatus {
+  status: 'ready' | 'not_found' | 'bridge_required' | 'unsupported';
+  device_id: string;
+  device_name?: string | null;
+  bridge_state: string;
+  package_id?: string | null;
+  instance_id?: string | null;
+  supported_capabilities: DeviceSyncCapability[];
+  existing_sync_profiles: DeviceSyncProfileSummary[];
+  message: string;
+  limitations: string[];
+}
+
+export interface DeviceSyncProfileResult {
+  status: 'planned' | 'created' | 'already_exists' | 'not_found' | 'bridge_required' | 'unsupported' | 'validation_failed' | 'unsafe';
+  device_id: string;
+  device_name?: string | null;
+  package_id?: string | null;
+  instance_id?: string | null;
+  credential_profile_id?: string | null;
+  sync_profile_id?: string | null;
+  capability?: string | null;
+  mode?: string | null;
+  limitations: string[];
+  errors: string[];
+}
+
 
 export interface SyncEnginePlanRequest {
   sync_profile_id: string;
@@ -1483,6 +1553,27 @@ export const securityAPI = {
     client.patch<SyncProfile>(`/api/security/integrations/sync-profiles/${id}`, payload),
   deleteSyncProfile: (id: string) =>
     client.delete(`/api/security/integrations/sync-profiles/${id}`),
+  getDeviceBridgeStatus: (deviceId?: string) =>
+    client.get<DeviceBridgeStatus[]>('/api/security/integrations/device-bridge/status', {
+      params: deviceId ? { device_id: deviceId } : undefined,
+    }),
+  confirmDeviceBridge: (deviceId: string) =>
+    client.post<DeviceBridgeResult>('/api/security/integrations/device-bridge/confirm', {
+      device_id: deviceId,
+      confirmed: true,
+    }),
+  getDeviceSyncProfileStatus: (deviceId?: string) =>
+    client.get<DeviceSyncProfileStatus[]>('/api/security/integrations/device-sync-profile/status', {
+      params: deviceId ? { device_id: deviceId } : undefined,
+    }),
+  confirmDeviceSyncProfile: (deviceId: string, capability = 'alert.search') =>
+    client.post<DeviceSyncProfileResult>('/api/security/integrations/device-sync-profile/confirm', {
+      device_id: deviceId,
+      capability,
+      confirmed: true,
+      mode: 'manual',
+      params: {},
+    }),
   planSyncEngine: (payload: SyncEnginePlanRequest) =>
     client.post<SyncEnginePlanResult>('/api/security/integrations/sync-engine/plan', {
       ...payload,
