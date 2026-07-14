@@ -560,8 +560,8 @@ function unavailableSyncBinding(): DeviceSyncBinding {
   return {
     source: null,
     state: 'unavailable',
-    label: '暂无同步映射',
-    message: '当前设备包暂未提供标准化数据同步映射。',
+    label: '同步未配置',
+    message: '当前产品尚未关联 Runtime v2 同步实例。',
     capabilities: [],
   };
 }
@@ -832,8 +832,8 @@ function buildDeviceSyncBinding(
     return {
       source: null,
       state: 'unavailable',
-      label: '暂无同步映射',
-      message: '当前设备包暂未提供标准化数据同步映射。',
+      label: '同步未配置',
+      message: '当前产品尚未关联 Runtime v2 同步实例。',
       capabilities: [],
     };
   }
@@ -1172,6 +1172,9 @@ function ActiveCard({ device, vendorKey, sync, selected, onClick }: {
             </span>
             <span className={`rounded-full border px-2 py-0.5 text-[10px] ${statusTone(syncStatus)}`}>
               同步 {statusLabel(syncStatus)}
+            </span>
+            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700">
+              凭据安全保存
             </span>
             {vendor && (
               <>
@@ -1978,6 +1981,7 @@ function DeviceConfigPanel({
   onResumeSchedule,
   onUpdateScheduleInterval,
   onUpdateSyncCredentials,
+  onOpenSyncIngest,
 }: {
   device?: DeviceIntegration;
   template?: APIServiceSummary;
@@ -2002,6 +2006,7 @@ function DeviceConfigPanel({
   onResumeSchedule?: (source: SecurityConnectorCustomerDataSource, schedule: SecurityConnectorCustomerSchedule) => Promise<void>;
   onUpdateScheduleInterval?: (source: SecurityConnectorCustomerDataSource, schedule: SecurityConnectorCustomerSchedule, intervalSeconds: number) => Promise<void>;
   onUpdateSyncCredentials?: (source: SecurityConnectorCustomerDataSource) => void;
+  onOpenSyncIngest?: () => void;
 }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -2551,12 +2556,30 @@ function DeviceConfigPanel({
                     )}
                   </>
                 ) : (
-                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-center">
-                    <Database className="mx-auto h-7 w-7 text-zinc-300" />
-                    <p className="mt-3 text-sm font-semibold text-zinc-700">当前设备暂未提供数据同步</p>
-                    <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-400">
-                      设备 API 和工具调用仍可使用；要进入统一资产、告警、风险分析，需要为该产品补充 connector manifest、adapter 和字段 mapping。
-                    </p>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
+                        <Database className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-blue-900">当前产品尚未配置数据同步</p>
+                        <p className="mt-2 text-xs leading-relaxed text-blue-800">
+                          当前产品已完成连接配置，但尚未配置数据同步。<br />
+                          同步能力用于从安全产品拉取告警、资产、漏洞等数据，并在预览和人工确认后入库。
+                        </p>
+                        <p className="mt-2 text-xs leading-relaxed text-blue-700">
+                          当前产品尚未关联 Runtime v2 同步实例，暂不能生成计划、预览或入库。
+                        </p>
+                        <button
+                          type="button"
+                          onClick={onOpenSyncIngest}
+                          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                        >
+                          前往同步与入库
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2996,14 +3019,33 @@ function SyncIngestResultCard({ result, onClose }: { result: ManualSyncIngestRes
   );
 }
 
-function SyncSetupSection({ profiles, error }: { profiles: SyncProfile[]; error?: string | null }) {
+function SyncSetupSection({ profiles, error, onReturnIntegrations }: { profiles: SyncProfile[]; error?: string | null; onReturnIntegrations: () => void }) {
   return (
-    <SectionCard title="同步配置 / Sync Profiles" subtitle="从哪个产品同步什么数据；配置本身不会执行同步。" count={error ? '-' : profiles.length}>
+    <SectionCard title="同步配置 / Sync Configurations" subtitle="从哪个产品同步什么数据；配置本身不会执行同步。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
       <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-        同步策略用于描述：从哪个集成实例、同步哪类数据、采用什么模式。配置本身不会执行同步。
+        同步配置用于描述从哪个产品同步什么数据，例如告警、资产或漏洞。配置本身不会执行同步。
       </div>
-      {profiles.length === 0 ? <EmptyState text="还没有同步策略。需要先创建集成实例，再配置同步策略。当前 UI 创建入口后续完善，可先通过 API 创建测试策略。" /> : (
+      {profiles.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
+          <h4 className="text-sm font-semibold text-zinc-800">还没有同步配置</h4>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+            请先在「产品接入」中添加产品并完成连接配置，然后为产品创建同步配置。<br />
+            同步配置用于描述从哪个产品同步什么数据，例如告警、资产或漏洞。
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+            当前界面暂未开放同步配置创建，可通过 Runtime v2 API 创建测试策略。后续将支持从已接入产品自动生成同步配置。
+          </p>
+          <button
+            type="button"
+            onClick={onReturnIntegrations}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            返回产品接入
+          </button>
+        </div>
+      ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {profiles.map((p) => (
             <div key={p.sync_profile_id} className="rounded-2xl border border-zinc-200 bg-white p-4 text-xs text-zinc-700 shadow-sm">
@@ -3156,13 +3198,9 @@ const INTEGRATION_CENTER_TABS: Array<{ id: IntegrationCenterTab; label: string; 
 
 function IntegrationFlowHint() {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-500 shadow-sm">
+    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-600 shadow-sm">
       <span className="font-medium text-zinc-700">接入流程：</span>
-      <span>添加产品</span><ChevronRight className="h-3 w-3 text-zinc-300" />
-      <span>测试连接</span><ChevronRight className="h-3 w-3 text-zinc-300" />
-      <span>配置同步</span><ChevronRight className="h-3 w-3 text-zinc-300" />
-      <span>预览数据</span><ChevronRight className="h-3 w-3 text-zinc-300" />
-      <span>确认入库</span>
+      添加产品 → 测试连接 → 配置同步 → 预览数据 → 确认入库
     </div>
   );
 }
@@ -3862,10 +3900,14 @@ export default function DeviceIntegrationPage() {
             {activeIntegrationTab === 'syncIngest' && (
               <div className="space-y-6">
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-                  <h2 className="text-sm font-semibold text-indigo-900">高级同步与入库</h2>
-                  <p className="mt-1 text-xs text-indigo-700">用于测试 Integration Runtime v2 的同步计划、预览和人工确认入库能力。一般添加产品请从产品接入开始。</p>
+                  <h2 className="text-sm font-semibold text-indigo-900">同步与入库 / Sync & Ingest</h2>
+                  <p className="mt-1 text-xs text-indigo-700">同步与入库用于统一管理各安全产品的数据同步策略、预览结果和人工确认入库。</p>
                 </div>
-                <SyncSetupSection profiles={syncProfiles} error={integrationCenterErrors.syncProfiles} />
+                <SyncSetupSection
+                  profiles={syncProfiles}
+                  error={integrationCenterErrors.syncProfiles}
+                  onReturnIntegrations={() => setActiveIntegrationTab('integrations')}
+                />
                 <PreviewIngestSection
                   profiles={syncProfiles}
                   error={integrationCenterErrors.syncProfiles}
@@ -3966,6 +4008,10 @@ export default function DeviceIntegrationPage() {
             onResumeSchedule={handleResumeSchedule}
             onUpdateScheduleInterval={handleUpdateScheduleInterval}
             onUpdateSyncCredentials={setCredentialSource}
+            onOpenSyncIngest={() => {
+              setPanel(null);
+              setActiveIntegrationTab('syncIngest');
+            }}
             onBack={panel.kind === 'add'
               ? () => setPanel({
                   kind: 'wizard',
