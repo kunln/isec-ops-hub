@@ -2932,6 +2932,86 @@ function valueOrDash(value?: string | number | boolean | null) {
   return String(value);
 }
 
+function syncProfileMetadataValue(profile: SyncProfile, key: string) {
+  const value = profile.metadata?.[key];
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return null;
+}
+
+function isDeviceSyncProfile(profile: SyncProfile) {
+  return syncProfileMetadataValue(profile, 'source') === 'device_sync_profile';
+}
+
+function syncProfileTimestamp(profile: SyncProfile) {
+  const value = profile.updated_at || profile.created_at;
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function choosePreferredSyncProfile(
+  profiles: SyncProfile[],
+  currentId?: string | null,
+  focusedDeviceId?: string | null,
+): string | null {
+  if (profiles.length === 0) return null;
+
+  const focusedProfiles = focusedDeviceId
+    ? profiles.filter((profile) => syncProfileMetadataValue(profile, 'device_id') === focusedDeviceId)
+    : [];
+  const candidates = focusedProfiles.length > 0 ? focusedProfiles : profiles;
+
+  if (currentId && candidates.some((profile) => profile.sync_profile_id === currentId)) return currentId;
+  if (candidates.length === 1) return candidates[0].sync_profile_id;
+
+  const originalOrder = new Map(profiles.map((profile, index) => [profile.sync_profile_id, index]));
+  const sorted = [...candidates].sort((left, right) => {
+    const sourceDifference = Number(isDeviceSyncProfile(right)) - Number(isDeviceSyncProfile(left));
+    if (sourceDifference !== 0) return sourceDifference;
+
+    const enabledDifference = Number(right.enabled) - Number(left.enabled);
+    if (enabledDifference !== 0) return enabledDifference;
+
+    const pendingDifference = Number(right.last_status !== 'ingested') - Number(left.last_status !== 'ingested');
+    if (pendingDifference !== 0) return pendingDifference;
+
+    const updatedDifference = syncProfileTimestamp(right) - syncProfileTimestamp(left);
+    if (updatedDifference !== 0) return updatedDifference;
+
+    return (originalOrder.get(left.sync_profile_id) || 0) - (originalOrder.get(right.sync_profile_id) || 0);
+  });
+
+  return sorted[0]?.sync_profile_id || profiles[0].sync_profile_id;
+}
+
+function syncProfileStatusPresentation(status?: string | null) {
+  const normalized = status?.trim() || '';
+  const presentations: Record<string, { label: string; className: string }> = {
+    planned: { label: '已生成计划', className: 'bg-blue-50 text-blue-700' },
+    previewed: { label: '已预览', className: 'bg-sky-50 text-sky-700' },
+    ingested: { label: '已入库', className: 'bg-emerald-50 text-emerald-700' },
+    failed: { label: '失败', className: 'bg-rose-50 text-rose-700' },
+    validation_failed: { label: '校验失败', className: 'bg-rose-50 text-rose-700' },
+    confirmation_required: { label: '等待人工确认', className: 'bg-amber-50 text-amber-700' },
+  };
+  return presentations[normalized] || {
+    label: normalized || '尚未运行',
+    className: 'bg-zinc-100 text-zinc-600',
+  };
+}
+
+function syncProfileCapabilityLabel(capability: string) {
+  return capability === 'alert.search' ? '告警同步 alert.search' : capability;
+}
+
+function syncProfileModeLabel(mode: string) {
+  return mode === 'manual' ? '手动 manual' : mode;
+}
+
+function shortIdentifier(value: string) {
+  if (value.length <= 26) return value;
+  return `${value.slice(0, 12)}…${value.slice(-8)}`;
+}
+
 function SectionCard({
   title,
   subtitle,
@@ -3151,13 +3231,9 @@ function SyncSetupSection({ profiles, error, onReturnIntegrations }: { profiles:
       </div>
       {profiles.length === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
-          <h4 className="text-sm font-semibold text-zinc-800">还没有同步配置</h4>
+          <h4 className="text-sm font-semibold text-zinc-800">暂无同步配置</h4>
           <p className="mt-2 text-xs leading-relaxed text-zinc-600">
-            请先在「产品接入」中添加产品并完成连接配置，然后为产品创建同步配置。<br />
-            同步配置用于描述从哪个产品同步什么数据，例如告警、资产或漏洞。
-          </p>
-          <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-            当前界面暂未开放同步配置创建，可通过 Runtime v2 API 创建测试策略。后续将支持从已接入产品自动生成同步配置。
+            请先在“产品接入”中打开某个产品详情页，在“同步”Tab 中生成 Runtime v2 同步实例并创建同步配置。
           </p>
           <button
             type="button"
@@ -3209,6 +3285,8 @@ function SyncSetupSection({ profiles, error, onReturnIntegrations }: { profiles:
 function PreviewIngestSection({
   profiles,
   error,
+  selectedSyncProfileId,
+  profilesRefreshing,
   syncPlanLoadingId,
   syncPlanResult,
   syncPlanError,
@@ -3218,6 +3296,9 @@ function PreviewIngestSection({
   syncIngestLoadingId,
   syncIngestResult,
   syncIngestError,
+  onSelectProfile,
+  onRefreshProfiles,
+  onReturnIntegrations,
   onGeneratePlan,
   onClearPlanResult,
   onPreviewSync,
@@ -3227,6 +3308,8 @@ function PreviewIngestSection({
 }: {
   profiles: SyncProfile[];
   error?: string | null;
+  selectedSyncProfileId: string | null;
+  profilesRefreshing: boolean;
   syncPlanLoadingId: string | null;
   syncPlanResult: SyncEnginePlanResult | null;
   syncPlanError: string | null;
@@ -3236,6 +3319,9 @@ function PreviewIngestSection({
   syncIngestLoadingId: string | null;
   syncIngestResult: ManualSyncIngestResult | null;
   syncIngestError: string | null;
+  onSelectProfile: (syncProfileId: string) => void;
+  onRefreshProfiles: () => void;
+  onReturnIntegrations: () => void;
   onGeneratePlan: (profile: SyncProfile) => void;
   onClearPlanResult: () => void;
   onPreviewSync: (profile: SyncProfile) => void;
@@ -3243,50 +3329,155 @@ function PreviewIngestSection({
   onConfirmIngest: (profile: SyncProfile) => void;
   onClearIngestResult: () => void;
 }) {
+  const selectedProfile = profiles.find((profile) => profile.sync_profile_id === selectedSyncProfileId) || null;
+  const hasPlanForSelected = Boolean(selectedProfile && syncPlanResult?.sync_profile_id === selectedProfile.sync_profile_id);
+  const planResultForSelected = hasPlanForSelected ? syncPlanResult : null;
+  const previewResultForSelected = selectedProfile && syncPreviewResult?.sync_profile_id === selectedProfile.sync_profile_id
+    ? syncPreviewResult
+    : null;
+  const ingestResultForSelected = selectedProfile && syncIngestResult?.sync_profile_id === selectedProfile.sync_profile_id
+    ? syncIngestResult
+    : null;
+
   return (
-    <SectionCard title="预览与入库" subtitle="按生成计划、预览结果、人工确认入库三步安全接入数据。" count={error ? '-' : profiles.length}>
+    <SectionCard title="选择同步配置" subtitle="选择一个 Sync Profile，再按三步人工流程安全接入数据。" count={error ? '-' : profiles.length}>
       <LoadHint error={error} />
-      <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-800">
-        我现在能不能安全地把数据接进来？先生成计划，再预览结果；只有点击确认入库并完成二次确认后，才会创建 Evidence/Alert，不创建 Case/Incident，不执行处置。
-      </div>
-      {syncPlanError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPlanError}</div>}
-      {syncPreviewError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPreviewError}</div>}
-      {syncIngestError && <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncIngestError}</div>}
-      {syncPlanResult && <SyncPlanResultCard result={syncPlanResult} onClose={onClearPlanResult} />}
-      {syncPreviewResult && <SyncPreviewResultCard result={syncPreviewResult} onClose={onClearPreviewResult} />}
-      {syncIngestResult && <SyncIngestResultCard result={syncIngestResult} onClose={onClearIngestResult} />}
-      {profiles.length === 0 ? <EmptyState text="还没有同步策略。同步策略用于描述从哪个实例同步哪类数据；创建策略后才能生成计划、预览结果并确认入库。" /> : (
-        <div className="space-y-4">
+      {profiles.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
+          <h4 className="text-sm font-semibold text-zinc-800">暂无同步配置</h4>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+            请先在“产品接入”中打开某个产品详情页，在“同步”Tab 中生成 Runtime v2 同步实例并创建同步配置。
+          </p>
+          <button
+            type="button"
+            onClick={onReturnIntegrations}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            返回产品接入
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-zinc-500">
+              {selectedProfile ? <>当前选中：<span className="font-medium text-zinc-800">{selectedProfile.display_name}</span></> : '请选择一个同步配置'}
+            </div>
+            <button
+              type="button"
+              onClick={onRefreshProfiles}
+              disabled={profilesRefreshing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${profilesRefreshing ? 'animate-spin' : ''}`} />
+              刷新
+            </button>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
           {profiles.map((p) => (
-            <div key={p.sync_profile_id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <SyncProfileSelectionCard
+              key={p.sync_profile_id}
+              profile={p}
+              selected={p.sync_profile_id === selectedSyncProfileId}
+              onSelect={() => onSelectProfile(p.sync_profile_id)}
+            />
+          ))}
+          </div>
+
+          {!selectedProfile ? (
+            <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-500">请选择一个同步配置。</div>
+          ) : (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <div className="text-sm font-semibold text-zinc-900">{p.display_name}</div>
-                  <div className="mt-1 text-xs text-zinc-500">产品 {p.package_id} · 能力 {p.capability} · 实例 {p.instance_id}</div>
+                  <div className="text-sm font-semibold text-zinc-900">三步人工同步</div>
+                  <div className="mt-1 text-xs text-zinc-500">{selectedProfile.display_name} · {syncProfileCapabilityLabel(selectedProfile.capability)}</div>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] ${p.enabled ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-500'}`}>当前策略 {p.enabled ? 'enabled' : 'disabled'}</span>
-              </div>
-              <div className="mt-3 grid gap-2 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-600 md:grid-cols-3">
-                <div>最近状态：{p.last_status}</div>
-                <div>最近运行：{valueOrDash(p.last_run_id)}</div>
-                <div>最近同步：{valueOrDash(p.last_synced_at)}</div>
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">人工操作</span>
               </div>
               <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                <ActionStep number="1" title="生成计划" description="只验证执行计划，不取数、不入库">
-                  <button type="button" onClick={() => onGeneratePlan(p)} disabled={syncPlanLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPlanLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划</button>
+                <ActionStep number="1" title="生成计划" description="只生成本次同步计划，不拉取数据，不入库。">
+                  <button type="button" onClick={() => onGeneratePlan(selectedProfile)} disabled={syncPlanLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPlanLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Generate Plan / 生成计划</button>
                 </ActionStep>
-                <ActionStep number="2" title="预览结果" description="只预览会产生的数据，不创建 Evidence/Alert">
-                  <button type="button" onClick={() => onPreviewSync(p)} disabled={syncPreviewLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPreviewLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步</button>
+                <ActionStep number="2" title="预览数据" description={hasPlanForSelected ? '只预览适配器返回的标准化事件，不创建告警或事件。' : '尚未生成计划；仍可预览，但建议先生成计划。预览不会创建告警或事件。'}>
+                  <button type="button" onClick={() => onPreviewSync(selectedProfile)} disabled={syncPreviewLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPreviewLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步</button>
                 </ActionStep>
-                <ActionStep number="3" title="确认入库" description="二次确认后创建 Evidence/Alert，不创建 Case/Incident，不处置">
-                  <button type="button" onClick={() => onConfirmIngest(p)} disabled={syncIngestLoadingId === p.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">{syncIngestLoadingId === p.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Confirm Ingest / 确认入库</button>
+                <ActionStep number="3" title="人工确认入库" description="人工确认后才写入标准对象；不会创建 Incident 或执行自动处置。">
+                  <button type="button" onClick={() => onConfirmIngest(selectedProfile)} disabled={syncIngestLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">{syncIngestLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Confirm Ingest / 确认入库</button>
                 </ActionStep>
               </div>
+
+              {syncPlanError && <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPlanError}</div>}
+              {syncPreviewError && <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncPreviewError}</div>}
+              {syncIngestError && <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{syncIngestError}</div>}
+              {planResultForSelected && <SyncPlanResultCard result={planResultForSelected} onClose={onClearPlanResult} />}
+              {previewResultForSelected && <SyncPreviewResultCard result={previewResultForSelected} onClose={onClearPreviewResult} />}
+              {ingestResultForSelected && <SyncIngestResultCard result={ingestResultForSelected} onClose={onClearIngestResult} />}
             </div>
-          ))}
+
+          )}
+
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+            当前页面执行的是 Runtime v2 人工同步链路：生成计划、预览数据、人工确认入库。系统不会自动拉取数据、不会自动创建事件、不会自动处置风险。
+          </div>
         </div>
       )}
     </SectionCard>
+  );
+}
+
+function SyncProfileSelectionCard({ profile, selected, onSelect }: { profile: SyncProfile; selected: boolean; onSelect: () => void }) {
+  const status = syncProfileStatusPresentation(profile.last_status);
+  const fromDevice = isDeviceSyncProfile(profile);
+  const deviceName = syncProfileMetadataValue(profile, 'device_name');
+  const deviceId = syncProfileMetadataValue(profile, 'device_id');
+  const source = syncProfileMetadataValue(profile, 'source');
+  const bridgeSource = syncProfileMetadataValue(profile, 'bridge_source');
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`rounded-2xl border p-4 text-left shadow-sm transition-colors ${selected ? 'border-blue-300 bg-blue-50/50 ring-1 ring-blue-200' : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/60'}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold text-zinc-900">{profile.display_name}</span>
+            {selected && <CheckCircle className="h-4 w-4 shrink-0 text-blue-600" />}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${fromDevice ? 'bg-indigo-50 text-indigo-700' : 'bg-zinc-100 text-zinc-600'}`}>{fromDevice ? '来自产品接入' : 'Runtime v2'}</span>
+            {bridgeSource === 'device_integration_bridge' && <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">Runtime Bridge</span>}
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${status.className}`}>{status.label}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${profile.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>{profile.enabled ? '已启用' : '未启用'}</span>
+          </div>
+        </div>
+      </div>
+
+      {fromDevice && (
+        <div className="mt-3 rounded-xl border border-indigo-100 bg-white/80 p-3 text-xs text-zinc-700">
+          <div className="font-medium text-zinc-900">来源产品：{deviceName || '未命名产品'}</div>
+          <div className="mt-1 break-all text-zinc-500">产品 ID：{deviceId || '-'}</div>
+        </div>
+      )}
+
+      <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-zinc-600 sm:grid-cols-2">
+        <div><span className="text-zinc-400">同步能力：</span>{syncProfileCapabilityLabel(profile.capability)}</div>
+        <div><span className="text-zinc-400">模式：</span>{syncProfileModeLabel(profile.mode)}</div>
+        <div className="break-all"><span className="text-zinc-400">package_id：</span>{profile.package_id}</div>
+        <div className="break-all"><span className="text-zinc-400">instance_id：</span>{profile.instance_id}</div>
+        <div title={profile.sync_profile_id}><span className="text-zinc-400">sync_profile_id：</span>{shortIdentifier(profile.sync_profile_id)}</div>
+        <div title={profile.last_run_id || undefined}><span className="text-zinc-400">last_run_id：</span>{profile.last_run_id ? shortIdentifier(profile.last_run_id) : '-'}</div>
+        <div><span className="text-zinc-400">最近同步：</span>{valueOrDash(profile.last_synced_at)}</div>
+        <div><span className="text-zinc-400">创建时间：</span>{valueOrDash(profile.created_at)}</div>
+        {source && <div><span className="text-zinc-400">metadata.source：</span>{source}</div>}
+        {bridgeSource && <div><span className="text-zinc-400">bridge_source：</span>{bridgeSource}</div>}
+        <div className="sm:col-span-2"><span className="text-zinc-400">更新时间：</span>{valueOrDash(profile.updated_at)}</div>
+      </div>
+    </button>
   );
 }
 
@@ -3374,6 +3565,9 @@ export default function DeviceIntegrationPage() {
   const [integrationInstances, setIntegrationInstances] = useState<IntegrationInstance[]>([]);
   const [credentialProfiles, setCredentialProfiles] = useState<CredentialProfile[]>([]);
   const [syncProfiles, setSyncProfiles] = useState<SyncProfile[]>([]);
+  const [selectedSyncProfileId, setSelectedSyncProfileId] = useState<string | null>(null);
+  const [focusedSyncDeviceId, setFocusedSyncDeviceId] = useState<string | null>(null);
+  const [syncProfilesRefreshing, setSyncProfilesRefreshing] = useState(false);
   const [integrationRuns, setIntegrationRuns] = useState<IntegrationRun[]>([]);
   const [integrationCenterErrors, setIntegrationCenterErrors] = useState<Record<string, string | null>>({});
   const [syncPlanLoadingId, setSyncPlanLoadingId] = useState<string | null>(null);
@@ -3453,14 +3647,34 @@ export default function DeviceIntegrationPage() {
   useEffect(() => { void fetchData(); }, [fetchData]);
 
   const refreshSyncProfiles = useCallback(async () => {
+    setSyncProfilesRefreshing(true);
     try {
       const response = await securityAPI.listSyncProfiles();
       setSyncProfiles(response.data || []);
       setIntegrationCenterErrors((previous) => ({ ...previous, syncProfiles: null }));
     } catch {
       setIntegrationCenterErrors((previous) => ({ ...previous, syncProfiles: '同步策略暂不可用。' }));
+    } finally {
+      setSyncProfilesRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (activeIntegrationTab === 'syncIngest') void refreshSyncProfiles();
+  }, [activeIntegrationTab, refreshSyncProfiles]);
+
+  useEffect(() => {
+    if (activeIntegrationTab !== 'syncIngest') return;
+    const preferredId = choosePreferredSyncProfile(syncProfiles, selectedSyncProfileId, focusedSyncDeviceId);
+    if (preferredId !== selectedSyncProfileId) setSelectedSyncProfileId(preferredId);
+
+    if (focusedSyncDeviceId && preferredId) {
+      const preferredProfile = syncProfiles.find((profile) => profile.sync_profile_id === preferredId);
+      if (preferredProfile && syncProfileMetadataValue(preferredProfile, 'device_id') === focusedSyncDeviceId) {
+        setFocusedSyncDeviceId(null);
+      }
+    }
+  }, [activeIntegrationTab, focusedSyncDeviceId, selectedSyncProfileId, syncProfiles]);
 
   const handleGenerateSyncPlan = async (profile: SyncProfile) => {
     setSyncPlanLoadingId(profile.sync_profile_id);
@@ -4034,7 +4248,7 @@ export default function DeviceIntegrationPage() {
               <div className="space-y-6">
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
                   <h2 className="text-sm font-semibold text-indigo-900">同步与入库 / Sync & Ingest</h2>
-                  <p className="mt-1 text-xs text-indigo-700">同步与入库用于统一管理各安全产品的数据同步策略、预览结果和人工确认入库。</p>
+                  <p className="mt-1 text-xs leading-relaxed text-indigo-700">选择一个同步配置，先生成计划，再预览数据，最后由人工确认入库。当前流程不会自动创建事件或执行处置动作。</p>
                 </div>
                 <SyncSetupSection
                   profiles={syncProfiles}
@@ -4044,6 +4258,8 @@ export default function DeviceIntegrationPage() {
                 <PreviewIngestSection
                   profiles={syncProfiles}
                   error={integrationCenterErrors.syncProfiles}
+                  selectedSyncProfileId={selectedSyncProfileId}
+                  profilesRefreshing={syncProfilesRefreshing}
                   syncPlanLoadingId={syncPlanLoadingId}
                   syncPlanResult={syncPlanResult}
                   syncPlanError={syncPlanError}
@@ -4053,6 +4269,12 @@ export default function DeviceIntegrationPage() {
                   syncIngestLoadingId={syncIngestLoadingId}
                   syncIngestResult={syncIngestResult}
                   syncIngestError={syncIngestError}
+                  onSelectProfile={(syncProfileId) => {
+                    setFocusedSyncDeviceId(null);
+                    setSelectedSyncProfileId(syncProfileId);
+                  }}
+                  onRefreshProfiles={() => void refreshSyncProfiles()}
+                  onReturnIntegrations={() => setActiveIntegrationTab('integrations')}
                   onGeneratePlan={(profile) => void handleGenerateSyncPlan(profile)}
                   onClearPlanResult={() => setSyncPlanResult(null)}
                   onPreviewSync={(profile) => void handlePreviewSync(profile)}
@@ -4121,6 +4343,7 @@ export default function DeviceIntegrationPage() {
         const panelVendorKey = panel.kind === 'edit'
           ? vendorOf(panel.device)
           : panel.template.vendor;
+        const panelDeviceId = panel.kind === 'edit' ? panel.device.id : null;
         return (
           <DeviceConfigPanel
             key={panel.kind === 'edit' ? panel.device.id : panel.template.id}
@@ -4142,6 +4365,8 @@ export default function DeviceIntegrationPage() {
             onUpdateScheduleInterval={handleUpdateScheduleInterval}
             onUpdateSyncCredentials={setCredentialSource}
             onOpenSyncIngest={() => {
+              setFocusedSyncDeviceId(panelDeviceId);
+              setSelectedSyncProfileId(null);
               setPanel(null);
               setActiveIntegrationTab('syncIngest');
             }}
