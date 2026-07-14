@@ -195,6 +195,14 @@ safe Runtime v2 reference creation:
   Evidence, Alert, Analysis Case, Incident, Notification, or remediation.
 - Preview and explicit Confirm Ingest remain later, separate Runtime actions.
 
+### Scheduled Sync Skeleton Notes
+
+- The scheduled sync skeleton only evaluates Sync Profile due status and creates plan-only output.
+- It adds no worker, background loop, timer, or automatic scheduled execution.
+- It does not execute an Adapter or Connector, call a vendor API, resolve credentials, preview data, or ingest data.
+- It does not update cursors or Sync Profile run state and creates no Evidence, Alert, Analysis Case, Incident, notification, or remediation.
+- Scheduled execution remains future Integration Runtime work and requires a separate architecture review.
+
 ## 8. Prohibited Design and Behavior
 
 - The Analysis Layer must not call vendor APIs directly; it consumes Evidence and Facts with source references.

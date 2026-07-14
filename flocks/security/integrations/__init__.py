@@ -62,6 +62,15 @@ from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileC
 from flocks.security.integrations.sync_engine import SyncEnginePlanRequest, SyncEnginePlanResult, plan_sync_profile_run
 from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, ManualSyncPreviewResult, preview_sync_profile_run
 from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ManualSyncIngestResult, ingest_sync_profile_run
+from flocks.security.integrations.scheduled_sync import (
+    ScheduledSyncPlanRequest,
+    ScheduledSyncPlanResult,
+    ScheduledSyncStatus,
+    evaluate_scheduled_sync_status,
+    list_due_scheduled_sync,
+    list_scheduled_sync_status,
+    plan_scheduled_sync,
+)
 from flocks.security.integrations.instances import (
     IntegrationInstance,
     IntegrationInstanceCreate,
@@ -161,6 +170,13 @@ __all__ = [
     "ManualSyncIngestRequest",
     "ManualSyncIngestResult",
     "ingest_sync_profile_run",
+    "ScheduledSyncPlanRequest",
+    "ScheduledSyncPlanResult",
+    "ScheduledSyncStatus",
+    "evaluate_scheduled_sync_status",
+    "list_due_scheduled_sync",
+    "list_scheduled_sync_status",
+    "plan_scheduled_sync",
     "IntegrationInstance",
     "IntegrationInstanceCreate",
     "IntegrationInstanceUpdate",

@@ -1,7 +1,7 @@
 """Sync Profile metadata store.
 
 The store persists synchronization metadata, parameters, cursor references, and
-schedule strings only. It never executes sync, calls connectors, performs HTTP,
+schedule metadata only. It never executes sync, calls connectors, performs HTTP,
 reads Credential Profiles or secret refs, dispatches evidence, or creates
 Security objects.
 """
