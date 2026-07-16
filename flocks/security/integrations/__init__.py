@@ -15,6 +15,14 @@ from flocks.security.integrations.adapter_registry import (
     AdapterRegistryEntry,
     create_default_adapter_registry,
     default_adapter_registry,
+    register_device_runtime_adapters,
+)
+from flocks.security.integrations.device_runtime_adapter import DeviceIntegrationRuntimeAdapter
+from flocks.security.integrations.preview_batch_store import (
+    PreviewBatch,
+    PreviewBatchError,
+    PreviewBatchStore,
+    default_preview_batch_store,
 )
 from flocks.security.integrations.builtin import get_builtin_integration_packages
 from flocks.security.integrations.builtin_mappings import MINGYU_RISK_MAPPING, TDA_ALERT_MAPPING
@@ -123,6 +131,12 @@ __all__ = [
     "AdapterRegistry",
     "default_adapter_registry",
     "create_default_adapter_registry",
+    "register_device_runtime_adapters",
+    "DeviceIntegrationRuntimeAdapter",
+    "PreviewBatch",
+    "PreviewBatchError",
+    "PreviewBatchStore",
+    "default_preview_batch_store",
     "EvidenceEventMappingResult",
     "MappingRule",
     "MINGYU_RISK_MAPPING",

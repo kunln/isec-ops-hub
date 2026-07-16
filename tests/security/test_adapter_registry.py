@@ -223,10 +223,11 @@ def test_create_default_adapter_registry_include_fake_contains_fake_adapter() ->
     assert adapter.package_id == "fake.integration"
 
 
-def test_create_default_adapter_registry_include_fake_false_is_empty() -> None:
+def test_create_default_adapter_registry_include_fake_false_keeps_real_device_adapter() -> None:
     registry = create_default_adapter_registry(include_fake=False)
 
-    assert registry.list_adapters() == []
+    assert registry.has_adapter("fake.integration", "alert.search") is False
+    assert registry.has_adapter("asiainfo.tda", "alert.search") is True
 
 
 def test_init_exports_preserve_existing_adapter_sync_runtime_dispatcher_mapping_manifest_symbols() -> None:

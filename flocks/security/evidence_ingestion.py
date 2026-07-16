@@ -55,6 +55,15 @@ def _first_text(*values: Any) -> str | None:
     return None
 
 
+def _first_reference(*values: Any) -> str | None:
+    for value in values:
+        candidates = value if isinstance(value, list) else [value]
+        for candidate in candidates:
+            if candidate not in (None, "", [], {}):
+                return str(candidate)
+    return None
+
+
 def _severity(value: Any) -> str:
     text = str(value or "medium").lower()
     aliases = {"informational": "info", "warning": "medium", "warn": "medium"}
@@ -90,7 +99,8 @@ def summarize_external_event(event: dict[str, Any], *, connector_context: dict |
     """Return a compact evidence summary without embedding the full raw event."""
     context = connector_context or {}
     connector_id = _first_text(context.get("connector_id"), event.get("connector_id"), "external")
-    source_type = _first_text(context.get("source_type"), event.get("source_type"), event.get("source"), "other")
+    evidence_source_type = _first_text(context.get("source_type"), event.get("source_type"), event.get("source"), "other")
+    alert_source = _first_text(context.get("alert_source"), event.get("source"), evidence_source_type, "other")
     external_event_id = _first_text(event.get("external_event_id"), event.get("event_id"), event.get("id"))
     external_base_url = _first_text(context.get("external_base_url"))
     external_url = _first_text(event.get("external_url"), event.get("url_external"))
@@ -99,35 +109,39 @@ def summarize_external_event(event: dict[str, Any], *, connector_context: dict |
 
     title = _first_text(event.get("title"), event.get("name"), event.get("signature"), event.get("rule"), "External security event") or "External security event"
     description = _first_text(event.get("description"), event.get("message"), event.get("summary"), title) or title
-    payload_hash = hashlib.sha256(_stable_json(event).encode("utf-8")).hexdigest()
-    key_fields = _key_fields(event)
+    supplied_payload_hash = _first_text(event.get("payload_hash"))
+    payload_hash = supplied_payload_hash or hashlib.sha256(_stable_json(event).encode("utf-8")).hexdigest()
+    supplied_key_fields = event.get("key_fields")
+    key_fields = _truncate(supplied_key_fields) if isinstance(supplied_key_fields, dict) else _key_fields(event)
     occurred_at = _first_text(event.get("occurred_at"), event.get("timestamp"), event.get("time"), event.get("created_at"))
     time_range_start = _first_text(event.get("time_range_start"), event.get("start_time"), occurred_at)
     time_range_end = _first_text(event.get("time_range_end"), event.get("end_time"), occurred_at)
     query_hint = _first_text(event.get("query_hint"), f"connector_id={connector_id} external_event_id={external_event_id or payload_hash}")
-    ioc = _first_text(event.get("ioc"), event.get("src_ip"), event.get("source_ip"), event.get("ip"), event.get("domain"), event.get("url"))
+    ioc = _first_reference(event.get("ioc"), event.get("ioc_refs"), event.get("src_ip"), event.get("source_ip"), event.get("ip"), event.get("domain"), event.get("url"))
 
     summary = {
         "title": _truncate(title),
         "description": _truncate(description),
-        "source": _source_type(source_type),
+        "source": _source_type(alert_source),
         "severity": _severity(event.get("severity")),
-        "asset_id": _first_text(event.get("asset_id"), event.get("host"), event.get("hostname"), event.get("dst_ip"), event.get("destination_ip")),
+        "asset_id": _first_reference(event.get("asset_id"), event.get("asset_refs"), event.get("host"), event.get("hostname"), event.get("dst_ip"), event.get("destination_ip")),
         "occurred_at": occurred_at,
         "ioc": ioc,
-        "alert_type": _first_text(event.get("alert_type"), event.get("attack_type"), event.get("category"), source_type),
+        "alert_type": _first_text(event.get("alert_type"), event.get("attack_type"), event.get("category"), evidence_source_type),
         "connector_id": connector_id,
         "connector_name": _first_text(context.get("connector_name"), event.get("connector_name")),
         "vendor": _first_text(context.get("vendor"), event.get("vendor")),
         "product": _first_text(context.get("product"), event.get("product")),
-        "source_type": source_type,
+        "source_type": evidence_source_type,
         "external_event_id": external_event_id,
+        "external_id": _first_text(event.get("external_id"), external_event_id),
         "external_url": external_url,
         "query_hint": query_hint,
         "time_range_start": time_range_start,
         "time_range_end": time_range_end,
         "key_fields": key_fields,
         "payload_hash": payload_hash,
+        "metadata": _truncate(event.get("metadata")) if isinstance(event.get("metadata"), dict) else {},
     }
     return summary
 

@@ -1,39 +1,38 @@
-"""Manual Sync Ingest skeleton for Integration Runtime v2.
-
-This module adds an explicit approval-gated ingest path from Sync Profiles to
-sanitized Evidence/Alert creation. It does not execute real vendor sync, perform
-HTTP, resolve credentials, create Analysis Cases or Incidents, send
-notifications, remediate, or update Sync Profile cursors/last_run_id outside the successful confirmed ingest boundary.
-"""
+"""Explicit Confirm Ingest for a previously captured Runtime v2 preview batch."""
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from flocks.security.integrations.adapter import IntegrationAdapterRequest, sanitize_adapter_mapping
-from flocks.security.integrations.adapter_registry import create_default_adapter_registry
+from flocks.security.integrations.adapter import sanitize_adapter_mapping
 from flocks.security.integrations.evidence_dispatcher import EvidenceDispatchRequest, dispatch_evidence_events
 from flocks.security.integrations.instance_store import default_integration_instance_store
+from flocks.security.integrations.preview_batch_store import (
+    PreviewBatch,
+    PreviewBatchError,
+    default_preview_batch_store,
+    sanitize_preview_item,
+)
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.runs import IntegrationRunCreate, safe_export_item_refs, safe_export_summary
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 from flocks.security.integrations.sync_state import SyncStateUpdateRequest, update_sync_profile_run_state
 
 _SECRET_LIKE_KEYS = {
-    "api_key", "apikey", "secret", "token", "password", "credential", "authorization",
-    "bearer", "access_token", "refresh_token", "cookie", "credential_value", "secret_ref",
+    "api_key", "apikey", "secret", "token", "password", "passwd", "credential", "authorization",
+    "bearer", "access_token", "refresh_token", "cookie", "credential_value", "secret_ref", "sign",
+    "auth_timestamp",
 }
 _SECRET_VALUE_HINTS = (
-    "bearer ", "begin private key", "api_key=", "apikey=", "password=", "secret=",
-    "token=", "authorization:", "cookie:", "x-api-key",
+    "bearer ", "begin private key", "api_key=", "apikey=", "password=", "passwd=", "secret=",
+    "token=", "authorization:", "cookie:", "x-api-key", "sign=", "auth_timestamp=",
 )
-_RAW_LIKE_KEYS = {
-    "raw", "raw_payload", "raw_response", "raw_data", "request", "response", "body",
-    "request_body", "response_body", "packet", "pcap", "payload", "logs", "events",
-}
+
+_INGEST_LOCK = asyncio.Lock()
 
 
 def _normalize_key(key: Any) -> str:
@@ -66,6 +65,8 @@ class ManualSyncIngestRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     sync_profile_id: str
+    preview_batch_id: str | None = None
+    preview_run_id: str | None = None
     requested_by: str | None = None
     params_override: dict[str, Any] = Field(default_factory=dict)
     dry_run: bool = True
@@ -99,6 +100,8 @@ class ManualSyncIngestResult(BaseModel):
     preview_only: bool = False
     confirmed: bool = False
     sync_profile_id: str
+    preview_batch_id: str | None = None
+    preview_run_id: str | None = None
     run_id: str | None = None
     package_id: str | None = None
     instance_id: str | None = None
@@ -128,36 +131,21 @@ async def _maybe_await(value: Any) -> Any:
     return value
 
 
-def _safe_item_metadata(item: dict[str, Any]) -> dict[str, Any]:
-    sanitized = sanitize_adapter_mapping(item)
-    if not isinstance(sanitized, dict):
-        return {}
-    return {
-        str(key): value
-        for key, value in sanitized.items()
-        if _normalize_key(key) not in _RAW_LIKE_KEYS and not _is_secret_like_key(key) and not _is_secret_like_value(value)
-    }
-
-
-def _adapter_items_to_ingest_events(items: list[dict[str, Any]], profile: Any, instance: Any) -> list[dict[str, Any]]:
+def _batch_items_to_ingest_events(batch: PreviewBatch) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
-    for index, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-        metadata = _safe_item_metadata(item)
-        event_id = item.get("id") or item.get("item_id") or f"{profile.sync_profile_id}:{index}"
-        events.append({
-            "external_event_id": str(event_id),
-            "event_id": str(event_id),
-            "event_type": profile.capability,
-            "source": profile.package_id,
-            "title": item.get("title") or item.get("name") or "Adapter ingest item",
-            "severity": item.get("severity"),
-            "asset": item.get("asset") or item.get("target"),
-            "metadata": metadata,
-            "preview_only": False,
-            "integration_instance_id": getattr(instance, "instance_id", None),
-        })
+    for index, item in enumerate(batch.items):
+        event = sanitize_preview_item({**item, "preview_only": False})
+        event_id = (
+            event.get("external_event_id")
+            or event.get("external_id")
+            or event.get("event_id")
+            or f"{batch.sync_profile_id}:{index}"
+        )
+        event["external_event_id"] = str(event_id)
+        event["external_id"] = str(event_id)
+        event["event_id"] = str(event_id)
+        event["preview_only"] = False
+        events.append(event)
     return events
 
 
@@ -171,26 +159,53 @@ async def ingest_sync_profile_run(
     sync_profile_store=None,
     instance_store=None,
     run_store=None,
+    preview_batch_store=None,
     adapter_registry=None,
     mapping_rules: list[Any] | None = None,
 ) -> ManualSyncIngestResult:
-    request = ManualSyncIngestRequest(**request.model_dump(mode="json")) if isinstance(request, ManualSyncIngestRequest) else ManualSyncIngestRequest.model_validate(request)
+    """Ingest exactly the normalized items shown by Preview Sync.
+
+    ``adapter_registry`` remains an accepted keyword for source compatibility,
+    but is deliberately never resolved or called on this confirmation path.
+    """
+
+    del adapter_registry
+    request = (
+        ManualSyncIngestRequest(**request.model_dump(mode="json"))
+        if isinstance(request, ManualSyncIngestRequest)
+        else ManualSyncIngestRequest.model_validate(request)
+    )
     sync_profile_store = sync_profile_store or default_sync_profile_store
     instance_store = instance_store or default_integration_instance_store
     run_store = run_store or default_integration_run_store
-    adapter_registry = adapter_registry or create_default_adapter_registry(include_fake=True)
+    preview_batch_store = preview_batch_store or default_preview_batch_store
 
     if request.confirmed is not True:
-        return ManualSyncIngestResult(status="confirmation_required", sync_profile_id=request.sync_profile_id, confirmed=False, errors=["confirmed=True is required for manual sync ingest"])
+        return ManualSyncIngestResult(
+            status="confirmation_required",
+            sync_profile_id=request.sync_profile_id,
+            confirmed=False,
+            errors=["confirmed=True is required for manual sync ingest"],
+        )
 
     try:
         _validate_no_secrets(request.params_override)
     except ValueError as exc:
-        return ManualSyncIngestResult(status="validation_failed", sync_profile_id=request.sync_profile_id, confirmed=True, errors=[str(exc)])
+        return ManualSyncIngestResult(
+            status="validation_failed",
+            sync_profile_id=request.sync_profile_id,
+            confirmed=True,
+            errors=[str(exc)],
+        )
 
     profile = await _maybe_await(sync_profile_store.get_profile(request.sync_profile_id))
     if profile is None:
-        return ManualSyncIngestResult(status="not_found", sync_profile_id=request.sync_profile_id, confirmed=True, errors=["Sync profile not found"])
+        return ManualSyncIngestResult(
+            status="not_found",
+            sync_profile_id=request.sync_profile_id,
+            confirmed=True,
+            errors=["Sync profile not found"],
+        )
 
     base = {
         "sync_profile_id": profile.sync_profile_id,
@@ -198,79 +213,198 @@ async def ingest_sync_profile_run(
         "instance_id": profile.instance_id,
         "capability": profile.capability,
         "confirmed": True,
-        "request_summary": safe_export_summary({"dry_run": True, "preview_only": False, "confirmed": True, "params": {**profile.params, **request.params_override}}),
-        "safety_summary": {"dry_run": True, "preview_only": False, "confirmed": True, "credentials_read": False, "secret_ref_resolved": False, "create_analysis_cases": False, "run_initial_analysis": False, "cursor_updated": False, "last_run_id_updated": False, "last_status_updated": False, "last_synced_at_updated": False},
-        "limitations": ["manual approval required", "no real sync", "no vendor connector calls", "no analysis cases", "no incidents", "no notifications", "no remediation"],
+        "preview_batch_id": request.preview_batch_id,
+        "preview_run_id": request.preview_run_id,
+        "request_summary": safe_export_summary(
+            {
+                "dry_run": True,
+                "preview_only": False,
+                "confirmed": True,
+                "preview_batch_id": request.preview_batch_id,
+                "preview_run_id": request.preview_run_id,
+            }
+        ),
+        "safety_summary": {
+            "dry_run": True,
+            "preview_only": False,
+            "confirmed": True,
+            "adapter_called": False,
+            "device_called": False,
+            "credentials_read": False,
+            "secret_ref_resolved": False,
+            "create_analysis_cases": False,
+            "run_initial_analysis": False,
+            "cursor_updated": False,
+            "last_run_id_updated": False,
+            "last_status_updated": False,
+            "last_synced_at_updated": False,
+        },
+        "limitations": [
+            "manual preview confirmation required",
+            "uses the selected normalized PreviewBatch only",
+            "no adapter or vendor device re-query",
+            "no analysis cases or incidents",
+            "no notifications or remediation",
+        ],
     }
 
-    async def validation_failed(message: str, adapter_id: str | None = None) -> ManualSyncIngestResult:
-        run = await _record_run(run_store, IntegrationRunCreate(
-            run_type="sync_profile_ingest", package_id=profile.package_id, instance_id=profile.instance_id,
-            sync_profile_id=profile.sync_profile_id, capability=profile.capability, mode=profile.mode,
-            status="validation_failed", requested_by=request.requested_by, request_summary=base["request_summary"],
-            result_summary={"status": "validation_failed", "error": message, "created_alerts": 0, "created_analysis_cases": 0, "skipped_duplicates": 0, "ingested_count": 0}, error_message=message,
-            metadata={"source": "ManualSyncIngest", "dry_run": True, "preview_only": False, "confirmed": True},
-        ))
-        return ManualSyncIngestResult(status="validation_failed", run_id=run.run_id, adapter_id=adapter_id, errors=[message], **base)
+    async def validation_failed(code: str, message: str) -> ManualSyncIngestResult:
+        run = await _record_run(
+            run_store,
+            IntegrationRunCreate(
+                run_type="sync_profile_ingest",
+                package_id=profile.package_id,
+                instance_id=profile.instance_id,
+                sync_profile_id=profile.sync_profile_id,
+                capability=profile.capability,
+                mode=profile.mode,
+                status=code,
+                requested_by=request.requested_by,
+                request_summary=base["request_summary"],
+                result_summary={
+                    "status": code,
+                    "created_alerts": 0,
+                    "created_analysis_cases": 0,
+                    "skipped_duplicates": 0,
+                    "ingested_count": 0,
+                },
+                error_message=message,
+                metadata={
+                    "source": "ManualSyncIngest",
+                    "dry_run": True,
+                    "preview_only": False,
+                    "confirmed": True,
+                },
+            ),
+        )
+        return ManualSyncIngestResult(status=code, run_id=run.run_id, errors=[message], **base)
+
+    if not request.preview_batch_id and not request.preview_run_id:
+        return await validation_failed(
+            "preview_batch_required",
+            "preview confirmation required: provide preview_batch_id from Preview Sync",
+        )
 
     instance = await _maybe_await(instance_store.get_instance(profile.instance_id))
     if instance is None:
-        return await validation_failed("Integration instance not found")
+        return await validation_failed("preview_batch_mismatch", "Integration instance was not found")
 
-    try:
-        adapter = adapter_registry.require_adapter(profile.package_id, profile.capability)
-    except Exception as exc:
-        return await validation_failed(str(exc))
+    async with _INGEST_LOCK:
+        batch_id = request.preview_batch_id
+        if not batch_id and request.preview_run_id:
+            by_run = await _maybe_await(preview_batch_store.find_by_preview_run_id(request.preview_run_id))
+            if by_run is None:
+                return await validation_failed("preview_batch_expired", "Preview batch was not found or has expired")
+            batch_id = by_run.preview_batch_id
 
-    adapter_id = getattr(adapter, "adapter_id", None)
-    adapter_request = IntegrationAdapterRequest(
-        package_id=profile.package_id, instance_id=profile.instance_id, capability=profile.capability,
-        mode=profile.mode, params={**profile.params, **request.params_override}, cursor=profile.cursor,
-        credential_ref=getattr(instance, "credential_profile_id", None), dry_run=True, requested_by=request.requested_by,
-        metadata={"sync_profile_id": profile.sync_profile_id},
-    )
-    adapter_result = await adapter.run_capability(adapter_request)
-    if adapter_result.status != "success":
-        return await validation_failed("Adapter ingest failed or capability unsupported", adapter_id)
+        assert batch_id is not None
+        try:
+            batch = await _maybe_await(
+                preview_batch_store.require_available(
+                    batch_id,
+                    sync_profile_id=profile.sync_profile_id,
+                    instance_id=profile.instance_id,
+                    package_id=profile.package_id,
+                    capability=profile.capability,
+                )
+            )
+            if request.preview_run_id and batch.preview_run_id != request.preview_run_id:
+                raise PreviewBatchError("preview_batch_mismatch", "Preview run does not match PreviewBatch")
+        except PreviewBatchError as exc:
+            return await validation_failed(exc.code, exc.message)
 
-    mapped_events = _adapter_items_to_ingest_events(adapter_result.items, profile, instance)
-    dispatch_result = await dispatch_evidence_events(EvidenceDispatchRequest(
-        events=mapped_events, connector_context={"package_id": profile.package_id, "instance_id": profile.instance_id},
-        preview_only=False, create_analysis_cases=False, run_initial_analysis=False, deduplicate=True,
-    ))
-    raw_item_refs = []
-    for ref in adapter_result.item_refs:
-        ref_data = {
-            "id": (ref.item_id if hasattr(ref, "item_id") else ref.get("item_id") or ref.get("id")),
-            "type": (ref.item_type if hasattr(ref, "item_type") else ref.get("item_type") or ref.get("type")),
-            "source": (ref.source if hasattr(ref, "source") else ref.get("source")),
-        }
-        raw_item_refs.append({key: value for key, value in ref_data.items() if value not in (None, "")})
-    item_refs = safe_export_item_refs(raw_item_refs)
-    ingested_count = int(dispatch_result.created_alerts)
-    result_summary = safe_export_summary({
-        "status": "ingested", "fetched_count": adapter_result.item_count, "mapped_count": len(mapped_events),
-        "ingested_count": ingested_count, "created_alerts": dispatch_result.created_alerts,
-        "created_analysis_cases": dispatch_result.created_analysis_cases, "skipped_duplicates": dispatch_result.skipped_duplicates,
-        "adapter_summary": adapter_result.summary,
-    })
-    run = await _record_run(run_store, IntegrationRunCreate(
-        run_type="sync_profile_ingest", package_id=profile.package_id, instance_id=profile.instance_id,
-        sync_profile_id=profile.sync_profile_id, capability=profile.capability, mode=profile.mode,
-        status="ingested", requested_by=request.requested_by, request_summary=base["request_summary"],
-        result_summary=result_summary, item_refs=item_refs,
-        metadata={"source": "ManualSyncIngest", "dry_run": True, "preview_only": False, "confirmed": True},
-    ))
-    state_update = await update_sync_profile_run_state(
-        SyncStateUpdateRequest(
-            sync_profile_id=profile.sync_profile_id,
-            run_id=run.run_id,
-            status="ingested",
-            cursor=adapter_result.cursor,
-            update_cursor=bool(adapter_result.cursor),
-        ),
-        sync_profile_store=sync_profile_store,
-    )
+        events = _batch_items_to_ingest_events(batch)
+        dispatch_result = await dispatch_evidence_events(
+            EvidenceDispatchRequest(
+                events=events,
+                connector_context={
+                    "package_id": profile.package_id,
+                    "instance_id": profile.instance_id,
+                    "connector_id": profile.instance_id,
+                    "connector_name": getattr(instance, "display_name", None),
+                    "vendor": getattr(instance, "vendor", None),
+                    "product": getattr(instance, "product", None),
+                },
+                preview_only=False,
+                create_analysis_cases=False,
+                run_initial_analysis=False,
+                deduplicate=bool(getattr(profile, "deduplicate", True)),
+            )
+        )
+        if dispatch_result.errors:
+            return await validation_failed("validation_failed", "PreviewBatch evidence dispatch failed")
+
+        item_refs = safe_export_item_refs(
+            [
+                {
+                    "id": event.get("external_event_id"),
+                    "external_event_id": event.get("external_event_id"),
+                    "source": event.get("source"),
+                    "severity": event.get("severity"),
+                    "payload_hash": event.get("payload_hash"),
+                }
+                for event in events
+            ]
+        )
+        ingested_count = int(dispatch_result.created_alerts)
+        result_summary = safe_export_summary(
+            {
+                "status": "ingested",
+                "preview_batch_id": batch.preview_batch_id,
+                "preview_run_id": batch.preview_run_id,
+                "fetched_count": batch.item_count,
+                "mapped_count": len(events),
+                "ingested_count": ingested_count,
+                "created_alerts": dispatch_result.created_alerts,
+                "created_analysis_cases": dispatch_result.created_analysis_cases,
+                "skipped_duplicates": dispatch_result.skipped_duplicates,
+            }
+        )
+        run = await _record_run(
+            run_store,
+            IntegrationRunCreate(
+                run_type="sync_profile_ingest",
+                package_id=profile.package_id,
+                instance_id=profile.instance_id,
+                sync_profile_id=profile.sync_profile_id,
+                capability=profile.capability,
+                mode=profile.mode,
+                status="ingested",
+                requested_by=request.requested_by,
+                request_summary=safe_export_summary(
+                    {
+                        **base["request_summary"],
+                        "preview_batch_id": batch.preview_batch_id,
+                        "preview_run_id": batch.preview_run_id,
+                    }
+                ),
+                result_summary=result_summary,
+                item_refs=item_refs,
+                metadata={
+                    "source": "ManualSyncIngest",
+                    "dry_run": True,
+                    "preview_only": False,
+                    "confirmed": True,
+                    "preview_batch_id": batch.preview_batch_id,
+                },
+            ),
+        )
+        try:
+            await _maybe_await(preview_batch_store.consume(batch.preview_batch_id, consumed_by_run_id=run.run_id))
+        except PreviewBatchError as exc:
+            return ManualSyncIngestResult(status=exc.code, run_id=run.run_id, errors=[exc.message], **base)
+
+        state_update = await update_sync_profile_run_state(
+            SyncStateUpdateRequest(
+                sync_profile_id=profile.sync_profile_id,
+                run_id=run.run_id,
+                status="ingested",
+                cursor=batch.cursor,
+                update_cursor=bool(batch.cursor),
+            ),
+            sync_profile_store=sync_profile_store,
+        )
+
     safety_summary = {
         **base["safety_summary"],
         "cursor_updated": state_update.cursor_updated,
@@ -282,20 +416,36 @@ async def ingest_sync_profile_run(
         "preview_only": dispatch_result.preview_only,
         "create_analysis_cases": False,
         "run_initial_analysis": False,
+        "preview_batch_consumed": True,
         "cursor_updated": state_update.cursor_updated,
         "last_run_id_updated": state_update.last_run_updated,
         "last_status_updated": state_update.last_status_updated,
         "last_synced_at_updated": state_update.last_synced_at_updated,
     }
+    adapter_summary = batch.summary.get("adapter_summary") if isinstance(batch.summary.get("adapter_summary"), dict) else {}
     return ManualSyncIngestResult(
-        status="ingested", run_id=run.run_id, adapter_id=adapter_id, fetched_count=adapter_result.item_count,
-        mapped_count=len(mapped_events), ingested_count=ingested_count, created_alerts=dispatch_result.created_alerts,
-        created_analysis_cases=dispatch_result.created_analysis_cases, skipped_duplicates=dispatch_result.skipped_duplicates,
-        item_refs=item_refs, event_summaries=dispatch_result.event_summaries,
-        adapter_summary=safe_export_summary(adapter_result.summary),
-        mapping_summary={"mode": "safe_passthrough_ingest", "mapping_rules": len(mapping_rules or [])},
+        status="ingested",
+        run_id=run.run_id,
+        preview_batch_id=batch.preview_batch_id,
+        preview_run_id=batch.preview_run_id,
+        adapter_id=str(batch.metadata.get("adapter_id")) if batch.metadata.get("adapter_id") else None,
+        fetched_count=batch.item_count,
+        mapped_count=len(events),
+        ingested_count=ingested_count,
+        created_alerts=dispatch_result.created_alerts,
+        created_analysis_cases=dispatch_result.created_analysis_cases,
+        skipped_duplicates=dispatch_result.skipped_duplicates,
+        item_refs=item_refs,
+        event_summaries=dispatch_result.event_summaries,
+        adapter_summary=safe_export_summary(adapter_summary),
+        mapping_summary={"mode": "confirmed_preview_batch", "mapping_rules": len(mapping_rules or [])},
         dispatch_summary=dispatch_summary,
         safety_summary=safety_summary,
-        warnings=[*adapter_result.warnings, *dispatch_result.warnings], errors=adapter_result.errors + dispatch_result.errors + state_update.errors,
-        **{key: value for key, value in base.items() if key != "safety_summary"},
+        warnings=dispatch_result.warnings,
+        errors=[*dispatch_result.errors, *state_update.errors],
+        **{
+            key: value
+            for key, value in base.items()
+            if key not in {"preview_batch_id", "preview_run_id", "safety_summary"}
+        },
     )

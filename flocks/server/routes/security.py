@@ -172,6 +172,8 @@ class ManualSyncPreviewAPIRequest(BaseModel):
 
 class ManualSyncIngestAPIRequest(BaseModel):
     sync_profile_id: str
+    preview_batch_id: str | None = None
+    preview_run_id: str | None = None
     requested_by: str | None = None
     params_override: dict[str, Any] = Field(default_factory=dict)
     confirmed: bool = False
@@ -811,7 +813,7 @@ async def preview_sync_engine(payload: ManualSyncPreviewAPIRequest):
     )
     if result.status == "not_found":
         raise HTTPException(status_code=404, detail="Sync profile not found")
-    if result.status in {"validation_failed", "rejected"}:
+    if result.status != "previewed":
         raise HTTPException(status_code=400, detail=result.model_dump(mode="json"))
     return result
 
@@ -829,6 +831,8 @@ async def ingest_sync_engine(payload: ManualSyncIngestAPIRequest):
     try:
         request = ManualSyncIngestRequest(
             sync_profile_id=payload.sync_profile_id,
+            preview_batch_id=payload.preview_batch_id,
+            preview_run_id=payload.preview_run_id,
             requested_by=payload.requested_by,
             params_override=payload.params_override,
             confirmed=True,
@@ -846,7 +850,7 @@ async def ingest_sync_engine(payload: ManualSyncIngestAPIRequest):
     )
     if result.status == "not_found":
         raise HTTPException(status_code=404, detail="Sync profile not found")
-    if result.status in {"validation_failed", "rejected", "confirmation_required"}:
+    if result.status not in {"ingested"}:
         raise HTTPException(status_code=400, detail=result.model_dump(mode="json"))
     return result
 

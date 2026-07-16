@@ -368,6 +368,8 @@ export interface ManualSyncPreviewRequest {
 
 export interface ManualSyncIngestRequest {
   sync_profile_id: string;
+  preview_batch_id?: string | null;
+  preview_run_id?: string | null;
   requested_by?: string | null;
   params_override?: Record<string, any>;
   confirmed: boolean;
@@ -383,6 +385,8 @@ export interface ManualSyncIngestResult {
   preview_only: boolean;
   confirmed: boolean;
   sync_profile_id: string;
+  preview_batch_id?: string | null;
+  preview_run_id?: string | null;
   run_id?: string | null;
   package_id?: string | null;
   instance_id?: string | null;
@@ -416,9 +420,13 @@ export interface ManualSyncPreviewResult {
   instance_id?: string | null;
   capability?: string | null;
   adapter_id?: string | null;
+  preview_batch_id?: string | null;
+  preview_run_id?: string | null;
   fetched_count: number;
   mapped_count: number;
   preview_count: number;
+  item_count: number;
+  event_count: number;
   item_refs: Record<string, any>[];
   event_summaries: Record<string, any>[];
   request_summary: Record<string, any>;

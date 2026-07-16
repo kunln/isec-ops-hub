@@ -17,7 +17,6 @@ _RAW_OR_VERBOSE_KEYS = {
     "raw_event",
     "raw_payload",
     "raw_data",
-    "source",
     "request",
     "response",
     "request_body",
@@ -41,8 +40,13 @@ _CREDENTIAL_KEYS = {
     "secret",
     "token",
     "password",
+    "passwd",
     "authorization",
     "cookie",
+    "credential",
+    "bearer",
+    "sign",
+    "auth_timestamp",
 }
 _REQUIRED_EVENT_FIELDS = ("title", "severity", "external_event_id")
 

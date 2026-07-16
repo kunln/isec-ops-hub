@@ -82,6 +82,7 @@ async def test_ingest_sync_profile_run_success_records_run_and_updates_profile_s
     from flocks.security.integrations.adapter import FakeIntegrationAdapter
     from flocks.security.integrations.adapter_registry import AdapterRegistry
     from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, preview_sync_profile_run
     from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 
     _, profile = await seed_fake_profile()
@@ -97,9 +98,14 @@ async def test_ingest_sync_profile_run_success_records_run_and_updates_profile_s
         adapter_id="fake.integration.adapter",
     )
 
+    preview = await preview_sync_profile_run(
+        ManualSyncPreviewRequest(sync_profile_id=profile.sync_profile_id, params_override={"limit": 2}),
+        adapter_registry=registry,
+    )
     result = await ingest_sync_profile_run(
         ManualSyncIngestRequest(
             sync_profile_id=profile.sync_profile_id,
+            preview_batch_id=preview.preview_batch_id,
             requested_by="tester",
             params_override={"limit": 2},
             dry_run=False,
@@ -117,7 +123,7 @@ async def test_ingest_sync_profile_run_success_records_run_and_updates_profile_s
     assert result.confirmed is True
     assert result.fetched_count == result.mapped_count == result.ingested_count == result.created_alerts == 1
     assert result.created_analysis_cases == 0
-    assert result.request_summary["params"]["limit"] == 2
+    assert result.request_summary["preview_batch_id"] == preview.preview_batch_id
     assert result.dispatch_summary["preview_only"] is False
     assert result.dispatch_summary["create_analysis_cases"] is False
     assert result.dispatch_summary["run_initial_analysis"] is False
@@ -130,7 +136,7 @@ async def test_ingest_sync_profile_run_success_records_run_and_updates_profile_s
     run = run_response.json()
     assert run["status"] == "ingested"
     assert run["run_type"] == "sync_profile_ingest"
-    assert run["item_refs"] == [{"id": "a1"}]
+    assert run["item_refs"][0]["id"] == "a1"
     assert run["result_summary"]["created_alerts"] == 1
     assert run["result_summary"]["created_analysis_cases"] == 0
 
@@ -144,9 +150,15 @@ async def test_ingest_sync_profile_run_success_records_run_and_updates_profile_s
 @pytest.mark.asyncio
 async def test_api_post_ingest_success_forces_safety_flags(client: AsyncClient) -> None:
     _, profile = await seed_fake_profile(sync_profile_id="syncprof_api")
+    preview_response = await client.post(
+        "/api/security/integrations/sync-engine/preview",
+        json={"sync_profile_id": profile.sync_profile_id, "params_override": {"limit": 3}},
+    )
+    assert preview_response.status_code == 200, preview_response.text
+    preview = preview_response.json()
     response = await client.post(
         "/api/security/integrations/sync-engine/ingest",
-        json={"sync_profile_id": profile.sync_profile_id, "params_override": {"limit": 3}, "confirmed": True, "dry_run": False, "preview_only": True, "create_analysis_cases": True, "run_initial_analysis": True},
+        json={"sync_profile_id": profile.sync_profile_id, "preview_batch_id": preview["preview_batch_id"], "confirmed": True, "dry_run": False, "preview_only": True, "create_analysis_cases": True, "run_initial_analysis": True},
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -155,7 +167,7 @@ async def test_api_post_ingest_success_forces_safety_flags(client: AsyncClient) 
     assert body["preview_only"] is False
     assert body["confirmed"] is True
     assert body["created_analysis_cases"] == 0
-    assert body["request_summary"]["params"]["limit"] == 3
+    assert body["request_summary"]["preview_batch_id"] == preview["preview_batch_id"]
 
 
 @pytest.mark.asyncio
@@ -211,6 +223,7 @@ async def test_dispatch_flags_and_no_forbidden_side_effects(client: AsyncClient,
     from flocks.security.integrations.adapter import FakeIntegrationAdapter
     from flocks.security.integrations.adapter_registry import AdapterRegistry
     from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, preview_sync_profile_run
 
     def forbidden(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("forbidden side effect")
@@ -238,7 +251,17 @@ async def test_dispatch_flags_and_no_forbidden_side_effects(client: AsyncClient,
         "alert.search",
         lambda: FakeIntegrationAdapter("fake.integration", {"alert.search"}, fake_items=[{"id": "a1", "title": "Safe", "severity": "low", "raw_response": {"x": 1}, "password": "hidden", "note": "ok"}]),
     )
-    result = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    preview = await preview_sync_profile_run(
+        ManualSyncPreviewRequest(sync_profile_id=profile.sync_profile_id), adapter_registry=registry
+    )
+    result = await ingest_sync_profile_run(
+        ManualSyncIngestRequest(
+            sync_profile_id=profile.sync_profile_id,
+            preview_batch_id=preview.preview_batch_id,
+            confirmed=True,
+        ),
+        adapter_registry=registry,
+    )
     assert result.status == "ingested"
     assert captured["preview_only"] is False
     assert captured["create_analysis_cases"] is False
@@ -272,6 +295,7 @@ async def test_ingest_success_updates_cursor_only_when_adapter_returns_safe_curs
     from flocks.security.integrations.adapter import FakeIntegrationAdapter
     from flocks.security.integrations.adapter_registry import AdapterRegistry
     from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, preview_sync_profile_run
     from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 
     _, profile = await seed_fake_profile(sync_profile_id="syncprof_cursor_success")
@@ -287,7 +311,17 @@ async def test_ingest_success_updates_cursor_only_when_adapter_returns_safe_curs
         ),
     )
 
-    result = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    preview = await preview_sync_profile_run(
+        ManualSyncPreviewRequest(sync_profile_id=profile.sync_profile_id), adapter_registry=registry
+    )
+    result = await ingest_sync_profile_run(
+        ManualSyncIngestRequest(
+            sync_profile_id=profile.sync_profile_id,
+            preview_batch_id=preview.preview_batch_id,
+            confirmed=True,
+        ),
+        adapter_registry=registry,
+    )
     updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
 
     assert result.status == "ingested"
@@ -304,13 +338,24 @@ async def test_ingest_success_without_cursor_keeps_existing_cursor(client: Async
     from flocks.security.integrations.adapter import FakeIntegrationAdapter
     from flocks.security.integrations.adapter_registry import AdapterRegistry
     from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
+    from flocks.security.integrations.sync_preview import ManualSyncPreviewRequest, preview_sync_profile_run
     from flocks.security.integrations.sync_profile_store import default_sync_profile_store
 
     _, profile = await seed_fake_profile(sync_profile_id="syncprof_cursor_empty")
     registry = AdapterRegistry()
     registry.register_adapter_factory("fake.integration", "alert.search", lambda: FakeIntegrationAdapter("fake.integration", {"alert.search"}, fake_items=[{"id": "a1"}], cursor={}))
 
-    result = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    preview = await preview_sync_profile_run(
+        ManualSyncPreviewRequest(sync_profile_id=profile.sync_profile_id), adapter_registry=registry
+    )
+    result = await ingest_sync_profile_run(
+        ManualSyncIngestRequest(
+            sync_profile_id=profile.sync_profile_id,
+            preview_batch_id=preview.preview_batch_id,
+            confirmed=True,
+        ),
+        adapter_registry=registry,
+    )
     updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
 
     assert result.status == "ingested"
@@ -321,7 +366,6 @@ async def test_ingest_success_without_cursor_keeps_existing_cursor(client: Async
 
 @pytest.mark.asyncio
 async def test_ingest_non_success_paths_do_not_update_cursor(client: AsyncClient) -> None:
-    from flocks.security.integrations.adapter import FakeIntegrationAdapter, IntegrationAdapterResult
     from flocks.security.integrations.adapter_registry import AdapterRegistry
     from flocks.security.integrations.sync_ingest import ManualSyncIngestRequest, ingest_sync_profile_run
     from flocks.security.integrations.sync_profile_store import default_sync_profile_store
@@ -335,15 +379,11 @@ async def test_ingest_non_success_paths_do_not_update_cursor(client: AsyncClient
     not_found = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id="missing", confirmed=True))
     assert not_found.status == "not_found"
 
-    class FailingAdapter(FakeIntegrationAdapter):
-        async def run_capability(self, request):
-            return IntegrationAdapterResult(status="error", package_id=request.package_id, instance_id=request.instance_id, capability=request.capability, cursor={"page": "bad"})
-
-    registry = AdapterRegistry()
-    registry.register_adapter_factory("fake.integration", "alert.search", lambda: FailingAdapter("fake.integration", {"alert.search"}))
-    failed = await ingest_sync_profile_run(ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True), adapter_registry=registry)
+    failed = await ingest_sync_profile_run(
+        ManualSyncIngestRequest(sync_profile_id=profile.sync_profile_id, confirmed=True)
+    )
     updated = await default_sync_profile_store.get_profile(profile.sync_profile_id)
-    assert failed.status == "validation_failed"
+    assert failed.status == "preview_batch_required"
     assert updated.cursor == {"page": "old"}
     assert updated.last_run_id is None
 
