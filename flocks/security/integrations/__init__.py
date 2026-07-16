@@ -41,7 +41,6 @@ from flocks.security.integrations.credentials import CredentialProfile, Credenti
 from flocks.security.integrations.device_bridge import (
     DeviceBridgeRequest,
     DeviceBridgeResult,
-    DeviceBridgeStatus,
     DeviceIntegrationBridge,
     default_device_integration_bridge,
 )
@@ -126,7 +125,6 @@ __all__ = [
     "CredentialProfileUpdate",
     "DeviceBridgeRequest",
     "DeviceBridgeResult",
-    "DeviceBridgeStatus",
     "DeviceIntegrationBridge",
     "SyncProfile",
     "SyncProfileCreate",

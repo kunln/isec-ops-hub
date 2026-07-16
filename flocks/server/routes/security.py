@@ -26,7 +26,6 @@ from flocks.security.integrations.credentials import CredentialProfile, Credenti
 from flocks.security.integrations.device_bridge import (
     DeviceBridgeRequest,
     DeviceBridgeResult,
-    DeviceBridgeStatus,
     default_device_integration_bridge,
 )
 from flocks.security.integrations.instance_store import default_integration_instance_store
@@ -173,15 +172,6 @@ class IntegrationCapabilityPlanRequest(BaseModel):
     mode: str = "manual"
     params: dict[str, Any] = Field(default_factory=dict)
     dry_run: bool = True
-
-
-class DeviceBridgeConfirmAPIRequest(BaseModel):
-    device_id: str
-    requested_by: str | None = None
-    dry_run: bool = False
-    force: bool = False
-    confirmed: bool = False
-
 
 
 def _analysis_case_incident_severity(severity: str) -> IncidentSeverity:
@@ -508,42 +498,15 @@ async def get_integration_package(package_id: str):
     return _integration_package_manifest(package_id)
 
 
-@router.get("/integrations/device-bridge/status", response_model=list[DeviceBridgeStatus])
-async def get_device_bridge_status(device_id: str | None = None):
-    """Return safe Device Integration to Runtime v2 linkage state."""
-
-    return await default_device_integration_bridge.list_status(device_id=device_id)
-
-
-@router.post("/integrations/device-bridge/plan", response_model=DeviceBridgeResult)
-async def plan_device_bridge(payload: DeviceBridgeRequest):
-    """Plan bridge references without creating or modifying Runtime objects."""
-
-    return await default_device_integration_bridge.bridge_device_integration(
-        payload.model_copy(update={"dry_run": True})
-    )
-
-
 @router.post(
-    "/integrations/device-bridge/confirm",
+    "/integrations/device-bridge",
     response_model=DeviceBridgeResult,
     dependencies=[Depends(require_capability("security.ops.write"))],
 )
-async def confirm_device_bridge(payload: DeviceBridgeConfirmAPIRequest):
-    """Create reference-only Runtime objects after explicit confirmation."""
+async def bridge_device_integration(payload: DeviceBridgeRequest):
+    """Create or reuse safe Runtime v2 metadata for a Device Integration."""
 
-    if payload.confirmed is not True:
-        raise HTTPException(status_code=400, detail="confirmed=True is required for device bridge creation")
-    return await default_device_integration_bridge.bridge_device_integration(
-        DeviceBridgeRequest(
-            device_id=payload.device_id,
-            requested_by=payload.requested_by,
-            dry_run=False,
-            force=payload.force,
-        )
-    )
-
-
+    return await default_device_integration_bridge.bridge_device_integration(payload)
 
 
 def _credential_profile_validation_error(exc: ValueError) -> HTTPException:

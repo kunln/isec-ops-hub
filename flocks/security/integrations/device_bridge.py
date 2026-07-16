@@ -1,15 +1,16 @@
-"""Device Integration to Integration Runtime v2 reference bridge.
+"""Device Integration to Integration Runtime v2 metadata bridge.
 
-The bridge belongs to the Integration Layer. It links existing product access
-metadata to Runtime v2 Instance and Credential Profile references only. It does
-not read Device Integration fields, resolve credentials, call vendor APIs or
-adapters, execute sync, write runs, dispatch evidence, or create Security
-objects.
+The bridge belongs to the Integration Layer. It creates only an Integration
+Instance, a reference-only Credential Profile, and one manual Sync Profile. It
+does not read Device Integration credential fields, resolve credentials, call
+vendor APIs or adapters, execute sync, write runs, dispatch evidence, or create
+Security objects.
 """
 
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from dataclasses import dataclass
 import re
 from typing import Any, Literal
@@ -29,24 +30,22 @@ from flocks.security.integrations.instance_store import (
     PersistentIntegrationInstanceStore,
     default_integration_instance_store,
 )
-from flocks.security.integrations.instances import IntegrationInstance, IntegrationInstanceCreate
+from flocks.security.integrations.instances import (
+    IntegrationInstance,
+    IntegrationInstanceCreate,
+    IntegrationInstanceUpdate,
+)
 from flocks.security.integrations.registry import IntegrationRegistry, create_default_integration_registry
-from flocks.tool.device.store import DeviceIntegrationIdentity, get_device_identity, list_device_identities
+from flocks.security.integrations.sync_profile_store import SyncProfileStore, default_sync_profile_store
+from flocks.security.integrations.sync_profiles import SyncProfile, SyncProfileCreate
+from flocks.tool.device.store import DeviceIntegrationIdentity, get_device_identity
 
 BRIDGE_SOURCE = "device_integration_bridge"
-BRIDGE_VERSION = "v1"
+BRIDGE_VERSION = "v2-skeleton-1"
 DEVICE_CREDENTIAL_REFERENCE_SCHEME = "device-integration"
+SUPPORTED_CAPABILITY = "alert.search"
 
-BridgeResultStatus = Literal[
-    "planned",
-    "bridged",
-    "already_bridged",
-    "unsupported",
-    "not_found",
-    "validation_failed",
-    "unsafe",
-]
-BridgeState = Literal["unlinked", "linked", "unsupported", "unknown"]
+BridgeResultStatus = Literal["created", "reused", "validation_failed", "not_found"]
 
 _SAFE_REFERENCE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,254}$")
 _UNSAFE_TEXT_HINTS = (
@@ -59,12 +58,6 @@ _UNSAFE_TEXT_HINTS = (
     "bearer ",
     "x-api-key",
 )
-_COMMON_LIMITATIONS = (
-    "Bridge skeleton does not create a Sync Profile.",
-    "No synchronization, preview, confirm ingest, or vendor request is performed.",
-    "Credential linkage is reference-only; credential values are not read or copied.",
-    "The force flag is reserved and does not change bridge behavior in this skeleton.",
-)
 
 
 class _DeviceBridgeBaseModel(BaseModel):
@@ -72,43 +65,28 @@ class _DeviceBridgeBaseModel(BaseModel):
 
 
 class DeviceBridgeRequest(_DeviceBridgeBaseModel):
-    device_id: str
+    device_integration_id: str
+    capability: str = SUPPORTED_CAPABILITY
     requested_by: str | None = None
-    dry_run: bool = True
-    force: bool = False
 
 
 class DeviceBridgeResult(_DeviceBridgeBaseModel):
     status: BridgeResultStatus
-    device_id: str
-    device_name: str | None = None
-    package_id: str | None = None
+    device_integration_id: str
     instance_id: str | None = None
     credential_profile_id: str | None = None
-    supported_capabilities: list[str] = Field(default_factory=list)
-    bridge_summary: dict[str, Any] = Field(default_factory=dict)
-    safety_summary: dict[str, Any] = Field(default_factory=dict)
-    limitations: list[str] = Field(default_factory=list)
+    sync_profile_id: str | None = None
+    capability: str
+    warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
-
-
-class DeviceBridgeStatus(_DeviceBridgeBaseModel):
-    device_id: str
-    device_name: str | None = None
-    bridge_state: BridgeState
-    package_id: str | None = None
-    instance_id: str | None = None
-    credential_profile_id: str | None = None
-    supported_capabilities: list[str] = Field(default_factory=list)
-    message: str
-    limitations: list[str] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class DevicePackageMapping:
     identifiers: frozenset[str]
     package_id: str
-    supported_capabilities: tuple[str, ...]
+    capabilities: tuple[str, ...]
+    required_credential_fields: tuple[str, ...]
 
 
 DEVICE_PACKAGE_MAPPINGS = (
@@ -122,13 +100,14 @@ DEVICE_PACKAGE_MAPPINGS = (
             }
         ),
         package_id="asiainfo.tda",
-        supported_capabilities=("alert.search",),
+        capabilities=(SUPPORTED_CAPABILITY,),
+        required_credential_fields=("api_key", "secret"),
     ),
 )
 
 
 class DeviceIntegrationBridge:
-    """Create idempotent Runtime v2 references for supported devices."""
+    """Create or reuse the three safe Runtime v2 metadata objects."""
 
     def __init__(
         self,
@@ -136,191 +115,239 @@ class DeviceIntegrationBridge:
         registry: IntegrationRegistry | None = None,
         instance_store: PersistentIntegrationInstanceStore | None = None,
         credential_store: CredentialProfileStore | None = None,
+        sync_profile_store: SyncProfileStore | None = None,
     ) -> None:
         self.registry = registry or create_default_integration_registry()
         self.instance_store = instance_store or default_integration_instance_store
         self.credential_store = credential_store or default_credential_profile_store
-        self._confirm_lock = asyncio.Lock()
+        self.sync_profile_store = sync_profile_store or default_sync_profile_store
+        self._bridge_lock = asyncio.Lock()
 
     async def bridge_device_integration(self, request: DeviceBridgeRequest) -> DeviceBridgeResult:
-        """Plan or create safe Runtime references without executing integration work."""
+        """Create or reuse reference-only Runtime metadata without executing it."""
 
-        device_id = request.device_id.strip()
-        if not _SAFE_REFERENCE_PATTERN.fullmatch(device_id):
+        device_integration_id = request.device_integration_id.strip()
+        capability = request.capability.strip()
+        if not _SAFE_REFERENCE_PATTERN.fullmatch(device_integration_id):
             return self._result(
                 status="validation_failed",
-                device_id="[invalid-device-id]",
-                errors=["device_id must be a non-empty safe reference"],
-                action="none",
-                dry_run=request.dry_run,
+                device_integration_id="[invalid-device-integration-id]",
+                capability=capability or SUPPORTED_CAPABILITY,
+                errors=["device_integration_id must be a non-empty safe reference"],
+            )
+        if capability != SUPPORTED_CAPABILITY:
+            return self._result(
+                status="validation_failed",
+                device_integration_id=device_integration_id,
+                capability=capability or "[invalid-capability]",
+                errors=[f"Only {SUPPORTED_CAPABILITY} is supported by this bridge skeleton"],
             )
 
-        device = await get_device_identity(device_id)
+        device = await get_device_identity(device_integration_id)
         if device is None:
             return self._result(
                 status="not_found",
-                device_id=device_id,
+                device_integration_id=device_integration_id,
+                capability=capability,
                 errors=["Device Integration not found"],
-                action="none",
-                dry_run=request.dry_run,
             )
 
-        mapping, mapping_error = self._resolve_mapping(device)
-        existing = await self._find_instance(device_id)
-        if existing is not None:
-            return self._result_for_device(
-                status="already_bridged",
-                device=device,
-                mapping=mapping,
-                instance=existing,
-                action="reuse_runtime_references",
-                dry_run=request.dry_run,
-            )
+        mapping, mapping_error = self._resolve_mapping(device, capability)
         if mapping is None:
-            return self._result_for_device(
-                status="unsupported",
-                device=device,
-                mapping=None,
-                action="none",
-                dry_run=request.dry_run,
-                errors=[mapping_error or "No Integration Package mapping is available"],
+            return self._result(
+                status="validation_failed",
+                device_integration_id=device_integration_id,
+                capability=capability,
+                errors=[mapping_error or "No Integration Package mapping is available for this product"],
             )
 
-        if request.dry_run:
-            return self._result_for_device(
-                status="planned",
-                device=device,
-                mapping=mapping,
-                action="create_runtime_references",
-                dry_run=True,
-            )
+        async with self._bridge_lock:
+            return await self._create_or_reuse_metadata(device, mapping, capability)
 
-        async with self._confirm_lock:
-            existing = await self._find_instance(device_id)
-            if existing is not None:
-                return self._result_for_device(
-                    status="already_bridged",
-                    device=device,
-                    mapping=mapping,
-                    instance=existing,
-                    action="reuse_runtime_references",
-                    dry_run=False,
-                )
-            return await self._create_references(device, mapping)
-
-    async def list_status(self, device_id: str | None = None) -> list[DeviceBridgeStatus]:
-        """Return linkage state without reading Device Integration fields."""
-
-        requested_id = device_id.strip() if device_id is not None else None
-        if device_id is not None and not _SAFE_REFERENCE_PATTERN.fullmatch(requested_id or ""):
-            return [self._unknown_status("[invalid-device-id]", "device_id is not a safe reference")]
-
-        if requested_id is None:
-            devices = await list_device_identities()
-        else:
-            device = await get_device_identity(requested_id)
-            devices = [device] if device is not None else []
-        if requested_id is not None and not devices:
-            return [self._unknown_status(requested_id, "Device Integration not found")]
-
-        instances = await self.instance_store.list_instances()
-        by_device_id = {
-            str(instance.metadata.get("device_id")): instance
-            for instance in instances
-            if instance.metadata.get("source") == BRIDGE_SOURCE and instance.metadata.get("device_id")
-        }
-        return [self._status_for_device(device, by_device_id.get(str(device["id"]))) for device in devices]
-
-    async def _create_references(
-        self, device: DeviceIntegrationIdentity, mapping: DevicePackageMapping
+    async def _create_or_reuse_metadata(
+        self,
+        device: DeviceIntegrationIdentity,
+        mapping: DevicePackageMapping,
+        capability: str,
     ) -> DeviceBridgeResult:
+        device_integration_id = str(device["id"])
+        expected_secret_ref = f"{DEVICE_CREDENTIAL_REFERENCE_SCHEME}:{device_integration_id}"
         created_profile = False
+        created_instance = False
+        created_sync_profile = False
+        profile: CredentialProfile | None = None
         instance: IntegrationInstance | None = None
-        profile = await self._find_credential_profile(str(device["id"]), mapping.package_id)
+        sync_profile: SyncProfile | None = None
+
         try:
-            if profile is None:
+            instance = await self._find_instance(device_integration_id)
+            if instance is not None and instance.package_id != mapping.package_id:
+                raise ValueError("Existing bridged Integration Instance has a different package_id")
+
+            profile = await self._resolve_existing_profile(
+                device_integration_id=device_integration_id,
+                package_id=mapping.package_id,
+                instance=instance,
+            )
+            if profile is not None:
+                if profile.package_id not in {None, mapping.package_id}:
+                    raise ValueError("Existing bridged Credential Profile has a different package_id")
+                compatible_refs = {
+                    expected_secret_ref,
+                    f"{DEVICE_CREDENTIAL_REFERENCE_SCHEME}://{device_integration_id}",
+                }
+                if profile.secret_ref not in compatible_refs:
+                    raise ValueError("Existing bridged Credential Profile has an incompatible secret_ref")
+            else:
                 profile = await self.credential_store.create_profile(
                     CredentialProfileCreate(
-                        display_name=f"{_safe_display_name(device['name'])} credential reference",
+                        display_name=f"{_safe_display_name(device['name'])} Credential Reference",
                         profile_type="device_integration_reference",
                         package_id=mapping.package_id,
-                        secret_ref=f"{DEVICE_CREDENTIAL_REFERENCE_SCHEME}://{device['id']}",
-                        metadata={
-                            "source": "device_integration",
-                            "device_id": str(device["id"]),
-                            "bridge_version": BRIDGE_VERSION,
-                            "reference_scope": "existing_device_credentials",
-                        },
+                        secret_ref=expected_secret_ref,
+                        required_fields=list(mapping.required_credential_fields),
+                        configured_fields=[],
+                        metadata=_bridge_metadata(device_integration_id),
                     )
                 )
                 created_profile = True
 
-            instance = await self.instance_store.create_instance(
-                IntegrationInstanceCreate(
-                    package_id=mapping.package_id,
-                    display_name=_safe_display_name(device["name"]),
-                    credential_profile_id=profile.credential_profile_id,
-                    verify_ssl=bool(device["verify_ssl"]),
-                    enabled=bool(device["enabled"]),
-                    metadata={
-                        "source": BRIDGE_SOURCE,
-                        "device_id": str(device["id"]),
-                        "device_name": _safe_display_name(device["name"]),
-                        "device_storage_key": str(device["storage_key"]),
-                        "device_service_id": str(device["service_id"]),
-                        "package_id": mapping.package_id,
-                        "bridge_version": BRIDGE_VERSION,
-                    },
+            if instance is None:
+                instance = await self.instance_store.create_instance(
+                    IntegrationInstanceCreate(
+                        package_id=mapping.package_id,
+                        display_name=_safe_display_name(device["name"]),
+                        base_url=None,
+                        credential_profile_id=profile.credential_profile_id,
+                        verify_ssl=bool(device["verify_ssl"]),
+                        enabled=bool(device["enabled"]),
+                        metadata={
+                            **_bridge_metadata(device_integration_id),
+                            "device_storage_key": str(device["storage_key"]),
+                            "device_service_id": str(device["service_id"]),
+                            "base_url_summary": "managed_by_device_integration",
+                        },
+                    )
                 )
-            )
-            updated_profile = await self.credential_store.update_profile(
-                profile.credential_profile_id,
-                CredentialProfileUpdate(instance_id=instance.instance_id),
-            )
-            if updated_profile is None:
-                raise RuntimeError("Credential Profile reference disappeared during bridge creation")
+                created_instance = True
+            elif instance.credential_profile_id not in {None, profile.credential_profile_id}:
+                raise ValueError("Existing bridged Integration Instance references a different Credential Profile")
+
+            if profile.instance_id not in {None, instance.instance_id}:
+                raise ValueError("Existing bridged Credential Profile references a different Integration Instance")
+
+            sync_profile = await self._find_sync_profile(instance.instance_id, capability)
+            if sync_profile is None:
+                sync_profile = await self.sync_profile_store.create_profile(
+                    SyncProfileCreate(
+                        display_name=f"{_safe_display_name(device['name'])} 告警同步",
+                        instance_id=instance.instance_id,
+                        capability=capability,
+                        mode="manual",
+                        schedule="manual",
+                        enabled=True,
+                        params={"time_range": "last_24h", "page_size": 100},
+                        deduplicate=True,
+                        create_analysis_cases=False,
+                        run_initial_analysis=False,
+                        metadata=_bridge_metadata(device_integration_id),
+                    )
+                )
+                created_sync_profile = True
+
+            if instance.credential_profile_id is None:
+                updated_instance = await self.instance_store.update_instance(
+                    instance.instance_id,
+                    IntegrationInstanceUpdate(credential_profile_id=profile.credential_profile_id),
+                )
+                if updated_instance is None:
+                    raise RuntimeError("Integration Instance disappeared during bridge creation")
+                instance = updated_instance
+
+            profile_updates: dict[str, Any] = {}
+            if profile.instance_id is None:
+                profile_updates["instance_id"] = instance.instance_id
+            if profile.secret_ref != expected_secret_ref:
+                profile_updates["secret_ref"] = expected_secret_ref
+            if profile_updates:
+                updated_profile = await self.credential_store.update_profile(
+                    profile.credential_profile_id,
+                    CredentialProfileUpdate(**profile_updates),
+                )
+                if updated_profile is None:
+                    raise RuntimeError("Credential Profile disappeared during bridge creation")
+                profile = updated_profile
         except Exception:
-            if instance is not None:
-                await self.instance_store.delete_instance(instance.instance_id)
+            if created_sync_profile and sync_profile is not None:
+                with suppress(Exception):
+                    await self.sync_profile_store.delete_profile(sync_profile.sync_profile_id)
+            if created_instance and instance is not None:
+                with suppress(Exception):
+                    await self.instance_store.delete_instance(instance.instance_id)
             if created_profile and profile is not None:
-                await self.credential_store.delete_profile(profile.credential_profile_id)
-            return self._result_for_device(
+                with suppress(Exception):
+                    await self.credential_store.delete_profile(profile.credential_profile_id)
+            return self._result(
                 status="validation_failed",
-                device=device,
-                mapping=mapping,
-                action="none",
-                dry_run=False,
-                errors=["Runtime reference creation failed safe validation"],
+                device_integration_id=device_integration_id,
+                capability=capability,
+                errors=["Runtime v2 bridge metadata could not be created safely"],
             )
 
-        return self._result_for_device(
-            status="bridged",
-            device=device,
-            mapping=mapping,
-            instance=instance,
-            action="created_runtime_references",
-            dry_run=False,
+        warnings: list[str] = []
+        if not bool(device["enabled"]):
+            warnings.append("Device Integration is disabled; the Integration Instance remains disabled")
+        if str(device["status"] or "unknown") != "ok":
+            warnings.append("Device Integration is not in a healthy state; no connection test was run")
+        created = created_profile or created_instance or created_sync_profile
+        return self._result(
+            status="created" if created else "reused",
+            device_integration_id=device_integration_id,
+            capability=capability,
+            instance_id=instance.instance_id,
+            credential_profile_id=profile.credential_profile_id,
+            sync_profile_id=sync_profile.sync_profile_id,
+            warnings=warnings,
         )
 
-    async def _find_instance(self, device_id: str) -> IntegrationInstance | None:
+    async def _find_instance(self, device_integration_id: str) -> IntegrationInstance | None:
         for instance in await self.instance_store.list_instances():
             if (
                 instance.metadata.get("source") == BRIDGE_SOURCE
-                and str(instance.metadata.get("device_id")) == device_id
+                and _source_device_integration_id(instance.metadata) == device_integration_id
             ):
                 return instance
         return None
 
-    async def _find_credential_profile(self, device_id: str, package_id: str) -> CredentialProfile | None:
+    async def _resolve_existing_profile(
+        self,
+        *,
+        device_integration_id: str,
+        package_id: str,
+        instance: IntegrationInstance | None,
+    ) -> CredentialProfile | None:
+        if instance is not None and instance.credential_profile_id:
+            referenced = await self.credential_store.get_profile(instance.credential_profile_id)
+            if referenced is None:
+                raise ValueError("Existing bridged Integration Instance has a missing Credential Profile")
+            return referenced
         for profile in await self.credential_store.list_profiles(package_id=package_id):
-            if (
-                profile.metadata.get("source") == "device_integration"
-                and str(profile.metadata.get("device_id")) == device_id
-            ):
+            if _source_device_integration_id(profile.metadata) == device_integration_id:
                 return profile
         return None
 
-    def _resolve_mapping(self, device: DeviceIntegrationIdentity) -> tuple[DevicePackageMapping | None, str | None]:
+    async def _find_sync_profile(self, instance_id: str, capability: str) -> SyncProfile | None:
+        profiles = await self.sync_profile_store.list_profiles(
+            instance_id=instance_id,
+            capability=capability,
+        )
+        return profiles[0] if profiles else None
+
+    def _resolve_mapping(
+        self,
+        device: DeviceIntegrationIdentity,
+        capability: str,
+    ) -> tuple[DevicePackageMapping | None, str | None]:
         identifiers = {
             str(device["storage_key"]).strip().lower(),
             str(device["service_id"]).strip().lower(),
@@ -334,123 +361,45 @@ class DeviceIntegrationBridge:
         package = self.registry.get_package(mapping.package_id)
         if package is None:
             return None, f"Mapped Integration Package is not available: {mapping.package_id}"
-        missing = [
-            capability for capability in mapping.supported_capabilities if capability not in package.capabilities
-        ]
-        if missing:
-            return None, "Mapped Integration Package does not declare the required capability"
+        if capability not in mapping.capabilities or capability not in package.capabilities:
+            return None, f"Mapped Integration Package does not declare {capability}"
         return mapping, None
 
-    def _result_for_device(
-        self,
-        *,
-        status: BridgeResultStatus,
-        device: DeviceIntegrationIdentity,
-        mapping: DevicePackageMapping | None,
-        action: str,
-        dry_run: bool,
-        instance: IntegrationInstance | None = None,
-        errors: list[str] | None = None,
-    ) -> DeviceBridgeResult:
-        return self._result(
-            status=status,
-            device_id=str(device["id"]),
-            device_name=_safe_display_name(device["name"]),
-            package_id=instance.package_id if instance is not None else (mapping.package_id if mapping else None),
-            instance_id=instance.instance_id if instance is not None else None,
-            credential_profile_id=instance.credential_profile_id if instance is not None else None,
-            supported_capabilities=list(mapping.supported_capabilities) if mapping else [],
-            action=action,
-            dry_run=dry_run,
-            device_status=str(device["status"] or "unknown"),
-            errors=errors,
-        )
-
+    @staticmethod
     def _result(
-        self,
         *,
         status: BridgeResultStatus,
-        device_id: str,
-        action: str,
-        dry_run: bool,
-        device_name: str | None = None,
-        package_id: str | None = None,
+        device_integration_id: str,
+        capability: str,
         instance_id: str | None = None,
         credential_profile_id: str | None = None,
-        supported_capabilities: list[str] | None = None,
-        device_status: str | None = None,
+        sync_profile_id: str | None = None,
+        warnings: list[str] | None = None,
         errors: list[str] | None = None,
     ) -> DeviceBridgeResult:
         return DeviceBridgeResult(
             status=status,
-            device_id=device_id,
-            device_name=device_name,
-            package_id=package_id,
+            device_integration_id=device_integration_id,
             instance_id=instance_id,
             credential_profile_id=credential_profile_id,
-            supported_capabilities=supported_capabilities or [],
-            bridge_summary={
-                "source": BRIDGE_SOURCE,
-                "bridge_version": BRIDGE_VERSION,
-                "action": action,
-                "device_status": device_status,
-                "force_applied": False,
-            },
-            safety_summary={
-                "dry_run": dry_run,
-                "credential_linkage": "reference_only",
-                "vendor_call": False,
-                "adapter_call": False,
-                "sync_execution": False,
-                "evidence_dispatch": False,
-                "security_objects_created": False,
-                "plaintext_credentials_read_or_copied": False,
-            },
-            limitations=list(_COMMON_LIMITATIONS),
+            sync_profile_id=sync_profile_id,
+            capability=capability,
+            warnings=warnings or [],
             errors=errors or [],
         )
 
-    def _status_for_device(
-        self, device: DeviceIntegrationIdentity, instance: IntegrationInstance | None
-    ) -> DeviceBridgeStatus:
-        mapping, mapping_error = self._resolve_mapping(device)
-        if instance is not None:
-            return DeviceBridgeStatus(
-                device_id=str(device["id"]),
-                device_name=_safe_display_name(device["name"]),
-                bridge_state="linked",
-                package_id=instance.package_id,
-                instance_id=instance.instance_id,
-                credential_profile_id=instance.credential_profile_id,
-                supported_capabilities=list(mapping.supported_capabilities) if mapping else [],
-                message="Device Integration is linked to a Runtime v2 Integration Instance.",
-                limitations=list(_COMMON_LIMITATIONS),
-            )
-        if mapping is None:
-            return DeviceBridgeStatus(
-                device_id=str(device["id"]),
-                device_name=_safe_display_name(device["name"]),
-                bridge_state="unsupported",
-                message=mapping_error or "No Integration Package mapping is available.",
-                limitations=list(_COMMON_LIMITATIONS),
-            )
-        return DeviceBridgeStatus(
-            device_id=str(device["id"]),
-            device_name=_safe_display_name(device["name"]),
-            bridge_state="unlinked",
-            package_id=mapping.package_id,
-            supported_capabilities=list(mapping.supported_capabilities),
-            message="Device Integration can be linked to a Runtime v2 Integration Instance.",
-            limitations=list(_COMMON_LIMITATIONS),
-        )
 
-    def _unknown_status(self, device_id: str, message: str) -> DeviceBridgeStatus:
-        return DeviceBridgeStatus(
-            device_id=device_id,
-            bridge_state="unknown",
-            message=message,
-            limitations=list(_COMMON_LIMITATIONS),
-        )
+def _bridge_metadata(device_integration_id: str) -> dict[str, str]:
+    return {
+        "source": BRIDGE_SOURCE,
+        "bridge_version": BRIDGE_VERSION,
+        "source_device_integration_id": device_integration_id,
+    }
+
+
+def _source_device_integration_id(metadata: dict[str, Any]) -> str:
+    value = metadata.get("source_device_integration_id", metadata.get("device_id", ""))
+    return str(value)
 
 
 def _safe_display_name(value: Any) -> str:

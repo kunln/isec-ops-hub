@@ -11,7 +11,7 @@ Both concepts are necessary, but their relationship must be explicit. A user can
 
 PR #55 aligned the frontend semantics: Sync on a product details page is the single-product view, while global Sync and Ingest is the cross-product configuration, preview, confirmation, and run-history view. The internal model now needs to support that unified experience.
 
-This document defines the target relationship. It is an architecture and product-model decision for future bridge implementation; it does not replace existing Device Integration behavior or introduce runtime execution by itself.
+This document defines the target relationship. It is an architecture and product-model decision for the bridge implementation; it does not replace existing Device Integration behavior or introduce runtime execution by itself.
 
 ## 2. User-Visible Model
 
@@ -131,7 +131,7 @@ Credential migration must be staged and backward-compatible. Creating the bridge
 
 ## 7. Phase-One Bridge Scope
 
-A later implementation PR should provide a bridge skeleton with the following bounded scope:
+The phase-one bridge skeleton has the following bounded scope:
 
 - Identify `DeviceIntegration` products that have a supported Integration Package mapping and are eligible for bridging.
 - Create or associate a Runtime v2 Integration Instance idempotently.
@@ -153,27 +153,31 @@ The skeleton should establish object identity and safe references first. Real co
 ### Bridge Skeleton Implementation Notes
 
 The first Device Integration bridge implementation is intentionally limited to
-safe Runtime v2 reference creation:
+safe Runtime v2 metadata creation:
 
 - It reads a credential-free identity projection of a `DeviceIntegration`; the
   device credential/configuration fields are not selected, resolved, masked,
   copied, logged, or returned by the bridge.
 - It maps supported TDA Device Integration identifiers to the existing
-  `asiainfo.tda` Integration Package and exposes the initial
-  `alert.search` capability association.
-- The plan endpoint is always a dry run and does not modify Device Integration,
-  Integration Instance, Credential Profile, Sync Profile, or Integration Run
-  storage.
-- Confirmed bridge creation writes an idempotent Integration Instance and a
-  Credential Profile whose `secret_ref` points back to the existing Device
-  Integration credential source. It does not migrate plaintext credentials.
+  `asiainfo.tda` Integration Package and creates the initial `alert.search`
+  Sync Profile metadata.
+- `POST /api/security/integrations/device-bridge` writes or reuses an
+  idempotent Integration Instance, reference-only Credential Profile, and
+  manual Sync Profile. It does not modify the source Device Integration or
+  create an Integration Run.
+- The Credential Profile stores
+  `secret_ref=device-integration:{device_integration_id}` and points back to the
+  existing Device Integration credential source. It does not migrate plaintext
+  credentials.
+- The default Sync Profile is enabled, uses `mode=manual` and
+  `schedule=manual`, and stores only safe `last_24h` and `page_size=100`
+  parameters.
 - The bridge does not call a vendor API, connector, Adapter Registry, or
   Evidence Dispatcher. It performs no sync, preview, confirm ingest, Evidence
   or Alert creation, Analysis Case or Incident creation, notification, or
   remediation.
 - No raw payload or full API response is retained, and bridge actions are not
   recorded as Integration Runs in this skeleton.
-- Creating a Sync Profile from the connected product remains a later PR.
 
 ## 8. Prohibited Design and Behavior
 
@@ -190,9 +194,13 @@ safe Runtime v2 reference creation:
 
 A. **Model alignment document** — establish the product model, object relationships, layer ownership, safety boundaries, and terminology.
 
-B. **DeviceIntegration to Runtime v2 Instance Bridge Skeleton** — add idempotent package/instance mapping and reference-only credential linkage without sync execution.
+B. **DeviceIntegration to Runtime v2 Bridge Skeleton** — add idempotent
+package/instance mapping, reference-only credential linkage, and the initial
+manual `alert.search` Sync Profile without sync execution.
 
-C. **Create Sync Profile from Connected Product** — let the product-scoped and global views configure the same runtime sync metadata, beginning with `alert.search`.
+C. **Connector-backed Sync Execution** — connect the bridged metadata to a
+separately reviewed Runtime execution path without weakening preview, ingest,
+credential, or Evidence boundaries.
 
 D. **Scheduled Sync Skeleton v2** — add bounded scheduling and run-state behavior without automatic ingest, Incident creation, or remediation.
 

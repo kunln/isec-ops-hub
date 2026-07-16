@@ -1,7 +1,8 @@
-"""Device Integration to Runtime v2 reference bridge tests."""
+"""Device Integration to Runtime v2 metadata bridge tests."""
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import socket
 from typing import Any
@@ -14,6 +15,7 @@ from flocks.security.integrations.device_bridge import DeviceBridgeRequest, defa
 from flocks.security.integrations.instance_store import default_integration_instance_store
 from flocks.security.integrations.run_store import default_integration_run_store
 from flocks.security.integrations.sync_profile_store import default_sync_profile_store
+from flocks.security.store import default_store
 from flocks.storage.storage import Storage
 from flocks.tool.device.models import DEFAULT_GROUP_ID
 from flocks.tool.device.store import fetch_device, insert_device
@@ -21,7 +23,7 @@ from flocks.tool.device.store import fetch_device, insert_device
 SENSITIVE_VALUES = (
     "REAL_TOKEN_SHOULD_NOT_LEAK",
     "REAL_API_KEY_SHOULD_NOT_LEAK",
-    "REAL_PASSWORD_SHOULD_NOT_LEAK",
+    "REAL_SECRET_SHOULD_NOT_LEAK",
     "Bearer REAL_AUTH_SHOULD_NOT_LEAK",
 )
 
@@ -73,236 +75,259 @@ async def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 async def seed_device(
-    device_id: str = "device-tda-1",
+    device_integration_id: str = "device-tda-1",
     *,
     storage_key: str = "asiainfo_tda_api_v7_0",
     service_id: str = "asiainfo_tda_api",
     name: str = "TDA Production",
+    enabled: bool = True,
+    status: str = "ok",
 ) -> None:
     await insert_device(
-        device_id=device_id,
+        device_id=device_integration_id,
         group_id=DEFAULT_GROUP_ID,
         name=name,
         storage_key=storage_key,
         service_id=service_id,
-        enabled=True,
+        enabled=enabled,
         verify_ssl=True,
         db_fields={
             "token": SENSITIVE_VALUES[0],
             "api_key": SENSITIVE_VALUES[1],
-            "password": SENSITIVE_VALUES[2],
+            "secret": SENSITIVE_VALUES[2],
             "authorization": SENSITIVE_VALUES[3],
             "base_url": "https://tda.example.test",
         },
-        status="ok",
+        status=status,
     )
 
 
 def assert_no_plaintext_credentials(*payloads: Any) -> None:
     serialized = " ".join(
-        payload.model_dump_json() if hasattr(payload, "model_dump_json") else str(payload) for payload in payloads
+        payload.model_dump_json() if hasattr(payload, "model_dump_json") else str(payload)
+        for payload in payloads
     )
     for sensitive_value in SENSITIVE_VALUES:
         assert sensitive_value not in serialized
 
 
 @pytest.mark.asyncio
-async def test_dry_run_plan_is_read_only_and_does_not_read_device_fields(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+async def test_bridge_api_requires_security_ops_write(client: AsyncClient) -> None:
+    await seed_device()
+    from fastapi import FastAPI, Request
+    from flocks.auth.context import AuthUser
+    from flocks.server.routes.security import router as security_router
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def inject_viewer(request: Request, call_next):
+        request.state.auth_user = AuthUser(
+            id="viewer-user",
+            username="viewer-user",
+            role="viewer",
+            status="active",
+            must_reset_password=False,
+        )
+        return await call_next(request)
+
+    app.include_router(security_router, prefix="/api/security")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as viewer:
+        response = await viewer.post(
+            "/api/security/integrations/device-bridge",
+            json={"device_integration_id": "device-tda-1", "capability": "alert.search"},
+        )
+
+    assert response.status_code == 403
+    assert "security.ops.write" in response.json()["detail"]
+    assert await default_integration_instance_store.list_instances() == []
+    assert await default_credential_profile_store.list_profiles() == []
+    assert await default_sync_profile_store.list_profiles() == []
+
+
+@pytest.mark.asyncio
+async def test_bridge_api_creates_instance_credential_reference_and_alert_sync_profile(
+    client: AsyncClient,
+) -> None:
+    await seed_device()
+
+    response = await client.post(
+        "/api/security/integrations/device-bridge",
+        json={
+            "device_integration_id": "device-tda-1",
+            "capability": "alert.search",
+            "requested_by": "security-operator",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result == {
+        "status": "created",
+        "device_integration_id": "device-tda-1",
+        "instance_id": result["instance_id"],
+        "credential_profile_id": result["credential_profile_id"],
+        "sync_profile_id": result["sync_profile_id"],
+        "capability": "alert.search",
+        "warnings": [],
+        "errors": [],
+    }
+    assert result["instance_id"].startswith("intinst_")
+    assert result["credential_profile_id"].startswith("credprof_")
+    assert result["sync_profile_id"].startswith("syncprof_")
+
+    instance = await default_integration_instance_store.get_instance(result["instance_id"])
+    credential_profile = await default_credential_profile_store.get_profile(
+        result["credential_profile_id"]
+    )
+    sync_profile = await default_sync_profile_store.get_profile(result["sync_profile_id"])
+
+    assert instance is not None
+    assert credential_profile is not None
+    assert sync_profile is not None
+    assert instance.package_id == "asiainfo.tda"
+    assert instance.display_name == "TDA Production"
+    assert instance.base_url is None
+    assert instance.verify_ssl is True
+    assert instance.enabled is True
+    assert instance.credential_profile_id == credential_profile.credential_profile_id
+    assert instance.metadata["source_device_integration_id"] == "device-tda-1"
+    assert instance.metadata["base_url_summary"] == "managed_by_device_integration"
+
+    assert credential_profile.instance_id == instance.instance_id
+    assert credential_profile.profile_type == "device_integration_reference"
+    assert credential_profile.secret_ref == "device-integration:device-tda-1"
+    assert credential_profile.required_fields == ["api_key", "secret"]
+    assert credential_profile.configured_fields == []
+    assert credential_profile.metadata["source_device_integration_id"] == "device-tda-1"
+
+    assert sync_profile.instance_id == instance.instance_id
+    assert sync_profile.package_id == "asiainfo.tda"
+    assert sync_profile.display_name == "TDA Production 告警同步"
+    assert sync_profile.capability == "alert.search"
+    assert sync_profile.mode == "manual"
+    assert sync_profile.schedule == "manual"
+    assert sync_profile.enabled is True
+    assert sync_profile.params == {"time_range": "last_24h", "page_size": 100}
+    assert sync_profile.create_analysis_cases is False
+    assert sync_profile.run_initial_analysis is False
+    assert sync_profile.metadata["source_device_integration_id"] == "device-tda-1"
+    assert_no_plaintext_credentials(result, instance, credential_profile, sync_profile)
+
+
+@pytest.mark.asyncio
+async def test_bridge_is_idempotent_for_repeated_and_concurrent_requests(client: AsyncClient) -> None:
+    await seed_device()
+    request = DeviceBridgeRequest(
+        device_integration_id="device-tda-1",
+        capability="alert.search",
+        requested_by="security-operator",
+    )
+
+    first, second = await asyncio.gather(
+        default_device_integration_bridge.bridge_device_integration(request),
+        default_device_integration_bridge.bridge_device_integration(request),
+    )
+    third = await default_device_integration_bridge.bridge_device_integration(request)
+
+    assert {first.status, second.status} == {"created", "reused"}
+    assert third.status == "reused"
+    assert first.instance_id == second.instance_id == third.instance_id
+    assert first.credential_profile_id == second.credential_profile_id == third.credential_profile_id
+    assert first.sync_profile_id == second.sync_profile_id == third.sync_profile_id
+    assert len(await default_integration_instance_store.list_instances()) == 1
+    assert len(await default_credential_profile_store.list_profiles()) == 1
+    assert len(await default_sync_profile_store.list_profiles()) == 1
+    assert await default_integration_run_store.list_runs() == []
+
+
+@pytest.mark.asyncio
+async def test_bridge_returns_not_found_or_validation_failed_without_partial_objects(
+    client: AsyncClient,
+) -> None:
+    missing = await client.post(
+        "/api/security/integrations/device-bridge",
+        json={"device_integration_id": "device-missing", "capability": "alert.search"},
+    )
+    await seed_device(
+        "device-unsupported",
+        storage_key="unsupported_product_v1",
+        service_id="unsupported_product",
+        name="Unsupported Product",
+    )
+    unsupported = await client.post(
+        "/api/security/integrations/device-bridge",
+        json={"device_integration_id": "device-unsupported", "capability": "alert.search"},
+    )
+    unsupported_capability = await client.post(
+        "/api/security/integrations/device-bridge",
+        json={"device_integration_id": "device-unsupported", "capability": "asset.search"},
+    )
+    invalid_id = await client.post(
+        "/api/security/integrations/device-bridge",
+        json={"device_integration_id": "unsafe device id", "capability": "alert.search"},
+    )
+
+    assert missing.status_code == 200
+    assert missing.json()["status"] == "not_found"
+    assert unsupported.json()["status"] == "validation_failed"
+    assert unsupported_capability.json()["status"] == "validation_failed"
+    assert invalid_id.json()["status"] == "validation_failed"
+    assert await default_integration_instance_store.list_instances() == []
+    assert await default_credential_profile_store.list_profiles() == []
+    assert await default_sync_profile_store.list_profiles() == []
+
+
+@pytest.mark.asyncio
+async def test_bridge_does_not_read_plaintext_or_execute_runtime_and_security_paths(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     await seed_device()
     before_row = await fetch_device("device-tda-1")
     assert before_row is not None
     before = dict(before_row)
 
-    def fail_if_masking_fields(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("Bridge must not read or mask Device Integration credential fields")
-
-    monkeypatch.setattr("flocks.tool.device.store.mask_for_display", fail_if_masking_fields)
-    result = await default_device_integration_bridge.bridge_device_integration(
-        DeviceBridgeRequest(device_id="device-tda-1")
-    )
-    after_row = await fetch_device("device-tda-1")
-
-    assert result.status == "planned"
-    assert result.package_id == "asiainfo.tda"
-    assert result.supported_capabilities == ["alert.search"]
-    assert result.instance_id is None
-    assert result.credential_profile_id is None
-    assert await default_integration_instance_store.list_instances() == []
-    assert await default_credential_profile_store.list_profiles() == []
-    assert after_row is not None and dict(after_row) == before
-    assert_no_plaintext_credentials(result)
-
-
-@pytest.mark.asyncio
-async def test_missing_and_unsupported_devices_return_safe_statuses(client: AsyncClient) -> None:
-    missing = await default_device_integration_bridge.bridge_device_integration(
-        DeviceBridgeRequest(device_id="device-missing")
-    )
-    await seed_device(
-        "device-unsupported",
-        storage_key="unsupported_product_v1",
-        service_id="unsupported_product",
-        name="Unsupported Product",
-    )
-    unsupported = await default_device_integration_bridge.bridge_device_integration(
-        DeviceBridgeRequest(device_id="device-unsupported")
-    )
-
-    assert missing.status == "not_found"
-    assert unsupported.status == "unsupported"
-    assert unsupported.package_id is None
-    assert await default_integration_instance_store.list_instances() == []
-    assert await default_credential_profile_store.list_profiles() == []
-
-
-@pytest.mark.asyncio
-async def test_plan_api_forces_dry_run_without_creating_runtime_objects(client: AsyncClient) -> None:
-    await seed_device()
-    response = await client.post(
-        "/api/security/integrations/device-bridge/plan",
-        json={"device_id": "device-tda-1", "dry_run": False},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "planned"
-    assert response.json()["safety_summary"]["dry_run"] is True
-    assert await default_integration_instance_store.list_instances() == []
-    assert await default_credential_profile_store.list_profiles() == []
-
-
-@pytest.mark.asyncio
-async def test_confirm_api_requires_explicit_confirmation(client: AsyncClient) -> None:
-    await seed_device()
-
-    response = await client.post(
-        "/api/security/integrations/device-bridge/confirm",
-        json={"device_id": "device-tda-1", "confirmed": False},
-    )
-
-    assert response.status_code == 400
-    assert "confirmed=True" in response.json()["detail"]
-    assert await default_integration_instance_store.list_instances() == []
-    assert await default_credential_profile_store.list_profiles() == []
-
-
-@pytest.mark.asyncio
-async def test_confirm_creates_safe_linked_instance_and_credential_reference(client: AsyncClient) -> None:
-    await seed_device()
-    response = await client.post(
-        "/api/security/integrations/device-bridge/confirm",
-        json={"device_id": "device-tda-1", "confirmed": True, "dry_run": True},
-    )
-
-    assert response.status_code == 200, response.text
-    result = response.json()
-    assert result["status"] == "bridged"
-    assert result["package_id"] == "asiainfo.tda"
-    assert result["instance_id"].startswith("intinst_")
-    assert result["credential_profile_id"].startswith("credprof_")
-    assert result["safety_summary"]["dry_run"] is False
-
-    instance = await default_integration_instance_store.get_instance(result["instance_id"])
-    profile = await default_credential_profile_store.get_profile(result["credential_profile_id"])
-    assert instance is not None
-    assert profile is not None
-    assert instance.credential_profile_id == profile.credential_profile_id
-    assert profile.instance_id == instance.instance_id
-    assert instance.metadata == {
-        "source": "device_integration_bridge",
-        "device_id": "device-tda-1",
-        "device_name": "TDA Production",
-        "device_storage_key": "asiainfo_tda_api_v7_0",
-        "device_service_id": "asiainfo_tda_api",
-        "package_id": "asiainfo.tda",
-        "bridge_version": "v1",
-    }
-    assert profile.profile_type == "device_integration_reference"
-    assert profile.secret_ref == "device-integration://device-tda-1"
-    assert profile.metadata["source"] == "device_integration"
-    assert profile.metadata["device_id"] == "device-tda-1"
-    assert_no_plaintext_credentials(result, instance, profile)
-
-
-@pytest.mark.asyncio
-async def test_confirm_is_idempotent_and_does_not_create_sync_profile_or_run(client: AsyncClient) -> None:
-    await seed_device()
-    first = await client.post(
-        "/api/security/integrations/device-bridge/confirm",
-        json={"device_id": "device-tda-1", "confirmed": True},
-    )
-    second = await client.post(
-        "/api/security/integrations/device-bridge/confirm",
-        json={"device_id": "device-tda-1", "confirmed": True},
-    )
-
-    assert first.status_code == second.status_code == 200
-    assert first.json()["status"] == "bridged"
-    assert second.json()["status"] == "already_bridged"
-    assert second.json()["instance_id"] == first.json()["instance_id"]
-    assert second.json()["credential_profile_id"] == first.json()["credential_profile_id"]
-    assert len(await default_integration_instance_store.list_instances()) == 1
-    assert len(await default_credential_profile_store.list_profiles()) == 1
-    assert await default_sync_profile_store.list_profiles() == []
-    assert await default_integration_run_store.list_runs() == []
-
-
-@pytest.mark.asyncio
-async def test_status_api_reports_linked_unlinked_unsupported_and_unknown(client: AsyncClient) -> None:
-    await seed_device("device-linked", name="Linked TDA")
-    await seed_device("device-unlinked", name="Unlinked TDA")
-    await seed_device(
-        "device-unsupported",
-        storage_key="unsupported_product_v1",
-        service_id="unsupported_product",
-        name="Unsupported Product",
-    )
-    confirmed = await client.post(
-        "/api/security/integrations/device-bridge/confirm",
-        json={"device_id": "device-linked", "confirmed": True},
-    )
-    assert confirmed.status_code == 200
-
-    response = await client.get("/api/security/integrations/device-bridge/status")
-    missing = await client.get(
-        "/api/security/integrations/device-bridge/status", params={"device_id": "device-missing"}
-    )
-    by_id = {item["device_id"]: item for item in response.json()}
-
-    assert response.status_code == 200
-    assert by_id["device-linked"]["bridge_state"] == "linked"
-    assert by_id["device-unlinked"]["bridge_state"] == "unlinked"
-    assert by_id["device-unsupported"]["bridge_state"] == "unsupported"
-    assert missing.status_code == 200
-    assert missing.json()[0]["bridge_state"] == "unknown"
-
-
-@pytest.mark.asyncio
-async def test_bridge_calls_no_adapter_connector_network_or_evidence_dispatcher(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    await seed_device()
-
     def forbidden(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("Bridge crossed its Integration Layer reference-only boundary")
+        raise AssertionError("Device bridge crossed its metadata-only Integration Layer boundary")
 
+    monkeypatch.setattr("flocks.tool.device.store.fetch_device", forbidden)
+    monkeypatch.setattr("flocks.tool.device.store.get_device_credentials", forbidden)
+    monkeypatch.setattr("flocks.tool.device.store.mask_for_display", forbidden)
+    monkeypatch.setattr("flocks.tool.device.store.resolve_for_runtime", forbidden)
     monkeypatch.setattr("flocks.security.connectors.tda.TdaClient", forbidden)
     monkeypatch.setattr("flocks.security.integrations.adapter_registry.AdapterRegistry.get_adapter", forbidden)
-    monkeypatch.setattr("flocks.security.integrations.evidence_dispatcher.dispatch_evidence_events", forbidden)
+    monkeypatch.setattr("flocks.security.integrations.sync_engine.plan_sync_profile_run", forbidden)
+    monkeypatch.setattr("flocks.security.integrations.sync_preview.preview_sync_profile_run", forbidden)
+    monkeypatch.setattr("flocks.security.integrations.sync_ingest.ingest_sync_profile_run", forbidden)
+    monkeypatch.setattr(
+        "flocks.security.integrations.evidence_dispatcher.dispatch_evidence_events",
+        forbidden,
+    )
     monkeypatch.setattr(socket, "create_connection", forbidden)
 
-    before_alerts = (await client.get("/api/security/alerts")).json()
-    before_cases = (await client.get("/api/security/analysis-cases")).json()
-    before_incidents = (await client.get("/api/security/incidents")).json()
+    before_assets = await default_store.list_assets()
+    before_alerts = await default_store.list_alerts()
+    before_cases = await default_store.list_analysis_cases()
+    before_incidents = await default_store.list_incidents()
     response = await client.post(
-        "/api/security/integrations/device-bridge/confirm",
-        json={"device_id": "device-tda-1", "confirmed": True},
+        "/api/security/integrations/device-bridge",
+        json={"device_integration_id": "device-tda-1", "capability": "alert.search"},
     )
 
     assert response.status_code == 200, response.text
-    assert (await client.get("/api/security/alerts")).json() == before_alerts == []
-    assert (await client.get("/api/security/analysis-cases")).json() == before_cases == []
-    assert (await client.get("/api/security/incidents")).json() == before_incidents == []
-    assert await default_sync_profile_store.list_profiles() == []
+    assert response.json()["status"] == "created"
+    assert await default_store.list_assets() == before_assets == []
+    assert await default_store.list_alerts() == before_alerts == []
+    assert await default_store.list_analysis_cases() == before_cases == []
+    assert await default_store.list_incidents() == before_incidents == []
     assert await default_integration_run_store.list_runs() == []
+
+    async with Storage.connect(Storage.get_db_path()) as db:
+        db.row_factory = None
+        async with db.execute("SELECT * FROM device_integrations WHERE id = ?", ("device-tda-1",)) as cursor:
+            after_row = await cursor.fetchone()
+    assert after_row is not None
+    assert tuple(after_row) == tuple(before.values())
+    assert_no_plaintext_credentials(response.json())

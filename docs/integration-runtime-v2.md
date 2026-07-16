@@ -618,3 +618,36 @@ The Integration Center UI is organized around user tasks rather than internal ru
 ### Sync Cursor and Run State Updates
 
 Sync Cursor and Run State updates are applied only after successful confirmed manual ingest. Plan and preview do not update SyncProfile cursor or last_run_id. Successful ingest updates last_run_id, last_status, last_synced_at, and only advances cursor when the adapter returns a safe cursor. Failed, rejected, or confirmation-required runs do not overwrite the last successful cursor.
+
+### Device Integration to Runtime v2 Bridge Skeleton
+
+The Device Integration bridge is an Integration Layer metadata operation. A
+single `POST /api/security/integrations/device-bridge` request creates or reuses
+the following relationship for a supported connected product:
+
+```text
+DeviceIntegration
+  -> IntegrationInstance
+       -> CredentialProfile reference
+       -> SyncProfile (alert.search)
+```
+
+The initial bridge supports only `alert.search`. It creates a manual, enabled
+Sync Profile with `schedule=manual` and bounded defaults of
+`time_range=last_24h` and `page_size=100`. Repeating the request for the same
+`device_integration_id` reuses the existing Instance, Credential Profile, and
+Sync Profile rather than creating duplicates.
+
+Credential linkage is reference-only. The Credential Profile stores
+`secret_ref=device-integration:{device_integration_id}` and field names only;
+the bridge queries a credential-free Device Integration identity projection and
+does not select, resolve, copy, log, or return API keys, secrets, tokens, or
+passwords. Because Base URL is held with the existing Device Integration
+configuration, the Integration Instance records only a safe
+`base_url_summary=managed_by_device_integration` marker.
+
+Bridge creation does not call TDA or another vendor API, resolve an adapter,
+plan or preview sync, ingest data, dispatch evidence, write an Integration Run,
+or create Evidence, Alert, Asset, Analysis Case, Incident, notification, or
+remediation records. It establishes Runtime v2 metadata only; later execution
+must continue through the separately reviewed Runtime and Evidence boundaries.
