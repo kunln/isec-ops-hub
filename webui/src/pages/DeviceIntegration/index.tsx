@@ -28,6 +28,7 @@ import {
   type IntegrationInstance,
   type CredentialProfile,
   type SyncProfile,
+  type DeviceSyncProfileStatus,
   type IntegrationRun,
 } from '@/api/security';
 import type { APIServiceSummary, APIServiceCredentialField, Tool, MCPCatalogEntry } from '@/types';
@@ -550,6 +551,10 @@ function deviceApiStatus(device?: DeviceIntegration | null) {
   return device.status || 'pending_test';
 }
 
+function isValidDeviceIntegrationId(value?: string | null) {
+  return /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,254}$/.test(String(value || '').trim());
+}
+
 function deviceConnectionBaseUrl(device: DeviceIntegration) {
   const directUrl = [
     device.fields.base_url,
@@ -800,6 +805,13 @@ interface DeviceSyncBinding {
   label: string;
   message: string;
   capabilities: string[];
+}
+
+type SyncInitializationPhase = 'idle' | 'initializing' | 'configured' | 'failed';
+
+interface SyncInitializationFeedback {
+  phase: SyncInitializationPhase;
+  message?: string;
 }
 
 function deviceSyncProfileId(deviceId: string) {
@@ -1991,6 +2003,8 @@ function DeviceConfigPanel({
   vendorKey,
   sync,
   syncProfiles = [],
+  syncProfileStatus,
+  syncInitialization,
   actionLoading,
   onSave,
   onDelete,
@@ -2006,13 +2020,15 @@ function DeviceConfigPanel({
   onUpdateScheduleInterval,
   onUpdateSyncCredentials,
   onOpenSyncIngest,
-  onSyncProfilesChanged,
+  onInitializeSync,
 }: {
   device?: DeviceIntegration;
   template?: APIServiceSummary;
   vendorKey?: string;
   sync?: DeviceSyncBinding;
   syncProfiles?: SyncProfile[];
+  syncProfileStatus?: DeviceSyncProfileStatus;
+  syncInitialization?: SyncInitializationFeedback;
   actionLoading?: string | null;
   onSave: (data: { name: string; fields: Record<string, string>; enabled: boolean; verify_ssl: boolean }) => Promise<void>;
   onDelete?: () => Promise<void>;
@@ -2033,7 +2049,7 @@ function DeviceConfigPanel({
   onUpdateScheduleInterval?: (source: SecurityConnectorCustomerDataSource, schedule: SecurityConnectorCustomerSchedule, intervalSeconds: number) => Promise<void>;
   onUpdateSyncCredentials?: (source: SecurityConnectorCustomerDataSource) => void;
   onOpenSyncIngest?: () => void;
-  onSyncProfilesChanged?: () => Promise<void>;
+  onInitializeSync?: (device: DeviceIntegration) => Promise<void>;
 }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -2069,14 +2085,37 @@ function DeviceConfigPanel({
   const connectionReady = deviceApiStatus(device) === 'connected';
   const savedBaseUrl = device ? deviceConnectionBaseUrl(device) : null;
   const productSyncProfiles = device
-    ? syncProfiles.filter((profile) => syncProfileMetadataValue(profile, 'device_id') === device.id)
+    ? syncProfiles.filter((profile) => (
+        profile.capability === 'alert.search'
+        && syncProfileMetadataValue(profile, 'device_id') === device.id
+      ))
     : [];
-  const hasSyncConfiguration = productSyncProfiles.length > 0;
+  const statusSyncProfiles = (syncProfileStatus?.existing_sync_profiles || [])
+    .filter((profile) => profile.capability === 'alert.search');
+  const configuredSyncProfileIds = new Set([
+    ...productSyncProfiles.map((profile) => profile.sync_profile_id),
+    ...statusSyncProfiles.map((profile) => profile.sync_profile_id),
+  ]);
+  const initializationPhase = syncInitialization?.phase || 'idle';
+  const isSyncInitializing = initializationPhase === 'initializing'
+    || actionLoading === `initialize-sync:${device?.id || ''}`;
+  const hasSyncConfiguration = configuredSyncProfileIds.size > 0 || initializationPhase === 'configured';
+  const syncInitializationFailed = initializationPhase === 'failed' && !hasSyncConfiguration;
   const syncFoundationStatus = hasSyncConfiguration
-    ? '已初始化'
-    : connectionReady
-      ? '可初始化'
-      : '待初始化';
+    ? '已配置'
+    : isSyncInitializing
+      ? '正在初始化'
+      : syncInitializationFailed
+        ? '初始化失败'
+        : '未初始化';
+  const canInitializeSync = Boolean(
+    device
+    && isValidDeviceIntegrationId(device.id)
+    && device.enabled
+    && connectionReady
+    && onInitializeSync
+    && !isSyncInitializing,
+  );
 
   useEffect(() => {
     if (!serviceId) return;
@@ -2529,43 +2568,60 @@ function DeviceConfigPanel({
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">2</span>
                       <h4 className="text-sm font-semibold text-zinc-900">同步基础配置</h4>
                     </div>
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] ${hasSyncConfiguration ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : connectionReady ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] ${hasSyncConfiguration ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : syncInitializationFailed ? 'border-red-100 bg-red-50 text-red-700' : isSyncInitializing ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
                       {syncFoundationStatus}
                     </span>
                   </div>
                   <div className="mt-3 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-3 text-xs text-zinc-600">
                     <div className="flex items-center justify-between gap-3">
-                      <span>同步配置</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] ${hasSyncConfiguration ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-200 text-zinc-600'}`}>
-                        {hasSyncConfiguration ? '已配置' : '未配置'}
+                      <span>同步配置状态</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] ${hasSyncConfiguration ? 'bg-emerald-100 text-emerald-700' : syncInitializationFailed ? 'bg-red-100 text-red-700' : isSyncInitializing ? 'bg-blue-100 text-blue-700' : 'bg-zinc-200 text-zinc-600'}`}>
+                        {syncFoundationStatus}
                       </span>
                     </div>
                     {hasSyncConfiguration && (
-                      <p className="mt-2 text-[11px] text-zinc-500">已检测到 {productSyncProfiles.length} 个当前产品的同步配置，可前往“同步与入库”继续预览和人工确认。</p>
+                      <dl className="mt-3 space-y-1.5 text-[11px] text-zinc-500">
+                        <div className="flex justify-between gap-3"><dt>告警同步</dt><dd className="font-medium text-emerald-700">已配置</dd></div>
+                        <div className="flex justify-between gap-3"><dt>同步模式</dt><dd>手动</dd></div>
+                        <div className="flex justify-between gap-3"><dt>入库方式</dt><dd>预览后人工确认</dd></div>
+                      </dl>
                     )}
                   </div>
                   <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-xs leading-relaxed text-blue-800">
-                    当前版本暂未开放自动创建同步配置。后续将基于已保存的产品配置自动生成 Runtime v2 同步实例和同步策略。
+                    初始化只会复用当前产品已保存的连接配置引用，创建或复用 Runtime v2 同步实例与告警同步配置；不会拉取数据或自动入库。
                   </div>
                   <div className="mt-3">
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white opacity-50"
-                    >
-                      <Database className="h-3.5 w-3.5" />
-                      创建同步配置
-                    </button>
-                    <p className="mt-1.5 text-[11px] text-zinc-500">当前版本暂未开放自动创建同步配置。</p>
-                    {hasSyncConfiguration && onOpenSyncIngest && (
+                    {hasSyncConfiguration && onOpenSyncIngest ? (
                       <button
                         type="button"
                         onClick={onOpenSyncIngest}
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
                       >
                         前往同步与入库
                         <ChevronRight className="h-3.5 w-3.5" />
                       </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => device && onInitializeSync && void onInitializeSync(device)}
+                        disabled={!canInitializeSync}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSyncInitializing
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Database className="h-3.5 w-3.5" />}
+                        {isSyncInitializing ? '正在初始化...' : '初始化同步配置'}
+                      </button>
+                    )}
+                    {syncInitializationFailed && syncInitialization?.message && (
+                      <p className="mt-2 text-[11px] text-red-600">{syncInitialization.message}</p>
+                    )}
+                    {!hasSyncConfiguration && !isSyncInitializing && !syncInitializationFailed && (
+                      <p className="mt-1.5 text-[11px] text-zinc-500">
+                        {canInitializeSync
+                          ? '确认后创建或复用同步实例，仅配置 alert.search 告警同步。'
+                          : '请先保存并启用当前产品，然后完成连接测试。'}
+                      </p>
                     )}
                   </div>
                 </section>
@@ -2576,10 +2632,14 @@ function DeviceConfigPanel({
                     <h4 className="text-sm font-semibold text-zinc-900">可配置同步能力</h4>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    {['告警同步', '资产同步', '漏洞同步'].map((capability) => (
-                      <div key={capability} className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5 text-xs">
-                        <span className="font-medium text-zinc-700">{capability}</span>
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">待配置</span>
+                    {[
+                      { label: '告警同步', status: hasSyncConfiguration ? '已配置' : '待配置', configured: hasSyncConfiguration },
+                      { label: '资产同步', status: '暂未支持', configured: false },
+                      { label: '漏洞同步', status: '暂未支持', configured: false },
+                    ].map((capability) => (
+                      <div key={capability.label} className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5 text-xs">
+                        <span className="font-medium text-zinc-700">{capability.label}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] ${capability.configured ? 'bg-emerald-100 text-emerald-700' : capability.status === '待配置' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-200 text-zinc-600'}`}>{capability.status}</span>
                       </div>
                     ))}
                   </div>
@@ -2592,9 +2652,12 @@ function DeviceConfigPanel({
                   </div>
                   <ul className="mt-3 space-y-2 text-xs leading-relaxed text-zinc-600">
                     {[
-                      '同步配置复用已保存的凭据引用，不展示、不复制明文 API Key 或 Secret。',
-                      '预览只展示待同步数据，不会直接入库。',
-                      '入库需要人工确认，不会自动创建安全事件或执行处置动作。',
+                      '复用已保存的凭据引用。',
+                      '不复制或展示明文凭据。',
+                      '初始化不会拉取数据。',
+                      '预览不会入库。',
+                      '入库需要人工确认。',
+                      '不会自动创建事件或执行处置。',
                     ].map((item) => (
                       <li key={item} className="flex items-start gap-2">
                         <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
@@ -3151,10 +3214,10 @@ function SyncSetupSection({ profiles, error, onReturnIntegrations }: { profiles:
         <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
           <h4 className="text-sm font-semibold text-zinc-800">还没有同步配置</h4>
           <p className="mt-2 text-xs leading-relaxed text-zinc-600">
-            请先在「产品接入」中添加产品并完成连接配置。后续同步配置将基于已保存的产品连接参数自动生成，不需要重复填写 API Key、Secret 或 Base URL。
+            请先在「产品接入」中添加产品、完成连接测试，并在产品详情的「同步」页人工确认初始化同步配置。
           </p>
           <p className="mt-2 text-xs leading-relaxed text-zinc-600">
-            当前版本暂未开放自动创建同步配置，可先通过 Runtime v2 API 创建测试策略。
+            初始化只创建或复用 alert.search 告警同步配置，不会拉取数据或自动入库。
           </p>
           <button
             type="button"
@@ -3377,7 +3440,7 @@ function PreviewIngestSection({
         <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
           <h4 className="text-sm font-semibold text-zinc-800">还没有同步配置</h4>
           <p className="mt-2 text-xs leading-relaxed text-zinc-600">
-            请先在「产品接入」中添加产品并完成连接配置。后续同步配置将基于已保存的产品连接参数自动生成，不需要重复填写 API Key、Secret 或 Base URL。当前版本暂未开放自动创建同步配置。
+            请先在「产品接入」中添加产品、完成连接测试，并在产品详情的「同步」页人工确认初始化告警同步配置。
           </p>
           <button
             type="button"
@@ -4004,6 +4067,8 @@ export default function DeviceIntegrationPage() {
   const [integrationInstances, setIntegrationInstances] = useState<IntegrationInstance[]>([]);
   const [credentialProfiles, setCredentialProfiles] = useState<CredentialProfile[]>([]);
   const [syncProfiles, setSyncProfiles] = useState<SyncProfile[]>([]);
+  const [deviceSyncProfileStatuses, setDeviceSyncProfileStatuses] = useState<DeviceSyncProfileStatus[]>([]);
+  const [syncInitializationByDevice, setSyncInitializationByDevice] = useState<Record<string, SyncInitializationFeedback>>({});
   const [selectedSyncProfileId, setSelectedSyncProfileId] = useState<string | null>(null);
   const [focusedSyncDeviceId, setFocusedSyncDeviceId] = useState<string | null>(null);
   const [syncProfilesRefreshing, setSyncProfilesRefreshing] = useState(false);
@@ -4038,7 +4103,7 @@ export default function DeviceIntegrationPage() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes, packageRes, instanceRes, credentialProfileRes, syncProfileRes, integrationRunRes] = await Promise.allSettled([
+      const [devRes, tplRes, grpRes, diagnosticsRes, mcpCatalogRes, mcpConfiguredRes, mcpStatusRes, packageRes, instanceRes, credentialProfileRes, syncProfileRes, deviceSyncProfileStatusRes, integrationRunRes] = await Promise.allSettled([
         deviceAPI.list(),
         providerAPI.listApiServices(),
         deviceAPI.listGroups(),
@@ -4050,6 +4115,7 @@ export default function DeviceIntegrationPage() {
         securityAPI.listIntegrationInstances(),
         securityAPI.listCredentialProfiles(),
         securityAPI.listSyncProfiles(),
+        securityAPI.getDeviceSyncProfileStatus(),
         securityAPI.listIntegrationRuns({ limit: 50 }),
       ]);
       if (devRes.status !== 'fulfilled' || tplRes.status !== 'fulfilled' || grpRes.status !== 'fulfilled') {
@@ -4073,6 +4139,7 @@ export default function DeviceIntegrationPage() {
       setIntegrationInstances(instanceRes.status === 'fulfilled' ? instanceRes.value.data || [] : []);
       setCredentialProfiles(credentialProfileRes.status === 'fulfilled' ? credentialProfileRes.value.data || [] : []);
       setSyncProfiles(syncProfileRes.status === 'fulfilled' ? syncProfileRes.value.data || [] : []);
+      setDeviceSyncProfileStatuses(deviceSyncProfileStatusRes.status === 'fulfilled' ? deviceSyncProfileStatusRes.value.data || [] : []);
       setIntegrationRuns(integrationRunRes.status === 'fulfilled' ? integrationRunRes.value.data || [] : []);
       setIntegrationCenterErrors({
         packages: packageRes.status === 'fulfilled' ? null : '集成包暂不可用。',
@@ -4090,6 +4157,31 @@ export default function DeviceIntegrationPage() {
   }, []);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  const refreshRuntimeObjectsForDevice = useCallback(async (deviceId: string) => {
+    const [instanceRes, credentialProfileRes, syncProfileRes, deviceSyncProfileStatusRes] = await Promise.allSettled([
+      securityAPI.listIntegrationInstances(),
+      securityAPI.listCredentialProfiles(),
+      securityAPI.listSyncProfiles(),
+      securityAPI.getDeviceSyncProfileStatus(deviceId),
+    ]);
+
+    if (instanceRes.status === 'fulfilled') setIntegrationInstances(instanceRes.value.data || []);
+    if (credentialProfileRes.status === 'fulfilled') setCredentialProfiles(credentialProfileRes.value.data || []);
+    if (syncProfileRes.status === 'fulfilled') setSyncProfiles(syncProfileRes.value.data || []);
+    if (deviceSyncProfileStatusRes.status === 'fulfilled') {
+      setDeviceSyncProfileStatuses((current) => [
+        ...current.filter((status) => status.device_id !== deviceId),
+        ...(deviceSyncProfileStatusRes.value.data || []),
+      ]);
+    }
+    setIntegrationCenterErrors((current) => ({
+      ...current,
+      instances: instanceRes.status === 'fulfilled' ? null : '集成实例暂不可用。',
+      credentials: credentialProfileRes.status === 'fulfilled' ? null : '凭据配置引用暂不可用。',
+      syncProfiles: syncProfileRes.status === 'fulfilled' ? null : '同步策略暂不可用。',
+    }));
+  }, []);
 
   const refreshSyncProfiles = useCallback(async () => {
     setSyncProfilesRefreshing(true);
@@ -4382,6 +4474,61 @@ export default function DeviceIntegrationPage() {
   const hasUnboundSyncSources = activeProductCount === 0 && (connectorSummary?.data_sources?.length || 0) > 0;
 
   const panelDeviceId = panel?.kind === 'edit' ? panel.device.id : null;
+
+  const handleInitializeDeviceSync = async (device: DeviceIntegration) => {
+    const deviceId = device.id.trim();
+    if (!isValidDeviceIntegrationId(deviceId) || !device.enabled || deviceApiStatus(device) !== 'connected') return;
+
+    const ok = await confirm({
+      title: '初始化数据同步',
+      description: '系统将复用当前产品已保存的 Base URL、API Key、Secret 和 SSL 设置，创建 Runtime v2 同步实例和告警同步配置。\n\n本操作不会立即拉取数据，不会自动入库，不会创建事件，也不会执行处置。',
+      cancelText: '取消',
+      confirmText: '确认初始化',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    const loadingKey = `initialize-sync:${deviceId}`;
+    let stage: 'bridge' | 'sync-profile' = 'bridge';
+    setActionLoading(loadingKey);
+    setSyncInitializationByDevice((current) => ({
+      ...current,
+      [deviceId]: { phase: 'initializing' },
+    }));
+
+    try {
+      const bridgeResponse = await securityAPI.confirmDeviceBridge(deviceId);
+      const bridgeResult = bridgeResponse.data;
+      if (!['bridged', 'already_bridged'].includes(bridgeResult.status) || !bridgeResult.instance_id) {
+        throw new Error('device bridge confirmation failed');
+      }
+
+      stage = 'sync-profile';
+      const syncProfileResponse = await securityAPI.confirmDeviceSyncProfile(deviceId, 'alert.search');
+      const syncProfileResult = syncProfileResponse.data;
+      if (!['created', 'already_exists'].includes(syncProfileResult.status) || !syncProfileResult.sync_profile_id) {
+        throw new Error('device sync profile confirmation failed');
+      }
+
+      setSyncInitializationByDevice((current) => ({
+        ...current,
+        [deviceId]: { phase: 'configured' },
+      }));
+      toast.success('同步配置已创建');
+    } catch {
+      const message = stage === 'bridge'
+        ? '同步基础配置初始化失败，请稍后重试。'
+        : '同步实例已创建，但告警同步配置创建失败，请重试。';
+      setSyncInitializationByDevice((current) => ({
+        ...current,
+        [deviceId]: { phase: 'failed', message },
+      }));
+      toast.error(message);
+    } finally {
+      await refreshRuntimeObjectsForDevice(deviceId);
+      setActionLoading((current) => current === loadingKey ? null : current);
+    }
+  };
 
   const handleSave = async (data: { name: string; fields: Record<string, string>; enabled: boolean; verify_ssl: boolean }) => {
     if (panel?.kind === 'add') {
@@ -4768,7 +4915,7 @@ export default function DeviceIntegrationPage() {
               <div className="space-y-6">
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
                   <h2 className="text-sm font-semibold text-indigo-900">同步与入库 / Sync & Ingest</h2>
-                  <p className="mt-1 text-xs leading-relaxed text-indigo-700">同步配置后续会基于已接入产品自动生成，并复用配置页保存的连接参数。选择同步配置后，先生成计划，再预览数据，最后由人工确认入库；当前流程不会自动创建安全事件或执行处置动作。</p>
+                  <p className="mt-1 text-xs leading-relaxed text-indigo-700">同步配置由用户在已接入产品详情中确认初始化，并复用配置页保存的连接参数引用。选择同步配置后，先生成计划，再预览数据，最后由人工确认入库；当前流程不会自动创建安全事件或执行处置动作。</p>
                 </div>
                 <SyncSetupSection
                   profiles={syncProfiles}
@@ -4880,6 +5027,9 @@ export default function DeviceIntegrationPage() {
           ? vendorOf(panel.device)
           : panel.template.vendor;
         const panelDeviceId = panel.kind === 'edit' ? panel.device.id : null;
+        const panelSyncProfileStatus = panelDeviceId
+          ? deviceSyncProfileStatuses.find((status) => status.device_id === panelDeviceId)
+          : undefined;
         return (
           <DeviceConfigPanel
             key={panel.kind === 'edit' ? panel.device.id : panel.template.id}
@@ -4888,6 +5038,8 @@ export default function DeviceIntegrationPage() {
             vendorKey={panelVendorKey}
             sync={panel.kind === 'edit' ? syncByDeviceId[panel.device.id] : undefined}
             syncProfiles={syncProfiles}
+            syncProfileStatus={panelSyncProfileStatus}
+            syncInitialization={panelDeviceId ? syncInitializationByDevice[panelDeviceId] : undefined}
             actionLoading={actionLoading}
             onSave={handleSave}
             onDelete={panel.kind === 'edit' ? handleDelete : undefined}
@@ -4901,13 +5053,13 @@ export default function DeviceIntegrationPage() {
             onResumeSchedule={handleResumeSchedule}
             onUpdateScheduleInterval={handleUpdateScheduleInterval}
             onUpdateSyncCredentials={setCredentialSource}
+            onInitializeSync={handleInitializeDeviceSync}
             onOpenSyncIngest={() => {
               setFocusedSyncDeviceId(panelDeviceId);
               setSelectedSyncProfileId(null);
               setPanel(null);
               setActiveIntegrationTab('syncIngest');
             }}
-            onSyncProfilesChanged={refreshSyncProfiles}
             onBack={panel.kind === 'add'
               ? () => setPanel({
                   kind: 'wizard',
