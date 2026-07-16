@@ -118,9 +118,10 @@ class AdapterRegistry:
 
 
 def create_default_adapter_registry(*, include_fake: bool = True) -> AdapterRegistry:
-    """Create the default adapter registry for tests and future preview wiring."""
+    """Create the Runtime v2 registry with real device adapters and an optional fake."""
 
     registry = AdapterRegistry()
+    register_device_runtime_adapters(registry)
     if include_fake:
         registry.register_adapter_factory(
             "fake.integration",
@@ -132,4 +133,18 @@ def create_default_adapter_registry(*, include_fake: bool = True) -> AdapterRegi
     return registry
 
 
-default_adapter_registry = AdapterRegistry()
+def register_device_runtime_adapters(registry: AdapterRegistry) -> AdapterRegistryEntry:
+    """Register the bounded Device Integration-backed TDA alert adapter."""
+
+    from flocks.security.integrations.device_runtime_adapter import DeviceIntegrationRuntimeAdapter
+
+    return registry.register_adapter_factory(
+        "asiainfo.tda",
+        "alert.search",
+        DeviceIntegrationRuntimeAdapter,
+        adapter_id=DeviceIntegrationRuntimeAdapter.adapter_id,
+        metadata={"source": "device_integration_bridge", "normalized_only": True},
+    )
+
+
+default_adapter_registry = create_default_adapter_registry(include_fake=False)

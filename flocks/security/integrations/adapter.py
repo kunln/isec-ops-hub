@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 _REDACTED = "[REDACTED]"
 _RAW_LIKE_KEYS = {
     "raw",
+    "raw_data",
+    "raw_event",
     "raw_payload",
     "raw_response",
     "request",
@@ -29,16 +31,22 @@ _RAW_LIKE_KEYS = {
     "packet",
     "pcap",
     "payload_bytes",
+    "payload",
+    "logs",
+    "events",
 }
 _SECRET_LIKE_KEYS = {
     "api_key",
     "apikey",
+    "passwd",
     "secret",
     "token",
     "password",
     "credential",
     "authorization",
     "bearer",
+    "sign",
+    "auth_timestamp",
 }
 _ITEM_REF_KEYS = {"item_id", "id", "item_type", "type", "source", "summary"}
 _SECRET_VALUE_MARKERS = (
@@ -49,6 +57,10 @@ _SECRET_VALUE_MARKERS = (
     "password=",
     "secret=",
     "token=",
+    "passwd=",
+    "authorization=",
+    "sign=",
+    "auth_timestamp=",
 )
 _FORBIDDEN_REQUEST_FIELDS = _SECRET_LIKE_KEYS | {"apiKey", "access_token", "refresh_token"}
 

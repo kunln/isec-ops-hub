@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -225,11 +226,12 @@ def _pick_output(payload: Any) -> Any:
 
 
 def _http_error_message(status: int, text: str) -> str:
+    del text  # Vendor response bodies are intentionally not surfaced.
     if status in {401, 403}:
         return "TDA 拒绝了本次连接。请确认 API Key、Secret 有效，设备时间同步正常，且当前账号具备对外 API 权限。"
     if status == 404:
         return "TDA 未找到该 API 路径，请确认设备版本为 7.0 或兼容版本，且 Base URL 未包含 /ngtda。"
-    return f"TDA API 请求失败：HTTP {status}，响应片段：{text[:300]}"
+    return f"TDA API 请求失败：HTTP {status}。"
 
 
 async def _request(
@@ -277,10 +279,12 @@ async def _request(
                     payload = json.loads(text) if text else {}
                 except json.JSONDecodeError:
                     return ToolResult(success=True, output=text, metadata=metadata)
-    except aiohttp.ClientError as exc:
-        return ToolResult(success=False, error=f"无法连接 TDA：{exc}", metadata=metadata)
-    except Exception as exc:
-        return ToolResult(success=False, error=f"调用 TDA API 时发生异常：{exc}", metadata=metadata)
+    except asyncio.TimeoutError:
+        return ToolResult(success=False, error="调用 TDA API 超时。", metadata=metadata)
+    except aiohttp.ClientError:
+        return ToolResult(success=False, error="无法连接 TDA，请检查设备地址和网络连通性。", metadata=metadata)
+    except Exception:
+        return ToolResult(success=False, error="调用 TDA API 时发生异常。", metadata=metadata)
 
     error = _payload_error(payload)
     if error:

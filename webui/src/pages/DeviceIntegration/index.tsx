@@ -199,9 +199,13 @@ function syncPreviewResultFromError(error: unknown): ManualSyncPreviewResult | n
     instance_id: payload.instance_id ?? null,
     capability: payload.capability ?? null,
     adapter_id: payload.adapter_id ?? null,
+    preview_batch_id: payload.preview_batch_id ?? null,
+    preview_run_id: payload.preview_run_id ?? payload.run_id ?? null,
     fetched_count: Number(payload.fetched_count || 0),
     mapped_count: Number(payload.mapped_count || 0),
     preview_count: Number(payload.preview_count || 0),
+    item_count: Number(payload.item_count || payload.fetched_count || 0),
+    event_count: Number(payload.event_count || payload.preview_count || 0),
     item_refs: Array.isArray(payload.item_refs) ? payload.item_refs : [],
     event_summaries: Array.isArray(payload.event_summaries) ? payload.event_summaries : [],
     request_summary: payload.request_summary || {},
@@ -231,6 +235,8 @@ function syncIngestResultFromError(error: unknown): ManualSyncIngestResult | nul
     preview_only: payload.preview_only ?? false,
     confirmed: payload.confirmed ?? false,
     sync_profile_id: String(payload.sync_profile_id || ''),
+    preview_batch_id: payload.preview_batch_id ?? null,
+    preview_run_id: payload.preview_run_id ?? null,
     run_id: payload.run_id ?? null,
     package_id: payload.package_id ?? null,
     instance_id: payload.instance_id ?? null,
@@ -3191,6 +3197,7 @@ function SyncPreviewResultCard({ result, onClose }: { result: ManualSyncPreviewR
         <div><span className="font-medium">instance_id:</span> {valueOrDash(result.instance_id)}</div>
         <div><span className="font-medium">capability:</span> {valueOrDash(result.capability)}</div>
         <div><span className="font-medium">adapter_id:</span> {valueOrDash(result.adapter_id)}</div>
+        <div><span className="font-medium">preview_batch_id:</span> {valueOrDash(result.preview_batch_id)}</div>
         <div><span className="font-medium">fetched_count:</span> {result.fetched_count}</div>
         <div><span className="font-medium">mapped_count:</span> {result.mapped_count}</div>
         <div><span className="font-medium">preview_count:</span> {result.preview_count}</div>
@@ -3465,6 +3472,7 @@ function PreviewIngestSection({
   const previewResultForSelected = selectedProfile && syncPreviewResult?.sync_profile_id === selectedProfile.sync_profile_id
     ? syncPreviewResult
     : null;
+  const canConfirmPreview = Boolean(previewResultForSelected?.preview_batch_id);
   const ingestResultForSelected = selectedProfile && syncIngestResult?.sync_profile_id === selectedProfile.sync_profile_id
     ? syncIngestResult
     : null;
@@ -3542,8 +3550,8 @@ function PreviewIngestSection({
                 <ActionStep number="2" title="预览数据" description={hasPlanForSelected ? '只预览适配器返回的标准化事件，不创建告警或事件。' : '尚未生成计划；仍可预览，但建议先生成计划。预览不会创建告警或事件。'}>
                   <button type="button" onClick={() => onPreviewSync(selectedProfile)} disabled={syncPreviewLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60">{syncPreviewLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Preview Sync / 预览同步</button>
                 </ActionStep>
-                <ActionStep number="3" title="人工确认入库" description="人工确认后才写入标准对象；不会创建 Incident 或执行自动处置。">
-                  <button type="button" onClick={() => onConfirmIngest(selectedProfile)} disabled={syncIngestLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">{syncIngestLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}Confirm Ingest / 确认入库</button>
+                <ActionStep number="3" title="人工确认入库" description={canConfirmPreview ? '只入库本次 PreviewBatch 中已展示的标准化结果，不会重新查询设备。' : '请先为当前同步配置生成 PreviewBatch；不会创建 Incident 或执行自动处置。'}>
+                  <button type="button" onClick={() => onConfirmIngest(selectedProfile)} disabled={!canConfirmPreview || syncIngestLoadingId === selectedProfile.sync_profile_id} className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">{syncIngestLoadingId === selectedProfile.sync_profile_id && <Loader2 className="h-3 w-3 animate-spin" />}确认入库本次预览结果</button>
                 </ActionStep>
               </div>
 
@@ -4256,6 +4264,17 @@ export default function DeviceIntegrationPage() {
     void refreshScheduledSyncStatus(selectedSyncProfileId);
   }, [activeIntegrationTab, refreshScheduledSyncStatus, selectedSyncProfileId]);
 
+  useEffect(() => {
+    setSyncPreviewResult((current) => (
+      current && current.sync_profile_id !== selectedSyncProfileId ? null : current
+    ));
+    setSyncIngestResult((current) => (
+      current && current.sync_profile_id !== selectedSyncProfileId ? null : current
+    ));
+    setSyncPreviewError(null);
+    setSyncIngestError(null);
+  }, [selectedSyncProfileId]);
+
   const handleGenerateScheduledSyncPlan = async (profile: SyncProfile) => {
     setScheduledSyncPlanLoadingId(profile.sync_profile_id);
     setScheduledSyncError(null);
@@ -4297,6 +4316,7 @@ export default function DeviceIntegrationPage() {
   const handlePreviewSync = async (profile: SyncProfile) => {
     setSyncPreviewLoadingId(profile.sync_profile_id);
     setSyncPreviewError(null);
+    setSyncPreviewResult(null);
     try {
       const response = await securityAPI.previewSyncEngine({
         sync_profile_id: profile.sync_profile_id,
@@ -4317,10 +4337,17 @@ export default function DeviceIntegrationPage() {
   };
 
   const handleConfirmIngest = async (profile: SyncProfile) => {
+    const previewBatchId = syncPreviewResult?.sync_profile_id === profile.sync_profile_id
+      ? syncPreviewResult.preview_batch_id
+      : null;
+    if (!previewBatchId) {
+      setSyncIngestError('请先预览当前同步配置，再确认入库本次预览结果。');
+      return;
+    }
     const ok = await confirm({
-      title: '确认入库同步预览结果？',
-      description: '本操作会通过受控 Manual Sync Ingest 路径创建 Evidence/Alert 记录，但不会创建 Analysis Case、不会创建 Incident、不会发送通知、不会执行处置、不会更新 cursor 或 last_run_id。请确认这是一次人工确认入库操作。',
-      confirmText: '确认入库',
+      title: '确认入库本次预览结果？',
+      description: '本操作只会入库当前 PreviewBatch 中已展示的标准化结果，不会重新查询设备；不会创建 Analysis Case 或 Incident，不会发送通知或执行处置。成功后会消费本批次并更新同步状态。',
+      confirmText: '确认入库本次预览结果',
       variant: 'warning',
     });
     if (!ok) return;
@@ -4329,6 +4356,8 @@ export default function DeviceIntegrationPage() {
     try {
       const response = await securityAPI.ingestSyncEngine({
         sync_profile_id: profile.sync_profile_id,
+        preview_batch_id: previewBatchId,
+        preview_run_id: syncPreviewResult?.preview_run_id || syncPreviewResult?.run_id || null,
         params_override: {},
         confirmed: true,
         dry_run: true,
@@ -4337,6 +4366,7 @@ export default function DeviceIntegrationPage() {
         run_initial_analysis: false,
       });
       setSyncIngestResult(response.data);
+      setSyncPreviewResult(null);
       toast.success('确认入库已完成');
       await fetchData(true);
     } catch (error) {
